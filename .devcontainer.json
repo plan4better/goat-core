@@ -1,9 +1,9 @@
 // See https://aka.ms/vscode-remote/containers for the
 // documentation about the devcontainer.json format
 {
-    "name": "API DevContainer",
+    "name": "GOAT Core DevContainer",
     "dockerComposeFile": [
-        "../../docker-compose.yaml"
+        "docker-compose.yml"
     ],
     "service": "api",
     "workspaceFolder": "/app",
