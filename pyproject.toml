@@ -82,6 +82,7 @@ boto3 = "^1.26.164"
 h3 = "^3.7.6"
 numba = "^0.57.1"
 fastapi-pagination = "^0.12.6"
+gdal = "3.6.2"
 
 
 [tool.poetry.group.dev.dependencies]

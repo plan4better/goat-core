@@ -1,4 +1,4 @@
-FROM python:3.11.4-bullseye
+FROM python:3.11.4-bookworm
 # create directory for the app user
 RUN mkdir -p /app
 WORKDIR /app/
@@ -27,13 +27,11 @@ ENV CELERY_RESULT_EXPIRES 120
 
 # Install system dependencies
 RUN apt-get update \
-    && apt-get -y install netcat gcc libpq-dev \
+    && apt-get -y install netcat-traditional gcc libpq-dev \
     && apt-get clean
 # Install postgresql-client
-RUN apt install curl ca-certificates gnupg -y && \
-    curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/apt.postgresql.org.gpg >/dev/null && \
-    sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ bullseye-pgdg main" > /etc/apt/sources.list.d/postgresql.list' && \
-    apt update -y && apt-get install postgresql-client-14 -y
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client-15
+
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python && \
     cd /usr/local/bin && \
@@ -52,7 +50,6 @@ RUN bash -c "if [ $INSTALL_DEV == 'True' ] ; then poetry install --no-root ; els
 COPY . /app
 
 # Install gdal binaries
-# Add *libgdal-dev* in case you need to install python bindings
-RUN apt-get install -y python3-dev gdal-bin
+RUN apt-get install -y python3-dev gdal-bin libgdal-dev
 
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "5000"]
