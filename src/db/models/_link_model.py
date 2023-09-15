@@ -95,4 +95,4 @@ class UserProjectLink(DateTimeBase, table=True):
     project: "Project" = Relationship(back_populates="user_projects")
 
 
-UniqueConstraint(UserProjectLink.project_id, UserProjectLink.user_id, name="unique_layer_project")
+UniqueConstraint(UserProjectLink.project_id, UserProjectLink.user_id, name="unique_user_project")
