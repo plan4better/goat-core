@@ -4,7 +4,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, validator
 from sqlmodel import SQLModel
 
-from src.schemas.isochrone import (
+from src.schemas.legacy.isochrone import (
     CalculationTypes,
     IsochroneCyclingProfile,
     IsochroneScenario,

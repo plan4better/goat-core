@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from .heatmap import HeatmapMode, HeatmapProfile
-from .isochrone import (
+from .legacy.isochrone import (
     IsochroneAccessMode,
     IsochroneDTO,
     IsochroneMode,

@@ -9,7 +9,7 @@ from src.core.security import get_password_hash, verify_password
 from src.crud.base import CRUDBase
 from src.db import models
 from src.schemas.legacy.user import UserCreate, UserUpdate
-from src.schemas.isochrone import IsochroneStartingPointCoord
+from src.schemas.legacy.isochrone import IsochroneStartingPointCoord
 
 
 class CRUDUser(CRUDBase[models.User, UserCreate, UserUpdate]):

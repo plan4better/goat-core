@@ -21,7 +21,7 @@ from shapely import wkb
 import shutil
 import h3
 
-from src.schemas.isochrone import (
+from src.schemas.legacy.isochrone import (
     IsochroneDTO,
     IsochroneWalkingProfile,
     request_examples,
