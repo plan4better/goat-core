@@ -108,7 +108,7 @@ async def read_report(
 async def read_reports(
     async_session: AsyncSession = Depends(get_db),
     page_params: PaginationParams = Depends(),
-    folder_id: UUID4 = Query(..., description="Folder ID"),
+    folder_id: UUID4 | None = Query(None, description="Folder ID"),
     user_id: UUID4 = Depends(get_user_id),
     search: str = Query(None, description="Searches the name of the report"),
     order_by: str = Query(
@@ -123,7 +123,13 @@ async def read_reports(
     ),
 ):
     """Retrieve a list of reports."""
-    query = select(Report).where(and_(Report.user_id == user_id, Report.folder_id == folder_id))
+
+    if folder_id is None:
+        sql_and_filters = [Report.user_id == user_id]
+    else:
+        sql_and_filters = [Report.user_id == user_id, Report.folder_id == folder_id]
+
+    query = select(Report).where(and_(*sql_and_filters))
     reports = await crud_report.get_multi(
         async_session,
         query=query,

@@ -32,12 +32,15 @@ class CRUDProject(CRUDBase):
         if ids:
             query = select(Project).where(Project.id.in_(ids))
         else:
-            query = select(Project).where(
-                and_(
-                    Project.user_id == user_id,
-                    Project.folder_id == folder_id,
+            if not folder_id:
+                query = select(Project).where(Project.user_id == user_id)
+            else:
+                query = select(Project).where(
+                    and_(
+                        Project.user_id == user_id,
+                        Project.folder_id == folder_id,
+                    )
                 )
-            )
 
         projects = await self.get_multi(
             async_session,

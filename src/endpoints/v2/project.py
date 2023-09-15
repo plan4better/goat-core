@@ -142,7 +142,7 @@ async def read_project(
 async def read_projects(
     async_session: AsyncSession = Depends(get_db),
     page_params: PaginationParams = Depends(),
-    folder_id: UUID4 = Query(..., description="Folder ID"),
+    folder_id: UUID4 | None = Query(None, description="Folder ID"),
     user_id: UUID4 = Depends(get_user_id),
     search: str = Query(None, description="Searches the name of the project"),
     order_by: str = Query(
