@@ -1,27 +1,20 @@
 import asyncio
+import os
+import subprocess
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from pytest_postgresql import factories
-from pytest_postgresql.janitor import DatabaseJanitor
 from sqlalchemy import text
 
 from src.core.config import settings
-from src.db.session import session_manager
-from src.endpoints.deps import get_db_session
+from src.endpoints.deps import get_db, session_manager
 from src.main import app
 
 now = datetime.now().strftime("%Y%m%d%H%M%S")
-dbname = f"{now}_goat_test"
-test_db = factories.postgresql_noproc(
-    host=settings.POSTGRES_SERVER,
-    port=5432,
-    user=settings.POSTGRES_USER,
-    password=settings.POSTGRES_PASSWORD,
-    dbname=dbname,
-)
+schema_name = f"test_{now}"
 
 
 @pytest_asyncio.fixture
@@ -38,33 +31,26 @@ def event_loop():
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
-async def session_fixture(test_db, event_loop):
-    pg_host = test_db.host
-    pg_port = test_db.port
-    pg_user = test_db.user
-    pg_db = test_db.dbname
-    pg_password = test_db.password
-
-    with DatabaseJanitor(pg_user, pg_host, pg_port, pg_db, test_db.version, pg_password):
-        # Create database
-        test_db_url = f"postgresql+asyncpg://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_db}"
-        session_manager.init(test_db_url)
-        yield
-        await session_manager.close()
-
-
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def create_tables(session_fixture):
+async def session_fixture(event_loop):
+    session_manager.init(settings.ASYNC_SQLALCHEMY_DATABASE_URI)
+    session_manager._engine.update_execution_options(
+        schema_translate_map={"customer": schema_name}
+    )
     async with session_manager.connect() as connection:
-        # Create customer schema
-        await connection.execute(text("""CREATE SCHEMA IF NOT EXISTS customer"""))
-        await connection.execute(text("""CREATE EXTENSION IF NOT EXISTS postgis"""))
-        await connection.execute(text("""CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\""""))
+        await connection.execute(text(f"""CREATE SCHEMA IF NOT EXISTS {schema_name}"""))
         await session_manager.drop_all(connection)
         await session_manager.create_all(connection)
-        # run triggers
-        # triggers_file = os.path.join(Path(__file__).resolve().parent.parent, "src/db/triggers.sql")
-        # command = f'psql "postgresql://{settings.MASTER_POSTGRES_USER}:{settings.MASTER_POSTGRES_PASSWORD}@{settings.POSTGRES_SERVER}/{dbname}" -f {triggers_file}'
+        # triggers_file = os.path.join(
+        #     Path(__file__).resolve().parent.parent, "src/db/triggers.sql"
+        # )
+        # with open(triggers_file, "r") as f:
+        #     content = f.read()
+        # content = content.replace("customer", schema_name)
+        # triggers_test_path = f"/tmp/{schema_name}_triggers.sql"
+        # with open(triggers_test_path, "w") as f:
+        #     f.write(content)
+
+        # command = f'psql "postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_SERVER}/accounts" -f {triggers_test_path}'
         # process = subprocess.Popen(
         #     command,
         #     stdout=subprocess.PIPE,
@@ -76,6 +62,15 @@ async def create_tables(session_fixture):
         # if process.returncode != 0:
         #     raise Exception(f"Error running psql command: {error}")
         # print("Triggers created")
+        # os.remove(triggers_test_path)
+
+    yield
+    async with session_manager.connect() as connection:
+        pass
+        await connection.execute(
+            text(f"""DROP SCHEMA IF EXISTS {schema_name} CASCADE""")
+        )
+    await session_manager.close()
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -84,10 +79,11 @@ async def session_override(session_fixture):
         async with session_manager.session() as session:
             yield session
 
-    app.dependency_overrides[get_db_session] = get_db_override
+    app.dependency_overrides[get_db] = get_db_override
 
 
 @pytest_asyncio.fixture
 async def db_session():
     async with session_manager.session() as session:
         yield session
+

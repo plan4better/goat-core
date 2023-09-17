@@ -1,5 +1,18 @@
 from typing import List
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    status,
+    UploadFile,
+    File,
+    Form,
+    BackgroundTasks,
+)
+from fastapi.responses import JSONResponse
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
@@ -15,43 +28,85 @@ from src.schemas.layer import (
     ILayerRead,
     ILayerUpdate,
 )
-from src.schemas.layer import (
-    request_examples as layer_request_examples,
-)
+from src.schemas.layer import request_examples as layer_request_examples
 from src.core.content import (
-    create_content,
     delete_content_by_id,
     read_content_by_id,
     read_contents_by_ids,
     update_content_by_id,
+    create_content,
 )
-
+import ast
+from src.db.models.job import Job
+from src.schemas.job import JobType, job_mapping
+from src.crud.crud_job import job as crud_job
+from asyncio import sleep as async_sleep
+from starlette.concurrency import run_in_threadpool
 router = APIRouter()
+
+
+def generate_description(examples: dict) -> str:
+    description = "## Submit Data Endpoint\n\nThis endpoint accepts form data. Here are some example inputs:\n"
+    for _field, field_examples in examples.items():
+        description += f"\n- **{field_examples['summary']}**:\n"
+        description += f"{str(field_examples['value'])}\n"
+    return description
 
 
 ## Layer endpoints
 @router.post(
     "",
     summary="Create a new layer",
-    response_model=ILayerRead,
-    response_model_exclude_none=True,
+    response_class=JSONResponse,
     status_code=201,
+    description=generate_description(layer_request_examples["create"]),
 )
 async def create_layer(
+    background_tasks: BackgroundTasks,
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
-    layer_in: ILayerCreate = Body(
-        ..., examples=layer_request_examples["create"], description="Layer to create"
+    file: UploadFile | None = File(None, description="File to upload. "),
+    layer_in: str = Form(
+        ...,
+        example=str(layer_request_examples["create"]["feature_layer_standard"]["value"]),
+        description="Layer to create",
     ),
 ):
     """Create a new layer."""
-    return await create_content(
-        async_session=async_session,
-        model=Layer,
-        crud_content=crud_layer,
-        content_in=layer_in,
-        other_params={"user_id": user_id},
-    )
+
+    layer_in = ILayerCreate(**ast.literal_eval(layer_in))
+    if file is not None:
+        # Create job
+        job = Job(
+            type=JobType.layer_upload.value,
+            payload={},
+            status=job_mapping[JobType.layer_upload.value]().dict(),
+        )
+        # Create job
+        job = await crud_job.create(db=async_session, obj_in=job)
+        job_id = job.id
+
+        # Send job to background
+        background_tasks.add_task(
+            crud_layer.create_table_or_feature_layer,
+            async_session=async_session,
+            file=file,
+            job_id=job_id,
+            user_id=user_id,
+            layer_in=layer_in,
+            payload={},
+        )
+        return {"job_id": job_id}
+    else:
+        layer = await create_content(
+            async_session=async_session,
+            model=Layer,
+            crud_content=crud_layer,
+            content_in=layer_in,
+            other_params={"user_id": user_id},
+        )
+        layer = layer.dict(exclude_none=True)
+        return layer
 
 
 @router.get(
@@ -110,7 +165,7 @@ async def read_layers_by_ids(
 async def read_layers(
     async_session: AsyncSession = Depends(get_db),
     page_params: PaginationParams = Depends(),
-    folder_id: UUID4 = Query(..., description="Folder ID"),
+    folder_id: UUID4 | None = Query(None, description="Folder ID"),
     user_id: UUID4 = Depends(get_user_id),
     layer_type: List[LayerType]
     | None = Query(
@@ -147,7 +202,10 @@ async def read_layers(
             detail="Feature layer type can only be set when layer type is feature_layer",
         )
     # TODO: Put this in CRUD layer
-    sql_and_filters = [Layer.user_id == user_id, Layer.folder_id == folder_id]
+    if folder_id is None:
+        sql_and_filters = [Layer.user_id == user_id]
+    else:
+        sql_and_filters = [Layer.user_id == user_id, Layer.folder_id == folder_id]
 
     # Add conditions to filter by layer_type and feature_layer_type
     if layer_type is not None:
