@@ -13,9 +13,8 @@ import uuid
 import zipfile
 from datetime import datetime, timedelta
 from functools import wraps
-from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import IO, Any, Dict, List, Optional
+from typing import IO, Any, List, Optional
 
 import geopandas
 import h3
@@ -26,7 +25,6 @@ from fastapi import HTTPException, UploadFile
 from geoalchemy2.shape import to_shape
 from geojson import Feature, FeatureCollection
 from geojson import loads as geojsonloads
-from httpx import AsyncClient
 from jose import jwt
 from numba import njit
 from rich import print as print
@@ -575,19 +573,15 @@ def without_keys(d, keys):
 
 def delete_file(file_path: str) -> None:
     """Delete file from disk."""
-    try:
-        os.remove(file_path)
-    except OSError:
-        pass
 
+    if os.path.exists(file_path):
+        os.remove(file_path)
 
 def delete_dir(dir_path: str) -> None:
     """Delete file from disk."""
-    try:
-        shutil.rmtree(dir_path)
-    except OSError:
-        pass
 
+    if os.path.exists(dir_path):
+        shutil.rmtree(dir_path)
 
 def create_dir(dir_path: str) -> None:
     """Create directory if it does not exist."""

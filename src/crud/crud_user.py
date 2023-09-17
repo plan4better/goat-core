@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
 from src.utils import table_exists
+from src.schemas.layer import NumberColumnsPerType
 
 class CRUDUser(CRUDBase):
     async def create_user_data_tables(self, async_session: AsyncSession, user_id: UUID):
@@ -18,13 +19,17 @@ class CRUDUser(CRUDBase):
                 sql_create_table = f"""
                 CREATE TABLE user_data."{table_name}" (
                     id SERIAL PRIMARY KEY,
-                    layer_id UUID NOT NULL REFERENCES customer.layer(id),
+                    layer_id UUID NOT NULL,
                     geom GEOMETRY,
-                    {', '.join([f'integer_attr{i+1} INTEGER' for i in range(15)])},
-                    {', '.join([f'bigint_attr{i+1} INTEGER' for i in range(5)])},
-                    {', '.join([f'float_attr{i+1} FLOAT' for i in range(10)])},
-                    {', '.join([f'text_attr{i+1} TEXT' for i in range(20)])},
-                    {', '.join([f'datetime_attr{i+1} TIMESTAMP' for i in range(3)])}
+                    {', '.join([f'integer_attr{i+1} INTEGER' for i in range(NumberColumnsPerType.integer.value)])},
+                    {', '.join([f'bigint_attr{i+1} BIGINT' for i in range(NumberColumnsPerType.bigint.value)])},
+                    {', '.join([f'float_attr{i+1} FLOAT' for i in range(NumberColumnsPerType.float.value)])},
+                    {', '.join([f'text_attr{i+1} TEXT' for i in range(NumberColumnsPerType.text.value)])},
+                    {', '.join([f'jsonb_attr{i+1} jsonb' for i in range(NumberColumnsPerType.jsonb.value)])},
+                    {', '.join([f'arrint_attr{i+1} INTEGER[]' for i in range(NumberColumnsPerType.arrint.value)])},
+                    {', '.join([f'arrfloat_attr{i+1} FLOAT[]' for i in range(NumberColumnsPerType.arrfloat.value)])},
+                    {', '.join([f'arrtext_attr{i+1} TEXT[]' for i in range(NumberColumnsPerType.arrtext.value)])},
+                    {', '.join([f'timestamp_attr{i+1} TIMESTAMP' for i in range(NumberColumnsPerType.timestamp.value)])}
                 );
                 """
                 await async_session.execute(text(sql_create_table))

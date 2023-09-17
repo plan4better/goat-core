@@ -5,11 +5,9 @@ from pydantic import UUID4
 from sqlalchemy import select
 from sqlalchemy.sql import Select
 from sqlmodel import SQLModel
-
 from src.db.session import AsyncSession
 from src.schemas.common import ContentIdList
-from src.db.models._link_model import LayerProjectLink
-from src.db.models.layer import Layer
+
 
 ### Generic helper functions for content
 async def create_content(
