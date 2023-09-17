@@ -14,7 +14,6 @@ from src.db.models.layer import (
     LayerType,
     ScenarioType,
     TileLayerDataType,
-    geospatial_attributes_example,
     layer_base_example,
 )
 
@@ -24,16 +23,72 @@ class AnalysisType(str, Enum):
 
     intersects = "intersects"
 
+# It was decided against using MIME types here because for e.g. gpkg they are commonly just generic application/octet-stream
+class FileUploadType(str, Enum):
+    """File upload types."""
 
-# TODO: Differentiate the types here into import and export types?
+    geojson = "geojson"
+    csv = "csv"
+    xlsx = "xlsx"
+    gpkg = "gpkg"
+    kml = "kml"
+    zip = "zip"  # Commonly used for shapefiles
 
+class MaxFileSizeType(str, Enum):
+    """Max file size types in bytes."""
+
+    geojson = 300000000
+    csv = 100000000
+    xlsx = 100000000
+    gpkg = 300000000
+    kml = 300000000
+    zip = 300000000
 
 class TableDataType(str, Enum):
     """Table data types."""
 
     csv = "csv"
     xlsx = "xlsx"
-    json = "json"
+
+class SupportedOgrGeomType(Enum):
+    Point = "point"
+    Multi_Point = "point"
+    Line_String = "line"
+    Multi_Line_String = "line"
+    Polygon = "polygon"
+    Multi_Polygon = "polygon"
+
+class OgrPostgresType(str, Enum):
+    Integer= "integer"
+    Integer64 = "bigint"
+    Real="float"
+    String= "text"
+    Date= "timestamp"
+    Time= "timestamp"
+    DateTime= "timestamp"
+
+class OgrDriverType(str, Enum):
+    """OGR driver types."""
+
+    geojson = "GeoJSON"
+    csv = "XLSX" # Using XLSX driver for CSV files as the file is converted to XLSX to keep data types
+    xlsx = "XLSX"
+    gpkg = "GPKG"
+    kml = "KML"
+    zip = "ESRI Shapefile"
+
+class NumberColumnsPerType(int, Enum):
+    """Number of columns per type."""
+
+    integer = 15
+    bigint = 5
+    float = 10
+    text = 20
+    timestamp = 3
+    arrfloat = 3
+    arrint = 3
+    arrtext = 3
+    jsonb = 3
 
 
 class LayerReadBaseAttributes(BaseModel):
@@ -60,58 +115,33 @@ class FeatureLayerBase(LayerBase, GeospatialAttributes):
     style: dict = Field(..., description="Style of the layer")
 
 
-feature_layer_base_example = {
-    "size": 1000,
-    "style": {
-        "version": 8,
-        "name": "GeoStyler Demo",
-        "layers": [
-            {
-                "type": "line",
-                "paint": {"line-color": "#ff0000", "line-width": 5},
-                "id": "r0_sy0_st0",
-            }
-        ],
-        "metadata": {
-            "geostyler:ref": {"rules": [{"name": "Rule 1", "symbolizers": [["r0_sy0_st0"]]}]}
-        },
-    },
-}
-
 ################################################################################
 # Feature Layer DTOs
 ################################################################################
 # Base models
 
+class FeatureLayerCreateBase(
+    LayerCreateBaseAttributes, LayerBase, GeospatialAttributes
+):
+    """Base model for feature layer creates."""
+    feature_layer_type: "FeatureLayerType" = Field(..., description="Feature layer type")
 
-class FeatureLayerSpecificAttributes(BaseModel):
+
+class FeatureLayerReadBaseAttributes(
+    LayerReadBaseAttributes, LayerBase, GeospatialAttributes
+):
+    """Base model for feature layer reads."""
     feature_layer_type: "FeatureLayerType" = Field(..., description="Feature layer type")
     size: int = Field(..., description="Size of the layer in bytes")
     style: dict = Field(..., description="Style of the layer")
     query: str | None = Field(None, description="Query to filter the layer data")
 
 
-class FeatureLayerCreateBase(
-    LayerCreateBaseAttributes, LayerBase, FeatureLayerSpecificAttributes, GeospatialAttributes
-):
-    """Base model for feature layer creates."""
-
-    pass
-
-
-class FeatureLayerLayerReadBaseAttributes(
-    LayerReadBaseAttributes, LayerBase, FeatureLayerSpecificAttributes, GeospatialAttributes
-):
-    """Base model for feature layer reads."""
-
-    pass
-
-
-class FeatureLayerUpdateBase(LayerBase, FeatureLayerSpecificAttributes, GeospatialAttributes):
+class FeatureLayerUpdateBase(LayerBase, GeospatialAttributes):
     """Base model for feature layer updates."""
 
     style: dict | None = Field(None, description="Style ID of the layer")
-    size: int | None = Field(None, description="Size of the layer in bytes")
+    query: str | None = Field(None, description="Query to filter the layer data")
 
 
 feature_layer_update_base_example = {
@@ -147,7 +177,7 @@ class IFeatureLayerStandardCreate(FeatureLayerCreateBase):
     pass
 
 
-class IFeatureLayerStandardRead(FeatureLayerLayerReadBaseAttributes, DateTimeBase):
+class IFeatureLayerStandardRead(FeatureLayerReadBaseAttributes, DateTimeBase):
     pass
 
 
@@ -174,7 +204,7 @@ class IFeatureLayerIndicatorCreate(FeatureLayerCreateBase, FeatureLayerIndicator
 
 
 class IFeatureLayerIndicatorRead(
-    FeatureLayerLayerReadBaseAttributes, FeatureLayerIndicatorAttributesBase, DateTimeBase
+    FeatureLayerReadBaseAttributes, FeatureLayerIndicatorAttributesBase, DateTimeBase
 ):
     """Model to read a feature layer indicator."""
 
@@ -208,7 +238,7 @@ class IFeatureLayerScenarioCreate(FeatureLayerCreateBase, FeatureLayerScenarioAt
 
 
 class IFeatureLayerScenarioRead(
-    FeatureLayerLayerReadBaseAttributes, FeatureLayerScenarioAttributesBase, DateTimeBase
+    FeatureLayerReadBaseAttributes, FeatureLayerScenarioAttributesBase, DateTimeBase
 ):
     """Model to read a feature layer scenario."""
 
@@ -409,35 +439,19 @@ request_examples = {
                 "type": "table",
             },
         },
-        "layer_standard": {
+        "feature_layer_standard": {
             "summary": "Layer Standard",
             "value": {
                 **content_base_example,
-                **feature_layer_base_example,
-                **geospatial_attributes_example,
                 **layer_base_example,
                 "type": "feature_layer",
                 "feature_layer_type": "standard",
-            },
-        },
-        "layer_indicator": {
-            "summary": "Layer Indicator",
-            "value": {
-                **content_base_example,
-                **feature_layer_base_example,
-                **geospatial_attributes_example,
-                **layer_base_example,
-                **feature_layer_indicator_attributes_example,
-                "type": "feature_layer",
-                "feature_layer_type": "indicator",
             },
         },
         "layer_scenario": {
             "summary": "Layer Scenario",
             "value": {
                 **content_base_example,
-                **feature_layer_base_example,
-                **geospatial_attributes_example,
                 **layer_base_example,
                 **feature_layer_scenario_attributes_example,
                 "type": "feature_layer",
@@ -449,9 +463,9 @@ request_examples = {
             "value": {
                 **content_base_example,
                 **layer_base_example,
-                **geospatial_attributes_example,
                 **imagery_layer_attributes_example,
                 "type": "imagery_layer",
+                "extent": "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)), ((2 2, 2 3, 3 3, 3 2, 2 2)))"
             },
         },
         "tile_layer": {
@@ -459,9 +473,9 @@ request_examples = {
             "value": {
                 **content_base_example,
                 **layer_base_example,
-                **geospatial_attributes_example,
                 **tile_layer_attributes_example,
                 "type": "tile_layer",
+                "extent": "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)), ((2 2, 2 3, 3 3, 3 2, 2 2)))"
             },
         },
     },

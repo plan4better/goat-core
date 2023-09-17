@@ -38,7 +38,7 @@ class ContentBaseAttributes(SQLModel):
     )
 
 content_base_example = {
-    "folder_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "folder_id": "c97b577f-7f8b-4713-8250-1518e189e822",
     "name": "Layer name",
     "description": "Layer description",
     "tags": ["tag1", "tag2"],

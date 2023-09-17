@@ -21,12 +21,11 @@ from sqlalchemy.dialects.postgresql import UUID as UUID_PG, JSONB
 from src.db.models._base_class import DateTimeBase, ContentBaseAttributes
 
 if TYPE_CHECKING:
-    from .analysis_request import AnalysisRequest
     from .data_store import DataStore
     from .scenario import Scenario
     from .scenario_feature import ScenarioFeature
-    from .project import Project
     from ._link_model import LayerProjectLink
+    from .job import Job
 
 
 class FeatureLayerType(str, Enum):
@@ -106,12 +105,6 @@ class FeatureLayerGeometryType(str, Enum):
 class GeospatialAttributes(SQLModel):
     """Some general geospatial attributes."""
 
-    min_zoom: int | None = Field(
-        sa_column=Column(Integer, nullable=True), description="Minimum zoom level"
-    )
-    max_zoom: int | None = Field(
-        sa_column=Column(Integer, nullable=True), description="Maximum zoom level"
-    )
     extent: str | None = Field(
         sa_column=Column(
             Geometry(geometry_type="MultiPolygon", srid="4326", spatial_index=True),
@@ -126,14 +119,6 @@ class GeospatialAttributes(SQLModel):
             return to_shape(v).wkt
         else:
             return v
-
-
-geospatial_attributes_example = {
-    "min_zoom": 0,
-    "max_zoom": 10,
-    "extent": "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)), ((2 2, 2 3, 3 3, 3 2, 2 2)))",
-}
-
 
 class LayerBase(ContentBaseAttributes):
     """Base model for layers."""
@@ -193,7 +178,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     )
     extent: str | None = Field(
         sa_column=Column(
-            Geometry(geometry_type="MultiPolygon", srid="4326", spatial_index=True),
+            Geometry(geometry_type="MultiPolygon", srid="4326", spatial_index=False),
             nullable=True,
         ),
         description="Geographical Extent of the layer",
@@ -244,7 +229,6 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     scenario: "Scenario" = Relationship(back_populates="layers")
     scenario_features: List["ScenarioFeature"] = Relationship(back_populates="original_layer")
     data_store: "DataStore" = Relationship(back_populates="layers")
-    analysis_requests: List["AnalysisRequest"] = Relationship(back_populates="layer")
     layer_projects: List["LayerProjectLink"] = Relationship(back_populates="layer")
 
     @validator("extent", pre=True)

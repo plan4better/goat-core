@@ -1,5 +1,5 @@
 from src.schemas.heatmap import ReturnTypeHeatmap
-from src.schemas.isochrone import IsochroneOutputType
+from src.schemas.legacy.isochrone import IsochroneOutputType
 
 
 def findkeys(node, kv):
