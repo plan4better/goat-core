@@ -12,13 +12,19 @@ from sqlmodel import (
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
-from src.schemas.layer import ScenarioType
+from enum import Enum
 
 from ._base_class import DateTimeBase
 
 if TYPE_CHECKING:
     from .layer import Layer
 
+class ScenarioType(str, Enum):
+    """Scenario types."""
+
+    point = "point"
+    polygon = "polygon"
+    network_street = "network_street"
 
 class ScenarioFeature(DateTimeBase, table=True):
     """Layer model."""

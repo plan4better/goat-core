@@ -1122,3 +1122,16 @@ def read_results(results, return_type=None):
             headers={"Content-Disposition": f"attachment; filename={file_name}"},
         )
 
+def get_user_table(user_id: int, feature_layer_geometry_type: str):
+    return f"user_data.{feature_layer_geometry_type}_{user_id.replace('-', '')}"
+
+def get_layer_columns(attribute_mapping: dict, base_columns: list):
+    """Get the columns for the layer table and the original table. Add the base columns geom and layer_id"""
+
+    original_columns = ", ".join(attribute_mapping.keys())
+    table_columns = ", ".join(attribute_mapping.values())
+    additional_columns = ",".join(base_columns)
+    additional_columns = "," + additional_columns
+    original_columns += additional_columns
+    table_columns += additional_columns
+    return [original_columns, table_columns]

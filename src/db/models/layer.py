@@ -19,6 +19,7 @@ from pydantic import validator
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG, JSONB
 from src.db.models._base_class import DateTimeBase, ContentBaseAttributes
+from src.db.models.scenario_feature import ScenarioType
 
 if TYPE_CHECKING:
     from .data_store import DataStore
@@ -80,14 +81,6 @@ class LayerType(str, Enum):
     imagery_layer = "imagery_layer"
     tile_layer = "tile_layer"
     table = "table"
-
-
-class ScenarioType(str, Enum):
-    """Scenario types."""
-
-    point = "point"
-    polygon = "polygon"
-    network_street = "network_street"
 
 
 class TileLayerDataType(str, Enum):

@@ -55,9 +55,11 @@ async def check_reference_area(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"reference area is too large for this indicator. The maximum size is {getattr(AreaLimitPerTool, operation_type.value).value}. Please select a smaller area.",
         )
-
+    
     reference_area_sql = (
-        f"""SELECT geom FROM user_data.{table_name} WHERE layer_id = ''{reference_area.id}'' AND text_attr2 = ''Erding''"""
+        f"""SELECT geom FROM user_data.{table_name} WHERE layer_id = '{reference_area.id}'"""
     )
+
+
 
     return reference_area_sql

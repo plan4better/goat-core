@@ -1,18 +1,20 @@
 from src.schemas.motorized_mobility import (
     CalculateOevGueteklassenParameters,
     oev_gueteklasse_config_example,
+    oev_gueteklasse_station_config_layer_base, 
+    oev_gueteklasse_config_layer_base,
 )
 from src.db.session import AsyncSession
 from fastapi import Body, Depends, HTTPException, APIRouter
 from src.endpoints.deps import get_db, get_user_id
 from uuid import UUID
-from src.crud.crud_motorized_mobility import motorized_mobility as crud_motorized_mobility
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.crud.crud_layer import layer as crud_layer
 from src.core.indicator import check_reference_area
 from sqlalchemy import select
 from src.db.models.layer import Layer
-
+from datetime import datetime
+from src.crud.crud_motorized_mobility import crud_oev_gueteklasse
 router = APIRouter()
 
 @router.post("/oev-gueteklassen")
@@ -46,15 +48,23 @@ async def calculate_oev_gueteklassen(
         operation_type="oev_gueteklasse",
     )
 
-    await crud_motorized_mobility.compute_oev_gueteklassen(
+    # Get stations in study area
+    layer_stations = await crud_oev_gueteklasse.get_oev_gueteklasse_station_category(
         async_session=async_session,
         user_id=user_id,
-        start_time=params.start_time,
-        end_time=params.end_time,
-        weekday=params.weekday,
+        params=params,
         reference_area_sql=reference_area_sql,
-        station_config=params.station_config,
     )
+
+    # Compute stations category
+    await crud_oev_gueteklasse.compute_station_buffer(
+        async_session=async_session,
+        user_id=user_id,
+        params=params,
+        reference_area_id=layer_stations.id,
+    )
+    # TODO: Save layer in layer table and create a layer for the stations
+    # TODO: Send task into background    
 
     #TODO: Add layer to project if project_id is given
 

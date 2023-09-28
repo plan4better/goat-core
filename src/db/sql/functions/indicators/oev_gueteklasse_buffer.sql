@@ -1,4 +1,4 @@
-
+DROP FUNCTION IF EXISTS basic.oev_gueteklasse_buffer(_classification jsonb);
 CREATE OR REPLACE FUNCTION basic.oev_gueteklasse_buffer(
     _classification jsonb
 )

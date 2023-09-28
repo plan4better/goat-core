@@ -1,3 +1,4 @@
+DROP FUNCTION IF EXISTS basic.oev_guetklasse_station_category;
 CREATE OR REPLACE FUNCTION basic.oev_guetklasse_station_category(_station jsonb, _station_config jsonb, _start_time numeric, _end_time numeric)
  RETURNS jsonb
  LANGUAGE plpgsql
