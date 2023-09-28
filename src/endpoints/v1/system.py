@@ -1,11 +1,10 @@
-
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src import crud
 from src.db import models
 from src.endpoints.legacy import deps
-from src.schemas.system import SystemStatusModel
+from src.schemas.system_setting import SystemStatusModel
 
 router = APIRouter()
 

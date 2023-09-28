@@ -1,6 +1,7 @@
-from typing import List
 from uuid import UUID
-from src.db.models._base_class import DateTimeBase
+
+from sqlalchemy import ForeignKey
+from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
     Column,
     Field,
@@ -8,9 +9,10 @@ from sqlmodel import (
     Text,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID as UUID_PG
-from sqlalchemy import ForeignKey
+
+from src.db.models._base_class import DateTimeBase
 from src.db.models.user import User
+
 
 class Folder(DateTimeBase, table=True):
     __tablename__ = "folder"

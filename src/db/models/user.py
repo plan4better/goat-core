@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, List
 from uuid import UUID
 
+from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
     Column,
     Field,
@@ -8,11 +9,9 @@ from sqlmodel import (
     SQLModel,
 )
 
-from sqlalchemy.dialects.postgresql import UUID as UUID_PG
-
 if TYPE_CHECKING:
-    from .scenario import Scenario
     from .folder import Folder
+    from .scenario import Scenario
 
 
 class User(SQLModel, table=True):
