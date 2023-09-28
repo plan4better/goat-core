@@ -28,7 +28,12 @@ def upgrade():
             server_default=sa.text("CURRENT_TIMESTAMP"),
             nullable=False,
         ),
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            server_default=sa.text("uuid_generate_v4()"),
+            nullable=False,
+        ),
         sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("client_theme", sa.Text(), nullable=False),
         sa.Column("preferred_language", sa.Text(), nullable=False),

@@ -58,14 +58,16 @@ async def update_system_settings(
         async_session, keys={"user_id": user_id}
     )
     if not system_settings or len(system_settings) == 0:
+        new_system_settings = SystemSettingsCreate(**system_settings_in.dict())
+        new_system_settings.user_id = user_id
         system_settings = await crud_system_setting.create(
-            async_session, obj_in={"user_id": user_id, **system_settings_in.dict()}
+            async_session, obj_in=new_system_settings
         )
 
         return system_settings
 
     system_settings = await crud_system_setting.update(
-        async_session, db_obj=system_settings, obj_in=system_settings_in
+        async_session, db_obj=system_settings[0], obj_in=system_settings_in
     )
 
     return system_settings
