@@ -1,17 +1,19 @@
-from fastapi import HTTPException, status
+from uuid import UUID
+
+from fastapi_pagination import Page
+from fastapi_pagination import Params as PaginationParams
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi_pagination import Params as PaginationParams
-from src.db.models.project import Project
-from src.schemas.project import (
-    IProjectRead,
-    IProjectBaseUpdate,
-)
-from uuid import UUID
-from .base import CRUDBase
-from src.schemas.common import OrderEnum
-from fastapi_pagination import Page
+
 from src.core.content import update_content_by_id
+from src.db.models.project import Project
+from src.schemas.common import OrderEnum
+from src.schemas.project import (
+    IProjectBaseUpdate,
+    IProjectRead,
+)
+
+from .base import CRUDBase
 
 
 class CRUDProject(CRUDBase):
@@ -50,9 +52,6 @@ class CRUDProject(CRUDBase):
             order_by=order_by,
             order=order,
         )
-
-        if len(projects.items) == 0:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No Projects Found")
 
         return projects
 
