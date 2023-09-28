@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, List
 from uuid import UUID
 
+from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
     Column,
     Field,
@@ -8,11 +9,10 @@ from sqlmodel import (
     SQLModel,
 )
 
-from sqlalchemy.dialects.postgresql import UUID as UUID_PG
-
 if TYPE_CHECKING:
-    from .scenario import Scenario
     from .folder import Folder
+    from .scenario import Scenario
+    from .system_setting import SystemSetting
 
 
 class User(SQLModel, table=True):
@@ -25,5 +25,8 @@ class User(SQLModel, table=True):
         back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
     folders: List["Folder"] = Relationship(
+        back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    system_setting: "SystemSetting" = Relationship(
         back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )

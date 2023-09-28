@@ -114,7 +114,6 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     async def create(self, db: AsyncSession, *, obj_in: CreateSchemaType) -> ModelType:
         db_obj = self.model.from_orm(obj_in)
-        db_obj = obj_in
         db.add(db_obj)
         await db.commit()
         await db.refresh(db_obj)

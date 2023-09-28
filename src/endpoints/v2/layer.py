@@ -1,16 +1,17 @@
+import ast
 from typing import List
+
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Body,
     Depends,
+    File,
+    Form,
     HTTPException,
     Path,
     Query,
-    status,
     UploadFile,
-    File,
-    Form,
-    BackgroundTasks,
 )
 from fastapi.responses import JSONResponse
 from fastapi_pagination import Page
@@ -18,30 +19,28 @@ from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
 from sqlalchemy import and_, or_, select
 
+from src.core.content import (
+    create_content,
+    delete_content_by_id,
+    read_content_by_id,
+    read_contents_by_ids,
+    update_content_by_id,
+)
+from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import layer as crud_layer
+from src.db.models.job import Job
 from src.db.models.layer import FeatureLayerType, Layer, LayerType
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_user_id
 from src.schemas.common import ContentIdList, OrderEnum
+from src.schemas.job import JobType, job_mapping
 from src.schemas.layer import (
     ILayerCreate,
     ILayerRead,
     ILayerUpdate,
 )
 from src.schemas.layer import request_examples as layer_request_examples
-from src.core.content import (
-    delete_content_by_id,
-    read_content_by_id,
-    read_contents_by_ids,
-    update_content_by_id,
-    create_content,
-)
-import ast
-from src.db.models.job import Job
-from src.schemas.job import JobType, job_mapping
-from src.crud.crud_job import job as crud_job
-from asyncio import sleep as async_sleep
-from starlette.concurrency import run_in_threadpool
+
 router = APIRouter()
 
 
@@ -233,9 +232,6 @@ async def read_layers(
         page_params=page_params,
         **params,
     )
-
-    if len(layers.items) == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No Layers Found")
 
     return layers
 
