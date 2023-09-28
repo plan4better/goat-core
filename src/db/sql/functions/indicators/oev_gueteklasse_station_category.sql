@@ -1,10 +1,7 @@
-CREATE OR REPLACE FUNCTION basic.oev_guetklasse_station_category(
-    _station jsonb, 
-    _station_config jsonb,
-    _start_time NUMERIC,
-    _end_time NUMERIC
-)
-RETURNS text AS $$
+CREATE OR REPLACE FUNCTION basic.oev_guetklasse_station_category(_station jsonb, _station_config jsonb, _start_time numeric, _end_time numeric)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+AS $function$
 DECLARE
     _station_groups text[] := '{}';
     _station_group_trip_count numeric := 0;
@@ -35,7 +32,7 @@ BEGIN
     END LOOP;
     
 	IF _station_group_trip_count = 0 THEN
-        RETURN 'no_class';
+        RETURN JSONB_BUILD_OBJECT('_class', '999', 'frequency', 0);
     END IF;
 
     _station_group := (SELECT min(_group) FROM unnest(_station_groups) _group); -- Get minimum (highest priority)
@@ -49,16 +46,15 @@ BEGIN
 	WHERE _station_group_trip_time_frequency <= _time;
 
     IF _time_interval IS NULL THEN
-        RETURN 'no_class';
+        RETURN JSONB_BUILD_OBJECT('_class', '999', 'frequency', _station_group_trip_time_frequency);
     END IF;
 
     _station_category := _station_config->'categories'->_time_interval-2 ->>_station_group;
-	RAISE NOTICE '_station_category: %', _station_category;
 
     IF _station_category IS NULL THEN
-        RETURN 'no_class';
+        RETURN JSONB_BUILD_OBJECT('_class', '999', 'frequency', _station_group_trip_time_frequency);
     ELSE
-        RETURN _station_category;
+        RETURN JSONB_BUILD_OBJECT('_class', _station_category, 'frequency', _station_group_trip_time_frequency);
     END IF;
 END;
-$$ LANGUAGE plpgsql;
+$function$;

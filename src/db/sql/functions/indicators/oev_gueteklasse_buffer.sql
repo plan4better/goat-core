@@ -1,15 +1,17 @@
+
 CREATE OR REPLACE FUNCTION basic.oev_gueteklasse_buffer(
     _classification jsonb
 )
-RETURNS TABLE (_class integer, geom geometry) 
+RETURNS TABLE (_class_out integer, geom_out geometry) 
 AS $$
 BEGIN
 
 	DROP TABLE IF EXISTS temp_buffered_stations; 
 	CREATE TEMP TABLE temp_buffered_stations AS 
-	SELECT s.stop_id, ST_BUFFER(s.geom::geography, j.KEY::integer)::geometry AS geom, j.KEY::integer buffer_size, REPLACE(j.value::TEXT, '"', '')::integer AS _class
-	FROM basic.stations s, LATERAL jsonb_each(_classification -> s._class) j
-	WHERE s."_class" <> 'no_class'; 
+	SELECT s.stop_id, ST_BUFFER(s.geom::geography, j.KEY::integer)::geometry AS geom, 
+	j.KEY::integer buffer_size, REPLACE(j.value::TEXT, '"', '')::integer AS _class
+	FROM basic.temp_stations s
+	, LATERAL jsonb_each(_classification -> s._class::text) j;
 	CREATE INDEX ON temp_buffered_stations USING GIST(geom); 
 	
 	DROP TABLE IF EXISTS temp_union_buffer;
@@ -24,12 +26,12 @@ BEGIN
 	WHERE cluster_id IS NOT NULL 
 	GROUP BY b._class, cluster_id 
 	UNION ALL 
-	SELECT b._class, c.geom
-	FROM clustered_buffer c
+	SELECT b._class, b.geom
+	FROM clustered_buffer b
 	WHERE cluster_id IS NULL;
 	CREATE INDEX ON temp_buffered_stations USING GIST(geom); 
 	
-	RETURN QUERY SELECT CASE WHEN j.geom IS NULL THEN a.geom ELSE j.geom END AS geom, a._class  
+	RETURN QUERY SELECT a._class::integer, CASE WHEN j.geom IS NULL THEN a.geom ELSE j.geom END AS geom
 	FROM temp_union_buffer a
 	LEFT JOIN LATERAL 
 	(
