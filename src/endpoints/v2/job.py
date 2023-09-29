@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path, Query, Body
 from src.crud.crud_job import job as crud_job
 from src.db.models.job import Job
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +18,7 @@ router = APIRouter()
     response_model=Job,
     response_model_exclude_none=True,
     status_code=201,
+    summary="Get a job by its ID.",
 )
 async def get_job(
     async_session: AsyncSession = Depends(get_db),
@@ -36,6 +37,7 @@ async def get_job(
     response_model=Page[Job],
     response_model_exclude_none=True,
     status_code=201,
+    summary="Retrieve a list of jobs using different filters.",
 )
 async def read_jobs(
     async_session: AsyncSession = Depends(get_db),
@@ -87,3 +89,22 @@ async def read_jobs(
         order_by=order_by,
         order=order,
     )
+
+@router.put(
+    "/read",
+    response_model=List[Job],
+    response_model_exclude_none=True,
+    status_code=201,
+    summary="Mark jobs as read.",
+)
+async def mark_jobs_as_read(
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+    job_ids: List[UUID4] = Body(
+        ...,
+        description="List of job IDs to mark as read.",
+        example=["7e5eeb1f-3605-4ff7-87f8-2aed7094e4de", "c9d2884c-0e01-4d7a-b595-5c20be857ec5"],
+    ),
+):
+    """Mark jobs as read."""
+    return await crud_job.mark_as_read(async_session=async_session, user_id=user_id, job_ids=job_ids)

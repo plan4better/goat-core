@@ -140,6 +140,36 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         await db.refresh(db_obj)
         return db_obj
 
+    async def update_multi(
+        self,
+        db: AsyncSession,
+        *,
+        db_objs: ModelType,
+        objs_in: List[Union[UpdateSchemaType, Dict[str, Any]]],
+    ) -> List[ModelType]:
+        """Update multiple objects at once by id."""
+        ids = []
+        # Loop through all db_objs and objs_in and update the db_obj with the obj_in.
+        for db_obj, obj_in in zip(db_objs, objs_in, strict=True):
+            if isinstance(obj_in, dict):
+                update_data = obj_in
+                fields = obj_in.keys()
+            else:
+                update_data = obj_in.dict(exclude_unset=True)
+                fields = obj_in.__fields__.keys()
+            for field in fields:
+                if field in update_data:
+                    setattr(db_obj, field, update_data[field])
+            db.add(db_obj)
+            ids.append(db_obj.id)
+        await db.commit()
+
+        # Get objects again to return them. Refresh cannot be used as it only returns one object.
+        ids = [db_obj.id for db_obj in db_objs]
+        statement = select(self.model).where(self.model.id.in_(ids))
+        result = await db.execute(statement)
+        return result.scalars().all()
+
     async def remove(self, db: AsyncSession, *, id: int) -> ModelType:
         obj = await db.get(self.model, id)
         await db.delete(obj)

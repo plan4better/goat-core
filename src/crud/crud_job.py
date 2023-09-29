@@ -8,6 +8,7 @@ from fastapi_pagination import Params as PaginationParams
 from src.schemas.common import OrderEnum
 from fastapi import HTTPException, status
 from src.schemas.job import JobType
+from typing import List
 
 
 class CRUDJob(CRUDBase):
@@ -58,6 +59,25 @@ class CRUDJob(CRUDBase):
             order_by=order_by,
             order=order,
         )
+        return jobs
+
+    async def mark_as_read(self, async_session: AsyncSession, user_id: UUID, job_ids: List[UUID]):
+        """Mark a job as read."""
+
+        # Get the jobs owned by the user and ids in the list.
+        query_get = select(Job).where(and_(Job.id.in_(job_ids), Job.user_id == user_id))
+        jobs = await self.get_multi(async_session, query=query_get)
+        jobs = [job[0] for job in jobs]
+        if jobs == []:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Jobs not found.",
+            )
+
+        # Create dict of len jobs with read=True.
+        jobs_update = [{"read": True} for job in jobs]
+
+        jobs = await self.update_multi(async_session, db_objs=jobs, objs_in=jobs_update)
         return jobs
 
 
