@@ -77,6 +77,7 @@ async def create_layer(
     if file is not None:
         # Create job
         job = Job(
+            user_id=user_id,
             type=JobType.layer_upload.value,
             payload={},
             status=job_mapping[JobType.layer_upload.value]().dict(),

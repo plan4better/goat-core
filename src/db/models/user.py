@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from .folder import Folder
     from .scenario import Scenario
     from .system_setting import SystemSetting
+    from .job import Job
 
 
 class User(SQLModel, table=True):
@@ -28,5 +29,8 @@ class User(SQLModel, table=True):
         back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
     system_setting: "SystemSetting" = Relationship(
+        back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    jobs: List["Job"] = Relationship(
         back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from .report import Report
     from _link_model import UserProjectLink
     from _link_model import LayerProjectLink
-
+    from .job import Job
 class Project(ContentBaseAttributes, DateTimeBase, table=True):
     __tablename__ = "project"
     __table_args__ = {"schema": "customer"}
@@ -56,4 +56,7 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
     )
     layer_projects: List["LayerProjectLink"] = Relationship(
         back_populates="project", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    jobs: List["Job"] = Relationship(
+        back_populates="project"
     )
