@@ -90,7 +90,8 @@ class CRUDLayerProject(CRUDBase):
             layer_project = LayerProjectLink(
                 project_id=project_id,
                 layer_id=layer.id,
-                name=layer.name
+                name=layer.name,
+                query={}
             )
             # Add style if exists
             if layer.style is not None:

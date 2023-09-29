@@ -80,12 +80,11 @@ class IProjectBaseUpdate(ContentBaseAttributes):
 class IFeatureLayerBaseProject(BaseModel):
     name: str = Field(..., description="Layer name")
     group: str | None = Field(None, description="Layer group name")
-    query: dict | None = Field(None, description="CQL2-JSON filter to query the layer")
+    query: dict = Field(..., description="CQL2-JSON filter to query the layer")
     style: dict = Field(
         ...,
         description="Style of the layer",
     )
-
 
 class IFeatureLayerStandardProjectRead(IFeatureLayerStandardRead, IFeatureLayerBaseProject):
     pass
@@ -98,13 +97,15 @@ class IFeatureLayerIndicatorProjectRead(IFeatureLayerIndicatorRead, IFeatureLaye
 class IFeatureLayerScenarioProjectRead(IFeatureLayerScenarioRead, IFeatureLayerBaseProject):
     pass
 
-
+@optional
 class IFeatureLayerStandardProjectUpdate(IFeatureLayerBaseProject):
     pass
 
+@optional
 class IFeatureLayerIndicatorProjectUpdate(IFeatureLayerBaseProject):
     pass
 
+@optional
 class IFeatureLayerScenarioProjectUpdate(IFeatureLayerBaseProject):
     pass
 
