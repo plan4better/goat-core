@@ -134,15 +134,11 @@ class FeatureLayerReadBaseAttributes(
     feature_layer_type: "FeatureLayerType" = Field(..., description="Feature layer type")
     size: int = Field(..., description="Size of the layer in bytes")
     style: dict = Field(..., description="Style of the layer")
-    query: dict = Field(..., description="Query to filter the layer data")
-
 
 class FeatureLayerUpdateBase(LayerBase, GeospatialAttributes):
     """Base model for feature layer updates."""
 
     style: dict | None = Field(None, description="Style ID of the layer")
-    query: dict | None = Field(None, description="Query to filter the layer data")
-
 
 feature_layer_update_base_example = {
     "style": [
@@ -446,16 +442,6 @@ request_examples = {
                 **layer_base_example,
                 "type": "feature_layer",
                 "feature_layer_type": "standard",
-            },
-        },
-        "layer_scenario": {
-            "summary": "Layer Scenario",
-            "value": {
-                **content_base_example,
-                **layer_base_example,
-                **feature_layer_scenario_attributes_example,
-                "type": "feature_layer",
-                "feature_layer_type": "scenario",
             },
         },
         "imagery_layer": {
