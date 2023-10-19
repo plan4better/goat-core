@@ -1,6 +1,5 @@
 import ast
 from typing import List
-
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -12,13 +11,13 @@ from fastapi import (
     Path,
     Query,
     UploadFile,
+    status,
 )
 from fastapi.responses import JSONResponse
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
 from sqlalchemy import and_, or_, select
-
 from src.core.content import (
     create_content,
     delete_content_by_id,
@@ -33,13 +32,21 @@ from src.db.models.layer import FeatureLayerType, Layer, LayerType
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_user_id
 from src.schemas.common import ContentIdList, OrderEnum
-from src.schemas.job import JobType, job_mapping
+from src.schemas.job import JobType, job_mapping, JobStatusType
 from src.schemas.layer import (
     ILayerCreate,
     ILayerRead,
     ILayerUpdate,
+    TableUploadType,
+    FeatureLayerUploadType,
+    FileUploadType,
+    IUploadJobId
 )
-from src.schemas.layer import request_examples as layer_request_examples
+from src.schemas.layer import request_examples as layer_request_examples, MaxFileSizeType
+from src.core.config import settings
+import os
+from src.utils import check_file_size
+from uuid import uuid4
 
 router = APIRouter()
 
@@ -50,6 +57,121 @@ def generate_description(examples: dict) -> str:
         description += f"\n- **{field_examples['summary']}**:\n"
         description += f"{str(field_examples['value'])}\n"
     return description
+
+
+@router.post(
+    "/file-validate",
+    summary="Upload file to server and validate",
+    response_class=JSONResponse,
+    status_code=201,
+)
+async def file_validate(
+    *,
+    background_tasks: BackgroundTasks,
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+    file: UploadFile | None = File(None, description="File to upload. "),
+):
+    """
+    Upload file and validate.
+    """
+
+    file_ending = os.path.splitext(file.filename)[-1][1:]
+    # Check if file is feature_layer or table_layer
+    if file_ending in TableUploadType.__members__:
+        layer_type = LayerType.table.value
+    elif file_ending in FeatureLayerUploadType.__members__:
+        layer_type = LayerType.feature_layer.value
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"File type not allowed. Allowed file types are: {', '.join(FileUploadType.__members__.keys())}",
+        )
+
+    if await check_file_size(file=file, max_size=MaxFileSizeType[file_ending].value) is False:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File size too large. Max file size is {round(MaxFileSizeType[file_ending].value / 1048576, 2)} MB",
+        )
+
+    # Create job and check if user can create a new job
+    job = await crud_job.check_and_create(
+        async_session=async_session,
+        user_id=user_id,
+        job_type=JobType.file_validate,
+    )
+
+    # Run the validation
+    await crud_layer.validate_file(
+        background_tasks=background_tasks,
+        async_session=async_session,
+        user_id=user_id,
+        job_id=job.id,
+        layer_type=layer_type,
+        file=file,
+    )
+    return {"job_id": job.id}
+
+
+@router.post(
+    "/file-import",
+    summary="Import previously uploaded file using Ogr2ogr",
+    response_class=JSONResponse,
+    status_code=201,
+)
+async def file_import(
+    *,
+    background_tasks: BackgroundTasks,
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+    upload_job_id: IUploadJobId = Body(
+        ...,
+        example=layer_request_examples["upload_job_id"],
+        description="Upload job ID",
+    ),
+):
+    """
+    Import file using ogr2ogr.
+    """
+
+    # Check if file upload job exists, is finished and owned by the user
+    upload_job = await crud_job.get_by_multi_keys(
+        db=async_session,
+        keys={
+            "id": upload_job_id.upload_job_id,
+            "user_id": user_id,
+            "type": JobType.file_validate.value,
+            "status_simple": JobStatusType.finished.value,
+        },
+    )
+    if upload_job == []:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File upload job not found or not finished.",
+        )
+    upload_job = upload_job[0]
+    # Create job and check if user can create a new job
+    job = await crud_job.check_and_create(
+        async_session=async_session,
+        user_id=user_id,
+        job_type=JobType.file_import,
+    )
+
+    # Create layer_id
+    layer_id = str(uuid4())
+
+    # Run the import
+    await crud_layer.import_file(
+        background_tasks=background_tasks,
+        async_session=async_session,
+        user_id=user_id,
+        job_id=job.id,
+        layer_id=layer_id,
+        upload_job=upload_job,
+        file_path=upload_job.response["file_path"],
+    )
+
+    return {"job_id": job.id}
 
 
 ## Layer endpoints

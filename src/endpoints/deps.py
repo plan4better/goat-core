@@ -16,7 +16,7 @@ async def get_db_session() -> AsyncSession:
         yield session
 
 
-def get_user_id(authorization: str = Header(None)):
+def get_user_id(authorization: str = None):
     if authorization:
         # Split the Authorization header into the scheme and the token
         scheme, _, token = authorization.partition(" ")

@@ -39,7 +39,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 import inspect
-
+import asyncio
 
 def optional(*fields):
     def dec(_cls):
@@ -56,14 +56,18 @@ def optional(*fields):
     return dec
 
 
-async def table_exists(db: AsyncSession, table_name: str) -> bool:
+async def table_exists(db: AsyncSession, schema_name: str, table_name: str) -> bool:
     sql_check_table = (
         select(func.count())
-        .where(text("table_name = :table_name"))
+        .where(text("table_name = :table_name AND table_schema = :schema_name"))
         .select_from(text("information_schema.tables"))
     )
-    table_exists = await db.execute(sql_check_table, {"table_name": table_name})
-    return table_exists.all()[0][0] > 0
+    params = {
+        "table_name": table_name,
+        "schema_name": schema_name
+    }
+    table_exists = await db.execute(sql_check_table, params)
+    return table_exists.scalar() > 0
 
 
 def generate_token(email: str) -> str:
@@ -577,11 +581,13 @@ def delete_file(file_path: str) -> None:
     if os.path.exists(file_path):
         os.remove(file_path)
 
+
 def delete_dir(dir_path: str) -> None:
     """Delete file from disk."""
 
     if os.path.exists(dir_path):
         shutil.rmtree(dir_path)
+
 
 def create_dir(dir_path: str) -> None:
     """Create directory if it does not exist."""
@@ -1122,8 +1128,10 @@ def read_results(results, return_type=None):
             headers={"Content-Disposition": f"attachment; filename={file_name}"},
         )
 
+
 def get_user_table(user_id: int, feature_layer_geometry_type: str):
-    return f"user_data.{feature_layer_geometry_type}_{user_id.replace('-', '')}"
+    return f"{settings.USER_DATA_SCHEMA}.{feature_layer_geometry_type}_{user_id.replace('-', '')}"
+
 
 def get_layer_columns(attribute_mapping: dict, base_columns: list):
     """Get the columns for the layer table and the original table. Add the base columns geom and layer_id"""
@@ -1135,3 +1143,52 @@ def get_layer_columns(attribute_mapping: dict, base_columns: list):
     original_columns += additional_columns
     table_columns += additional_columns
     return [original_columns, table_columns]
+
+
+def sanitize_error_message(message: str) -> str:
+    replacements = {
+        settings.POSTGRES_SERVER: "HIDDEN_SERVER",
+        settings.POSTGRES_DB: "HIDDEN_DB",
+        settings.POSTGRES_USER: "HIDDEN_USER",
+        settings.POSTGRES_PASSWORD: "HIDDEN_PASSWORD",
+        settings.POSTGRES_PORT: "HIDDEN_PORT",
+    }
+    for key, value in replacements.items():
+        message = message.replace(key, value)
+    return message
+
+
+async def async_delete_dir(path: str):
+    """Asynchronously delete a directory and its contents."""
+    try:
+        await asyncio.to_thread(shutil.rmtree, path)
+    except FileNotFoundError:
+        pass
+
+async def async_scandir(directory):
+    for entry in os.scandir(directory):
+        yield entry
+
+def execute_cmd(cmd):
+    subprocess.run(cmd, shell=True, check=True)
+
+async def async_run_command(cmd):
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, execute_cmd, cmd)
+    return result
+
+async def check_file_size(file: UploadFile, max_size: int) -> bool:
+    """
+    Check the size of an uploaded file without reading it entirely into memory.
+    Returns True if the file is within the allowed size, otherwise raises an HTTPException.
+    """
+    total_size = 0
+    chunk_size = 128 * 1024  # 128KB
+
+    while data := await file.read(chunk_size):
+        total_size += len(data)
+        if total_size > max_size:
+            return False
+
+    await file.seek(0)  # Reset file position for further processing if needed
+    return True

@@ -44,7 +44,7 @@ class DatabaseSessionManager:
     def init(self, host: str):
         self._engine = create_async_engine(host, isolation_level="AUTOCOMMIT")
         self._session_maker = sessionmaker(
-            bind=self._engine, autocommit=False, class_=AsyncSession
+            bind=self._engine, autocommit=False, autoflush=False, expire_on_commit=False, class_=AsyncSession
         )
 
     @contextlib.asynccontextmanager

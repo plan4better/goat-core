@@ -5,6 +5,7 @@ from src.schemas.layer import IndicatorType
 from sqlalchemy import text
 from fastapi import HTTPException, status
 from src.db.models.layer import Layer
+from src.core.config import settings
 
 
 async def check_reference_area(
@@ -36,9 +37,9 @@ async def check_reference_area(
     if hasattr(reference_area, "query"):
         # TODO: Convert JSON-filter to SQL
         filter = reference_area.query
-        sql_query = f"""SELECT count(*) cnt, sum(ST_AREA(geom)) AS area FROM user_data.{table_name} WHERE layer_id = '{reference_area.id}' AND {filter}"""
+        sql_query = f"""SELECT count(*) cnt, sum(ST_AREA(geom)) AS area FROM {settings.USER_DATA_SCHEMA}.{table_name} WHERE layer_id = '{reference_area.id}' AND {filter}"""
     else:
-        sql_query = f"""SELECT count(*) cnt, sum(ST_AREA(geom)) AS area FROM user_data.{table_name} WHERE layer_id = '{reference_area.id}'"""
+        sql_query = f"""SELECT count(*) cnt, sum(ST_AREA(geom)) AS area FROM {settings.USER_DATA_SCHEMA}.{table_name} WHERE layer_id = '{reference_area.id}'"""
 
     result = await async_session.execute(text(sql_query))
     result = result.all()
@@ -57,7 +58,7 @@ async def check_reference_area(
         )
     
     reference_area_sql = (
-        f"""SELECT geom FROM user_data.{table_name} WHERE layer_id = '{reference_area.id}'"""
+        f"""SELECT geom FROM {settings.USER_DATA_SCHEMA}.{table_name} WHERE layer_id = '{reference_area.id}'"""
     )
 
 

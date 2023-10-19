@@ -6,7 +6,8 @@ from datetime import datetime
 
 class JobType(str, Enum):
     """Job types."""
-    layer_upload = "layer_upload"
+    file_validate = "file_validate"
+    file_import = "file_import"
 
 class JobStatusType(str, Enum):
     """Status types."""
@@ -15,6 +16,8 @@ class JobStatusType(str, Enum):
     running = "running"
     finished = "finished"
     failed = "failed"
+    timeout = "timeout"
+    killed = "killed"
 
 class MsgType(str, Enum):
     """Message types."""
@@ -37,13 +40,19 @@ class JobStep(BaseModel):
     timestamp_end: datetime | None
     msg: Msg | None
 
-class JobStatusLayerUpload(BaseModel):
+class JobStatusFileValidate(BaseModel):
     """Job layer upload attribute types."""
 
+    upload: JobStep = {}
     validation: JobStep = {}
+
+class JobStatusFileImport(BaseModel):
+    """Job layer upload attribute types."""
+
     upload: JobStep = {}
     migration: JobStep = {}
 
 job_mapping = {
-    JobType.layer_upload: JobStatusLayerUpload
+    JobType.file_validate: JobStatusFileValidate,
+    JobType.file_import: JobStatusFileImport
 }

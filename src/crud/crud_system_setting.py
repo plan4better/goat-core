@@ -3,7 +3,6 @@ from src.schemas.system_setting import (
     SystemSettingsCreate,
     SystemSettingsUpdate,
 )
-
 from .base import CRUDBase
 
 

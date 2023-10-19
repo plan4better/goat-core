@@ -1,17 +1,91 @@
 from src.crud.base import CRUDBase
 from src.db.models.job import Job
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, func
 from uuid import UUID
 from datetime import datetime
 from fastapi_pagination import Params as PaginationParams
 from src.schemas.common import OrderEnum
 from fastapi import HTTPException, status
-from src.schemas.job import JobType
+from src.schemas.job import JobType, job_mapping, JobStatusType, MsgType
 from typing import List
-
+from src.core.config import settings
+from src.utils import sanitize_error_message
+from sqlalchemy.orm.attributes import flag_modified
 
 class CRUDJob(CRUDBase):
+    async def check_and_create(
+        self,
+        async_session: AsyncSession,
+        user_id: UUID,
+        job_type: JobType,
+        project_id: UUID = None,
+    ):
+        """Create a job."""
+
+        # Count running jobs using count.
+        query = select(func.count(self.model.id)).where(
+            and_(
+                Job.user_id == user_id,
+                Job.status_simple == JobStatusType.running.value,
+            )
+        )
+        count = await async_session.execute(query)
+        count = count.scalar()
+
+        # Check if count is greater than or equal to MAX_NUMBER_PARALLEL_JOBS.
+        if count >= settings.MAX_NUMBER_PARALLEL_JOBS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"You can only run {settings.MAX_NUMBER_PARALLEL_JOBS} jobs at a time.",
+            )
+
+        # Create job.
+        job = Job(
+            user_id=user_id,
+            type=job_type.value,
+            payload={},
+            status=job_mapping[job_type.value]().dict(),
+            status_simple=JobStatusType.pending.value,
+        )
+        if project_id:
+            job.project_id = project_id
+        job = await self.create(db=async_session, obj_in=job)
+        return job
+
+    async def update_status(
+        self,
+        async_session: AsyncSession,
+        job_id: UUID,
+        job_step_name: str,
+        status_simple: JobStatusType = JobStatusType.running,
+        msg_text: str = "",
+    ):
+        """Update job status."""
+
+        # Get job and check if job is killed.
+        job = await self.get(db=async_session, id=job_id)
+        if job.status_simple == JobStatusType.killed.value:
+            job.status[job_step_name]["status"] = JobStatusType.killed.value
+            msg_text = "Job killed."
+        else:
+            job.status[job_step_name]["status"] = status_simple
+
+        # Update job step
+        job.status[job_step_name]["timestamp_end"] = str(datetime.now())
+
+        # Populate job step msg
+        job.status[job_step_name]["msg"] = {
+            "type": MsgType.info.value,
+            "text": sanitize_error_message(msg_text.replace("'", "''"))
+        }
+        job.status_simple = status_simple
+        flag_modified(job, "status")
+        flag_modified(job, "status_simple")
+        # Update job
+        job = await self.update(db=async_session, db_obj=job)
+        return job
+
     async def get_by_date(
         self,
         async_session: AsyncSession,

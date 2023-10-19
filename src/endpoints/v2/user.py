@@ -1,18 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi import status
 from src.db.models.user import User
+from src.db.models.folder import Folder
 from src.schemas.error import HTTPError
 from src.db.session import AsyncSession
 from pydantic import UUID4
 from src.endpoints.deps import get_user_id, get_db
 from src.crud.crud_user import user as crud_user
-
+from src.crud.crud_folder import folder as crud_folder
 router = APIRouter()
 
 
 @router.post(
     "",
     response_model=User,
+    status_code=201,
 )
 async def create_user(
     *,
@@ -26,10 +28,21 @@ async def create_user(
     if user:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already exists")
     else:
-        user = await crud_user.create(async_session, obj_in=User(id=user_id))
         # Create user tables
         await crud_user.create_user_data_tables(async_session, user_id=user_id)
-        return user
+        try:
+            # Create user
+            user = await crud_user.create(async_session, obj_in=User(id=user_id))
+            # Create home folder
+            folder = Folder(name="home", user_id=user_id)
+            await crud_folder.create(
+                async_session,
+                obj_in=folder,
+            )
+            return user
+        except Exception as e:
+            await crud_user.delete_user_data_tables(async_session, user_id)
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.delete(

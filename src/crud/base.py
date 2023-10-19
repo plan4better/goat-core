@@ -124,14 +124,20 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         db: AsyncSession,
         *,
         db_obj: ModelType,
-        obj_in: Union[UpdateSchemaType, Dict[str, Any]],
+        obj_in: Union[UpdateSchemaType, Dict[str, Any]] = None,
     ) -> ModelType:
         if isinstance(obj_in, dict):
             update_data = obj_in
             fields = obj_in.keys()
-        else:
+        elif isinstance(obj_in, BaseModel):
             update_data = obj_in.dict(exclude_unset=True)
             fields = obj_in.__fields__.keys()
+        elif obj_in is None:
+            update_data = {}
+            fields = []
+        else:
+            raise ValueError("Obj_in must be either a dict or a Pydantic model or None.")
+
         for field in fields:
             if field in update_data:
                 setattr(db_obj, field, update_data[field])

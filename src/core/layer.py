@@ -1,12 +1,11 @@
-from fastapi import HTTPException, status, UploadFile
+from fastapi import UploadFile
 from openpyxl import load_workbook
 from src.schemas.layer import (
-    FileUploadType,
     NumberColumnsPerType,
     OgrPostgresType,
     OgrDriverType,
-    ILayerCreate,
     SupportedOgrGeomType,
+    FileUploadType,
 )
 from src.core.config import settings
 import csv
@@ -14,35 +13,80 @@ import zipfile
 import os
 from osgeo import ogr, osr
 import pandas as pd
-from uuid import uuid4, UUID
-import subprocess
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
-from src.utils import create_dir, delete_dir
-from src.schemas.job import JobStatusType, MsgType, Msg
-from src.core.job import job_log
+from src.utils import (
+    async_delete_dir,
+    async_scandir,
+)
+from src.schemas.job import JobStatusType, Msg, MsgType
+from src.core.job import job_log, timeout
+import aiofiles
+import aiofiles.os as aos
+import time
+import asyncio
+from src.utils import async_run_command
 
-
-class OGRFileUpload:
-    def __init__(self, async_session: AsyncSession, user_id: UUID, file: UploadFile, layer_in: ILayerCreate):
+class FileUpload:
+    def __init__(self, async_session: AsyncSession, user_id: UUID, job_id: UUID, file: UploadFile):
         self.async_session = async_session
         self.user_id = user_id
         self.file = file
-        self.file_ending = os.path.splitext(self.file.filename)[-1][1:]
-        self.folder_name = str(uuid4())
-        self.file_name = self.folder_name + "." + self.file_ending
-        self.folder_path = os.path.join("/tmp", self.folder_name)
-        self.file_path = os.path.join(self.folder_path, self.file_name)
-        self.method_match = {
-            FileUploadType.csv: self.validate_csv,
-            FileUploadType.xlsx: self.validate_xlsx,
-            FileUploadType.zip: self.validate_shapefile,
-            FileUploadType.gpkg: self.validate_gpkg,
-            FileUploadType.geojson: self.validate_geojson,
-            FileUploadType.kml: self.validate_kml,
+        self.folder_path = os.path.join(settings.DATA_DIR, str(job_id))
+        self.file_ending = os.path.splitext(file.filename)[-1][1:]
+        self.file_name = file.filename
+        self.file_path = os.path.join(self.folder_path, "file." + self.file_ending)
+
+    @job_log(job_step_name="upload")
+    async def save_file(self, file: UploadFile, job_id: UUID):
+        """Save file to disk for later operations."""
+
+        # Clean all old folders that are older then two hours
+        async for folder in async_scandir(settings.DATA_DIR):
+            stat_result = await aos.stat(os.path.join(settings.DATA_DIR, folder.name))
+            if stat_result.st_mtime < (time.time() - 2 * 3600):
+                await async_delete_dir(os.path.join(settings.DATA_DIR, folder.name))
+
+        # Create folder if exist delete it
+        await async_delete_dir(self.folder_path)
+        await aos.mkdir(self.folder_path)
+
+        # Save file in chunks
+        async with aiofiles.open(self.file_path, "wb") as buffer:
+            while True:
+                chunk = await file.read(65536)
+                if not chunk:
+                    break
+                await buffer.write(chunk)
+
+        return {
+            "msg": Msg(type=MsgType.info, text="File uploaded."),
+            "status": JobStatusType.finished.value,
+        }
+
+    async def fail_save_file(folder_path: str):
+        """Delete folder if file upload fails."""
+        await async_delete_dir(folder_path)
+
+
+class OGRFileHandling:
+    def __init__(self, async_session: AsyncSession, user_id: UUID, job_id: UUID, file_path: str):
+        self.async_session = async_session
+        self.user_id = user_id
+        self.file_path = file_path
+        self.folder_path = os.path.dirname(file_path)
+        self.file_ending = os.path.splitext(os.path.basename(file_path))[-1][1:]
+        self.file_name = os.path.splitext(os.path.basename(file_path))[0]
+        self.method_match_validate = {
+            FileUploadType.csv.value: self.validate_csv,
+            FileUploadType.xlsx.value: self.validate_xlsx,
+            FileUploadType.zip.value: self.validate_shapefile,
+            FileUploadType.gpkg.value: self.validate_gpkg,
+            FileUploadType.geojson.value: self.validate_geojson,
+            FileUploadType.kml.value: self.validate_kml,
         }
         self.driver_name = OgrDriverType[self.file_ending].value
-        self.layer_in = layer_in
 
     def validate_ogr(self, file_path: str):
         """Validate using ogr and get valid attributes."""
@@ -53,31 +97,34 @@ class OGRFileUpload:
         # Open the file using OGR
         data_source = driver.Open(file_path)
         if data_source is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Could not open the file",
-            )
+            return {
+                "msg": "Could not open the file",
+                "status": JobStatusType.failed.value,
+            }
 
         # Count the number of layers
         layer_count = data_source.GetLayerCount()
 
         # Validate that there is only one layer
         if layer_count != 1:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="File must contain exactly one layer.",
-            )
+            return {
+                "msg": "File must contain exactly one layer.",
+                "status": JobStatusType.failed.value,
+            }
+
         # Get Layer and check types
         layer = data_source.GetLayer(0)
 
-        # Check if CRS is give other no conversion can be done later
-        spatial_ref = layer.GetSpatialRef()
+        # Check if layer has a geometry
+        if layer.GetLayerDefn().GetGeomFieldCount() == 1:
+            # Check if CRS is give other no conversion can be done later
+            spatial_ref = layer.GetSpatialRef()
 
-        if spatial_ref is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Could not determine Coordinate Reference System (CRS).",
-            )
+            if spatial_ref is None:
+                return {
+                    "msg": "Could not determine Coordinate Reference System (CRS).",
+                    "status": JobStatusType.failed.value,
+                }
 
         data_types = self.check_field_types(layer)
 
@@ -127,17 +174,22 @@ class OGRFileUpload:
         field_types = {"valid": {}, "unvalid": {}, "overflow": {}, "geometry": {}}
         layer_def = layer.GetLayerDefn()
 
-        # Get geometry type of layer to upload to specify target table
-        geometry_type = ogr.GeometryTypeToName(layer_def.GetGeomType()).replace(" ", "_")
-        if geometry_type not in SupportedOgrGeomType.__members__:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Geometry type {geometry_type} not supported.",
-            )
-        # Save geometry type and geometry column name
-        field_types["geometry"]["column_name"] = layer_def.GetGeomFieldDefn(0).GetName()
-        field_types["geometry"]["type"] = geometry_type
-        field_types["geometry"]["extent"] = self.get_layer_extent(layer)
+        if layer_def.GetGeomFieldCount() == 1:
+            # Get geometry type of layer to upload to specify target table
+            geometry_type = ogr.GeometryTypeToName(layer_def.GetGeomType()).replace(" ", "_")
+            if geometry_type not in SupportedOgrGeomType.__members__:
+                return {
+                    "msg": "Geometry type not supported.",
+                    "status": JobStatusType.failed.value,
+                }
+
+            # Save geometry type and geometry column name
+            if layer_def.GetGeomFieldDefn(0).GetName() == "":
+                field_types["geometry"]["column_name"] = "wkb_geometry"
+            else:
+                field_types["geometry"]["column_name"] = layer_def.GetGeomFieldDefn(0).GetName()
+            field_types["geometry"]["type"] = geometry_type
+            field_types["geometry"]["extent"] = self.get_layer_extent(layer)
 
         for i in range(layer_def.GetFieldCount()):
             field_def = layer_def.GetFieldDefn(i)
@@ -182,21 +234,25 @@ class OGRFileUpload:
 
         # Read from file_path and check if CSV is well-formed
         with open(self.file_path, "rb") as f:
-            contents = f.readlines()
-            csv_reader = csv.reader([line.decode() for line in contents])
+            sniffer = csv.Sniffer()
+            sample_bytes = 1024
+            sample = f.read(sample_bytes)
+
+            if not sniffer.has_header(sample):
+                return {
+                    "msg": "CSV is not well-formed: Missing header.",
+                    "status": JobStatusType.failed.value,
+                }
+
+            # Get header
+            csv_reader = csv.reader(f)
             header = next(csv_reader)
 
-            if not header:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="CSV is not well-formed: Missing header.",
-                )
-
             if any(not col for col in header):
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="CSV is not well-formed: Header contains empty values.",
-                )
+                return {
+                    "msg": "CSV is not well-formed: Header contains empty values.",
+                    "status": JobStatusType.failed.value,
+                }
 
         # Load in df to get data types
         df = pd.read_csv(self.file_path)
@@ -211,19 +267,19 @@ class OGRFileUpload:
 
         # Check if only one sheet is present
         if len(wb.sheetnames) != 1:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="XLSX is not well-formed: More than one sheet is present.",
-            )
+            return {
+                "msg": "XLSX is not well-formed: More than one sheet is present.",
+                "status": JobStatusType.failed.value,
+            }
 
         sheet = wb.active
         # Check header
         header = [cell.value for cell in sheet[1]]
         if any(value is None for value in header):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="XLSX is not well-formed: Header contains empty values.",
-            )
+            return {
+                "msg": "XLSX is not well-formed: Header contains empty values.",
+                "status": JobStatusType.failed.value,
+            }
 
         return self.validate_ogr(self.file_path)
 
@@ -241,19 +297,19 @@ class OGRFileUpload:
             for ext in extensions:
                 matching_files = [f for f in file_names if f.endswith(ext)]
                 if len(matching_files) != 1:
-                    raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                        detail=f"ZIP must contain exactly one {ext} file.",
-                    )
+                    return {
+                        "msg": f"ZIP must contain exactly one {ext} file.",
+                        "status": JobStatusType.failed.value,
+                    }
                 valid_files.append(matching_files[0])
 
             # Check if the main shapefile components share the same base name
             base_name = os.path.splitext(valid_files[0])[0]
             if any(f"{base_name}{ext}" not in valid_files for ext in extensions):
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="All main shapefile components (.shp, .shx, .dbf, .prj) must share the same base name.",
-                )
+                return {
+                    "msg": "All main shapefile components (.shp, .shx, .dbf, .prj) must share the same base name.",
+                    "status": JobStatusType.failed.value,
+                }
 
         # Unzip file in temporary directory
         zip_dir = os.path.join(
@@ -278,141 +334,147 @@ class OGRFileUpload:
         """Validate kml."""
         return self.validate_ogr(self.file_path)
 
-    @job_log(job_step_name='validation')
+    @job_log(job_step_name="validation")
     async def validate(self, job_id: UUID):
-        # Save file to disk inside /tmp folder
-        try:
-            # Create folder
-            create_dir(self.folder_path)
-            # Save file
-            with open(self.file_path, "wb") as buffer:
-                buffer.write(self.file.file.read())
-            # Run validation
-            result = self.method_match[self.file_ending]()
+        """Validate file before uploading."""
 
-            # Build object for job step status
-            msg_text = ""
-            if result["data_types"]["unvalid"] == {} and result["data_types"]["overflow"] == {}:
-                msg_type = MsgType.info.value
-                msg_text = "File is valid."
-            else:
-                msg_type = MsgType.warning.value
-                if result["data_types"]["unvalid"]:
-                    msg_text = f"The following attributes are not saved as they could not be mapped to a valid data type: {', '.join(result['data_types']['unvalid'].keys())}"
-                if result["data_types"]["overflow"]:
-                    msg_text = msg_text + f"The following attributes are not saved as they exceed the maximum number of columns per data type: {', '.join(result['data_types']['overflow'].keys())}"
+        # Run validation
+        result = self.method_match_validate[self.file_ending]()
 
-            result["msg"] = Msg(type=msg_type, text=msg_text)
-            result["status"] = JobStatusType.finished.value
+        if result.get("status") == JobStatusType.failed.value:
             return result
 
-        except Exception as e:
-            # Clean up temporary files
-            delete_dir(self.folder_path)
+        # Build object for job step status
+        msg_text = ""
+        if result["data_types"]["unvalid"] == {} and result["data_types"]["overflow"] == {}:
+            msg_type = MsgType.info.value
+            msg_text = "File is valid."
+        else:
+            msg_type = MsgType.warning.value
+            if result["data_types"]["unvalid"]:
+                msg_text = f"The following attributes are not saved as they could not be mapped to a valid data type: {', '.join(result['data_types']['unvalid'].keys())}"
+            if result["data_types"]["overflow"]:
+                msg_text = (
+                    msg_text
+                    + f"The following attributes are not saved as they exceed the maximum number of columns per data type: {', '.join(result['data_types']['overflow'].keys())}"
+                )
 
-            # Build object for job step status
-            msg = Msg(type=MsgType.error, text=str(e))
-            return {
-                "msg": msg,
-                "status": JobStatusType.failed.value,
-            }
+        result["msg"] = Msg(type=msg_type, text=msg_text)
+        result["status"] = JobStatusType.finished.value
+        return result
 
-    @job_log(job_step_name='upload')
-    async def upload_ogr2ogr(
-        self, validation_result: dict, temp_table_name: str, job_id: UUID
-    ):
+    async def validate_fail(self, folder_path: str):
+        """Delete folder if validation fails."""
+        await async_delete_dir(folder_path)
+
+    @job_log(job_step_name="upload")
+    async def upload_ogr2ogr(self, temp_table_name: str, job_id: UUID):
         """Upload file to database."""
 
-        try:
-            file_path = validation_result["file_path"]
-            # Initialize OGR
-            ogr.RegisterAll()
+        # Initialize OGR
+        ogr.RegisterAll()
 
-            # Setup the input GeoJSON data source
-            driver = ogr.GetDriverByName(self.driver_name)
-            data_source = driver.Open(file_path, 0)
-            layer = data_source.GetLayer(0)
-            layer.GetLayerDefn()
+        # Setup the input GeoJSON data source
+        driver = ogr.GetDriverByName(self.driver_name)
+        data_source = driver.Open(self.file_path, 0)
+        layer = data_source.GetLayer(0)
+        layer_def = layer.GetLayerDefn()
 
-            # Prepare the ogr2ogr command
-            if self.file_ending == FileUploadType.gpkg.value:
-                layer_name = layer.GetName()
-            else:
-                layer_name = None
+        # Get geometry type of layer to force multipolygon if any polygon type
+        geometry_type = ogr.GeometryTypeToName(layer_def.GetGeomType()).replace(" ", "_")
+        if 'polygon' in geometry_type.lower():
+            geometry_type = '-nlt MULTIPOLYGON'
+        else:
+            geometry_type = ''
 
-            # Build CMD command
-            cmd = f'ogr2ogr -f "PostgreSQL" "PG:host={settings.POSTGRES_SERVER} dbname={settings.POSTGRES_DB} user={settings.POSTGRES_USER} password={settings.POSTGRES_PASSWORD} port={settings.POSTGRES_PORT}" {file_path} {layer_name} -nln {temp_table_name} -t_srs "EPSG:4326" -progress'
+        # Prepare the ogr2ogr command
+        if self.file_ending == FileUploadType.gpkg.value:
+            layer_name = layer.GetName()
+        else:
+            layer_name = ""
 
-            # Execute the command command using subprocess
-            subprocess.run(cmd, shell=True, check=True)
+        # Build CMD command
+        cmd = f"""ogr2ogr -f "PostgreSQL" "PG:host={settings.POSTGRES_SERVER} dbname={settings.POSTGRES_DB} user={settings.POSTGRES_USER} password={settings.POSTGRES_PASSWORD} port={settings.POSTGRES_PORT}" {self.file_path} {layer_name} -nln {temp_table_name} -t_srs "EPSG:4326" -progress -dim XY {geometry_type} -unsetFieldWidth"""
+        # Run as async task
+        task = asyncio.create_task(async_run_command(cmd))
+        await task
 
-            # Close data source
-            data_source = None
+        # Close data source
+        data_source = None
 
-            # Build object for job step status
-            msg = Msg(type=MsgType.info, text="File uploaded.")
-            return {
-                "msg": msg,
-                "status": JobStatusType.finished.value,
-            }
-        except Exception as e:
-            # Clean up temporary files
-            delete_dir(self.folder_path)
-            await self.async_session.execute(text(f"DROP TABLE IF EXISTS {temp_table_name}"))
-            await self.async_session.commit()
+        # Build object for job step status
+        msg = Msg(type=MsgType.info, text="File uploaded.")
 
-            # Build object for job step status
-            msg = Msg(type=MsgType.error, text=str(e).replace("'", "''"))
-            return {
-                "msg": msg,
-                "status": JobStatusType.failed.value,
-            }
+        # Delete folder with file
+        await async_delete_dir(self.folder_path)
+        return {
+            "msg": msg,
+            "status": JobStatusType.finished.value,
+        }
 
-    @job_log(job_step_name='migration')
+    async def upload_ogr2ogr_fail(self, temp_table_name: str):
+        """Delete folder if ogr2ogr upload fails."""
+        self.validate_fail(self.folder_path)
+        await self.async_session.execute(text(f"DROP TABLE IF EXISTS {temp_table_name}"))
+        await self.async_session.commit()
+
+    @timeout(120)
+    @job_log(job_step_name="migration")
     async def migrate_target_table(
-        self, validation_result: dict, attribute_mapping: dict, temp_table_name: str, layer_id: UUID, job_id: UUID
+        self,
+        validation_result: dict,
+        attribute_mapping: dict,
+        temp_table_name: str,
+        layer_id: UUID,
+        job_id: UUID,
     ):
         """Migrate data from temporary table to target table."""
 
-        try:
-            data_types = validation_result["data_types"]
-            geom_column = data_types["geometry"]["column_name"]
+        data_types = validation_result["data_types"]
+        geom_column = data_types["geometry"].get("column_name")
+
+        # Check if table has a geometry if not it is just a normal table
+        if geom_column is None:
+            target_table = f"{settings.USER_DATA_SCHEMA}.no_geometry_{str(self.user_id).replace('-', '')}"
+            select_geom = ""
+            insert_geom = ""
+        else:
             geometry_type = data_types["geometry"]["type"]
-            target_table = f"user_data.{SupportedOgrGeomType[geometry_type].value}_{str(self.user_id).replace('-', '')}"
+            target_table = f"{settings.USER_DATA_SCHEMA}.{SupportedOgrGeomType[geometry_type].value}_{str(self.user_id).replace('-', '')}"
+            select_geom = f"{geom_column} as geom, "
+            insert_geom = "geom, "
+        select_statement = ""
+        insert_statement = ""
 
-            select_statement = ""
-            insert_statement = ""
-            for i in attribute_mapping:
-                select_statement += f"{i} as {attribute_mapping[i]}, "
-                insert_statement += f"{attribute_mapping[i]}, "
-            select_statement = f"""SELECT {select_statement} {geom_column} AS geom, '{str(layer_id)}' FROM {temp_table_name}"""
+        # Build select and insert statement
+        for i in attribute_mapping:
+            data_type = attribute_mapping[i].split("_")[0]
+            select_statement += f"{i}::{data_type} as {attribute_mapping[i]}, "
+            insert_statement += f"{attribute_mapping[i]}, "
+        select_statement = f"""SELECT {select_statement} {select_geom} '{str(layer_id)}' FROM {temp_table_name}"""
 
-            # Insert data in target table
-            await self.async_session.execute(
-                text(
-                    f"INSERT INTO {target_table}({insert_statement} geom, layer_id) {select_statement}"
-                )
+        # Insert data in target table
+        await self.async_session.execute(
+            text(
+                f"INSERT INTO {target_table}({insert_statement} {insert_geom} layer_id) {select_statement}"
             )
-            await self.async_session.commit()
-            return {
-                "msg": Msg(type=MsgType.info, text="Data migrated."),
-                "status": JobStatusType.finished.value,
-            }
+        )
+        await self.async_session.commit()
 
-        except Exception as e:
-            await self.async_session.rollback()
-            # Clean up temporary files
-            delete_dir(self.folder_path)
-            await self.async_session.execute(text(f"DROP TABLE IF EXISTS {temp_table_name}"))
-            await self.async_session.commit()
+        # Delete temporary table
+        await self.async_session.execute(text(f"DROP TABLE IF EXISTS {temp_table_name}"))
+        await self.async_session.commit()
 
-            # Delete data from user table if already inserted
-            await self.async_session.execute(text(f"DELETE FROM {target_table} WHERE layer_id = '{str(layer_id)}'"))
-            await self.async_session.commit()
+        return {
+            "msg": Msg(type=MsgType.info, text="Data migrated."),
+            "status": JobStatusType.finished.value,
+        }
 
-            # Build object for job step status
-            msg = Msg(type=MsgType.error, text=str(e).replace("'", "''"))
-            return {
-                "msg": msg,
-                "status": JobStatusType.failed.value,
-            }
+    async def migrate_target_table_fail(self, target_table: str, layer_id: UUID):
+        """Delete folder if ogr2ogr upload fails."""
+        # Delete data from user table if already inserted
+        await self.upload_ogr2ogr_fail(self.folder_path)
+        await self.async_session.execute(
+            text(f"DELETE FROM {target_table} WHERE layer_id = '{str(layer_id)}'")
+        )
+        await self.async_session.commit()

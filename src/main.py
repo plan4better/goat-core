@@ -58,11 +58,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-sentry_sdk.init(
-    dsn=settings.SENTRY_DSN,
-    environment=os.getenv("NAMESPACE", "dev"),
-    traces_sample_rate=0.2,
-)
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=os.getenv("NAMESPACE", "dev"),
+        traces_sample_rate=0.2,
+    )
 
 try:
     app.add_middleware(SentryAsgiMiddleware)

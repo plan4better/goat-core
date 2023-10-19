@@ -1,9 +1,7 @@
 from enum import Enum
 from typing import List
 from uuid import UUID
-
 from pydantic import BaseModel, Field, ValidationError
-
 from src.db.models._base_class import DateTimeBase, content_base_example
 from src.db.models.layer import (
     FeatureLayerType,
@@ -23,18 +21,8 @@ class AnalysisType(str, Enum):
 
     intersects = "intersects"
 
-# It was decided against using MIME types here because for e.g. gpkg they are commonly just generic application/octet-stream
-class FileUploadType(str, Enum):
-    """File upload types."""
 
-    geojson = "geojson"
-    csv = "csv"
-    xlsx = "xlsx"
-    gpkg = "gpkg"
-    kml = "kml"
-    zip = "zip"  # Commonly used for shapefiles
-
-class MaxFileSizeType(str, Enum):
+class MaxFileSizeType(int, Enum):
     """Max file size types in bytes."""
 
     geojson = 300000000
@@ -44,11 +32,22 @@ class MaxFileSizeType(str, Enum):
     kml = 300000000
     zip = 300000000
 
-class TableDataType(str, Enum):
+class TableUploadType(str, Enum):
     """Table data types."""
 
     csv = "csv"
     xlsx = "xlsx"
+
+# It was decided against using MIME types here because for e.g. gpkg they are commonly just generic application/octet-stream
+class FeatureLayerUploadType(str, Enum):
+    """File upload types."""
+
+    geojson = "geojson"
+    gpkg = "gpkg"
+    kml = "kml"
+    zip = "zip"  # Commonly used for shapefiles
+
+FileUploadType = Enum("FileUploadType", {**TableUploadType.__members__, **FeatureLayerUploadType.__members__})
 
 class SupportedOgrGeomType(Enum):
     Point = "point"
@@ -75,7 +74,8 @@ class OgrDriverType(str, Enum):
     xlsx = "XLSX"
     gpkg = "GPKG"
     kml = "KML"
-    zip = "ESRI Shapefile"
+    shp = "ESRI Shapefile" # Using SHP driver for ZIP files as the file is converted to SHP to keep data types
+    zip = "ESRI Shapefile" # Using SHP driver for ZIP files as the file is converted to SHP to keep data types
 
 class NumberColumnsPerType(int, Enum):
     """Number of columns per type."""
@@ -89,6 +89,7 @@ class NumberColumnsPerType(int, Enum):
     arrint = 3
     arrtext = 3
     jsonb = 3
+    boolean = 3
 
 
 class LayerReadBaseAttributes(BaseModel):
@@ -421,8 +422,16 @@ class ILayerUpdate(BaseModel):
         layer_update_class = get_layer_class("update", **kwargs)
         return layer_update_class(**kwargs)
 
+class IUploadJobId(BaseModel):
+    """Model to import a file object."""
+
+    upload_job_id: UUID = Field(..., description="Upload job ID")
+
 
 request_examples = {
+    "upload_job_id": {
+        "upload_job_id": "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
+    },
     "get": {
         "ids": ["e7dcaae4-1750-49b7-89a5-9510bf2761ad", "e7dcaae4-1750-49b7-89a5-9510bf2761ad"],
     },

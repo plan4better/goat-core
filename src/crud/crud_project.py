@@ -1,10 +1,7 @@
 from uuid import UUID
-
-from fastapi_pagination import Page
-from fastapi_pagination import Params as PaginationParams
+from fastapi_pagination import Page, Params as PaginationParams
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.content import update_content_by_id
 from src.db.models.project import Project
 from src.schemas.common import OrderEnum
