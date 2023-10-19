@@ -83,6 +83,7 @@ h3 = "^3.7.6"
 numba = "^0.57.1"
 fastapi-pagination = "^0.12.6"
 gdal = "3.6.2"
+aiofiles = "^23.2.1"
 
 
 [tool.poetry.group.dev.dependencies]
