@@ -51,3 +51,6 @@ coverage.xml
 
 # pyenv
 .python-version
+
+# Data folder
+/data/
