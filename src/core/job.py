@@ -26,7 +26,7 @@ def job_init():
             # Execute function
             try:
                 result = await func(*args, **kwargs)
-            except Exception:
+            except Exception as e:
                 # Update job status simple to failed
                 job = await crud_job.update(
                     db=async_session,

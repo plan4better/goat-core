@@ -15,6 +15,7 @@ from src.schemas.folder import (
     FolderUpdate,
     request_examples as folder_request_examples,
 )
+from typing import List
 
 router = APIRouter()
 
@@ -68,7 +69,7 @@ async def read_folder(
 @router.get(
     "",
     summary="Retrieve a list of folders",
-    response_model=Page[FolderRead],
+    response_model=List[FolderRead],
     response_model_exclude_none=True,
     status_code=200,
 )
@@ -76,7 +77,6 @@ async def read_folders(
     *,
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
-    page_params: PaginationParams = Depends(),
     search: str = Query(None, description="Searches the name of the folder"),
     order_by: str = Query(
         None,
@@ -94,15 +94,15 @@ async def read_folders(
     folders = await crud_folder.get_multi(
         async_session,
         query=query,
-        page_params=page_params,
         search_text={"name": search} if search else {},
         order_by=order_by,
         order=order,
     )
 
-    if len(folders.items) == 0:
+    if folders == []:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No Folders Found")
 
+    folders = [folder[0] for folder in folders]
     return folders
 
 

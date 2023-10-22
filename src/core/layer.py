@@ -232,18 +232,20 @@ class OGRFileHandling:
     def validate_csv(self):
         """Validate if CSV."""
 
-        # Read from file_path and check if CSV is well-formed
+        # Read file in binary mode to check if header exists
         with open(self.file_path, "rb") as f:
             sniffer = csv.Sniffer()
             sample_bytes = 1024
             sample = f.read(sample_bytes)
 
-            if not sniffer.has_header(sample):
+            if not sniffer.has_header(sample.decode('utf-8')):
                 return {
                     "msg": "CSV is not well-formed: Missing header.",
                     "status": JobStatusType.failed.value,
                 }
 
+        # Read file in text mode
+        with open(self.file_path, "r") as f:
             # Get header
             csv_reader = csv.reader(f)
             header = next(csv_reader)

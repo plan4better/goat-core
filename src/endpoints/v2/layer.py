@@ -1,12 +1,13 @@
-import ast
+import os
 from typing import List
+from uuid import uuid4
+
 from fastapi import (
     APIRouter,
     BackgroundTasks,
     Body,
     Depends,
     File,
-    Form,
     HTTPException,
     Path,
     Query,
@@ -19,7 +20,6 @@ from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
 from sqlalchemy import and_, or_, select
 from src.core.content import (
-    create_content,
     delete_content_by_id,
     read_content_by_id,
     read_contents_by_ids,
@@ -27,36 +27,26 @@ from src.core.content import (
 )
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import layer as crud_layer
-from src.db.models.job import Job
 from src.db.models.layer import FeatureLayerType, Layer, LayerType
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_user_id
 from src.schemas.common import ContentIdList, OrderEnum
-from src.schemas.job import JobType, job_mapping, JobStatusType
+from src.schemas.job import JobStatusType, JobType
 from src.schemas.layer import (
-    ILayerCreate,
-    ILayerRead,
-    ILayerUpdate,
-    TableUploadType,
     FeatureLayerUploadType,
     FileUploadType,
-    IUploadJobId
+    IInternalLayerCreate,
+    ILayerExternalCreate,
+    ILayerRead,
+    ILayerUpdate,
+    IValidateJobId,
+    MaxFileSizeType,
+    TableUploadType,
 )
-from src.schemas.layer import request_examples as layer_request_examples, MaxFileSizeType
-from src.core.config import settings
-import os
-from src.utils import check_file_size
-from uuid import uuid4
+from src.schemas.layer import request_examples as layer_request_examples
+from src.utils import check_file_size, get_user_table
 
 router = APIRouter()
-
-
-def generate_description(examples: dict) -> str:
-    description = "## Submit Data Endpoint\n\nThis endpoint accepts form data. Here are some example inputs:\n"
-    for _field, field_examples in examples.items():
-        description += f"\n- **{field_examples['summary']}**:\n"
-        description += f"{str(field_examples['value'])}\n"
-    return description
 
 
 @router.post(
@@ -124,9 +114,9 @@ async def file_import(
     background_tasks: BackgroundTasks,
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
-    upload_job_id: IUploadJobId = Body(
+    validate_job_id: IValidateJobId = Body(
         ...,
-        example=layer_request_examples["upload_job_id"],
+        example=layer_request_examples["validate_job_id"],
         description="Upload job ID",
     ),
 ):
@@ -135,21 +125,21 @@ async def file_import(
     """
 
     # Check if file upload job exists, is finished and owned by the user
-    upload_job = await crud_job.get_by_multi_keys(
+    validate_job = await crud_job.get_by_multi_keys(
         db=async_session,
         keys={
-            "id": upload_job_id.upload_job_id,
+            "id": validate_job_id.validate_job_id,
             "user_id": user_id,
             "type": JobType.file_validate.value,
             "status_simple": JobStatusType.finished.value,
         },
     )
-    if upload_job == []:
+    if validate_job == []:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File upload job not found or not finished.",
         )
-    upload_job = upload_job[0]
+    validate_job = validate_job[0]
     # Create job and check if user can create a new job
     job = await crud_job.check_and_create(
         async_session=async_session,
@@ -167,8 +157,8 @@ async def file_import(
         user_id=user_id,
         job_id=job.id,
         layer_id=layer_id,
-        upload_job=upload_job,
-        file_path=upload_job.response["file_path"],
+        validate_job=validate_job,
+        file_path=validate_job.response["file_path"],
     )
 
     return {"job_id": job.id}
@@ -176,59 +166,49 @@ async def file_import(
 
 ## Layer endpoints
 @router.post(
-    "",
-    summary="Create a new layer",
-    response_class=JSONResponse,
+    "/internal",
+    summary="Create a new internal layer",
+    response_model=ILayerRead,
     status_code=201,
-    description=generate_description(layer_request_examples["create"]),
+    description="Generate a new layer from a file that was previously uploaded using the file-upload endpoint.",
 )
-async def create_layer(
-    background_tasks: BackgroundTasks,
+async def create_layer_internal(
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
-    file: UploadFile | None = File(None, description="File to upload. "),
-    layer_in: str = Form(
+    layer_in: IInternalLayerCreate = Body(
         ...,
-        example=str(layer_request_examples["create"]["feature_layer_standard"]["value"]),
+        examples=layer_request_examples["create_internal"],
         description="Layer to create",
     ),
 ):
-    """Create a new layer."""
+    """Create a new internal layer."""
+    layer = await crud_layer.create_internal(
+        async_session=async_session, user_id=user_id, layer_in=layer_in
+    )
+    return layer
 
-    layer_in = ILayerCreate(**ast.literal_eval(layer_in))
-    if file is not None:
-        # Create job
-        job = Job(
-            user_id=user_id,
-            type=JobType.layer_upload.value,
-            payload={},
-            status=job_mapping[JobType.layer_upload.value]().dict(),
-        )
-        # Create job
-        job = await crud_job.create(db=async_session, obj_in=job)
-        job_id = job.id
 
-        # Send job to background
-        background_tasks.add_task(
-            crud_layer.create_table_or_feature_layer,
-            async_session=async_session,
-            file=file,
-            job_id=job_id,
-            user_id=user_id,
-            layer_in=layer_in,
-            payload={},
-        )
-        return {"job_id": job_id}
-    else:
-        layer = await create_content(
-            async_session=async_session,
-            model=Layer,
-            crud_content=crud_layer,
-            content_in=layer_in,
-            other_params={"user_id": user_id},
-        )
-        layer = layer.dict(exclude_none=True)
-        return layer
+@router.post(
+    "/external",
+    summary="Create a new external layer",
+    response_model=ILayerRead,
+    status_code=201,
+    description="Generate a new layer based on a URL that is stored on an external server.",
+)
+async def create_layer_external(
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+    layer_in: ILayerExternalCreate = Body(
+        ...,
+        example=layer_request_examples["create_external"],
+        description="Layer to create",
+    ),
+):
+    """Create a new external layer."""
+
+    layer_in = Layer(**layer_in.dict(), user_id=user_id)
+    layer = await crud_layer.create(db=async_session, obj_in=layer_in)
+    return layer
 
 
 @router.get(
@@ -388,6 +368,7 @@ async def update_layer(
 @router.delete(
     "/{id}",
     response_model=None,
+    summary="Delete a layer and its data in case of an internal layer.",
     status_code=204,
 )
 async def delete_layer(
@@ -398,6 +379,25 @@ async def delete_layer(
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
 ):
-    return await delete_content_by_id(
-        async_session=async_session, id=id, model=Layer, crud_content=crud_layer
+    """Delete a layer and its data in case of an internal layer."""
+
+    layer = await crud_layer.get(async_session, id=id)
+    if layer is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Layer not found")
+
+    # Check if internal or external layer
+    if layer.type == LayerType.feature_layer.value:
+        # Get data table name
+        table_name = get_user_table(str(layer.user_id), layer.feature_layer_geometry_type)
+        await crud_layer.delete_layer_data(async_session=async_session, layer_id=layer.id, table_name=table_name)
+    elif layer.type == LayerType.table.value:
+        # Get data table name
+        table_name = get_user_table(str(layer.user_id), "no_geometry")
+        await crud_layer.delete_layer_data(async_session=async_session, layer_id=layer.id, table_name=table_name)
+
+    # Delete layer metadata
+    await crud_layer.delete(
+        db=async_session,
+        id=id,
     )
+    return

@@ -1,29 +1,113 @@
 import os
 from uuid import UUID, uuid4
-from fastapi import UploadFile, BackgroundTasks
+
+from fastapi import BackgroundTasks, UploadFile, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.core.config import settings
+from src.core.job import job_init, run_background_or_immediately
 from src.core.layer import FileUpload, OGRFileHandling
 from src.crud.base import CRUDBase
 from src.crud.crud_job import job as crud_job
-from src.db.models.layer import Layer
 from src.db.models.job import Job
+from src.db.models.layer import Layer
 from src.schemas.job import JobStatusType
 from src.schemas.layer import (
-    ILayerCreate,
     LayerType,
     SupportedOgrGeomType,
+    FeatureLayerType,
+    IFeatureLayerStandardCreateAdditionalAttributes,
+    ITableLayerCreateAdditionalAttributes,
 )
 from src.schemas.style import base_styles
-from src.core.config import settings
-from src.core.job import job_init, run_background_or_immediately
-
+from src.schemas.job import JobType
+from sqlalchemy import text
 
 class CRUDLayer(CRUDBase):
-    async def create_layer_metadata(
-        self, async_session: AsyncSession, user_id: UUID, layer_in: ILayerCreate
-    ):
-        layer_in = Layer(**layer_in.dict(exclude_none=True), **{"user_id": user_id})
-        layer = await self.create(async_session, obj_in=layer_in)
+    """CRUD class for Layer."""
+
+    async def create_internal(self, async_session: AsyncSession, user_id: UUID, layer_in):
+        # Get import job
+        import_job = await crud_job.get_by_multi_keys(
+            db=async_session,
+            keys={
+                "id": layer_in.import_job_id,
+                "user_id": user_id,
+                "type": JobType.file_import.value,
+                "status_simple": JobStatusType.finished.value,
+            },
+        )
+        # Check if import job exists, is finished and owned by the user
+        if import_job == []:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Import job not found or not finished.",
+            )
+        import_job = import_job[0]
+
+        # Get validate job
+        validate_job = await crud_job.get_by_multi_keys(
+            db=async_session,
+            keys={
+                "id": import_job.response["validate_job_id"],
+                "user_id": user_id,
+                "type": JobType.file_validate.value,
+                "status_simple": JobStatusType.finished.value,
+            },
+        )
+        # Check if validate job exists, is finished and owned by the user
+        if validate_job == []:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Validate job not found or not finished.",
+            )
+        validate_job = validate_job[0]
+        layer_attributes = validate_job.response
+
+        additional_attributes = {}
+        # Get layer_id and size from import job
+        additional_attributes["id"] = import_job.layer_ids[0]
+        additional_attributes["user_id"] = user_id
+        additional_attributes["size"] = layer_attributes["file_size"]
+
+        # Create attribute mapping
+        attribute_mapping = {}
+        for data_type in layer_attributes["data_types"]["valid"]:
+            cnt = 0
+            for column in layer_attributes["data_types"]["valid"][data_type]:
+                cnt += 1
+                attribute_mapping[data_type + "_" + str(cnt)] = column
+
+        additional_attributes["attribute_mapping"] = attribute_mapping
+
+        # Get default style if feature layer
+        if layer_attributes["data_types"].get("geometry"):
+            geom_type = SupportedOgrGeomType[
+                layer_attributes["data_types"]["geometry"]["type"]
+            ].value
+            additional_attributes["style"] = base_styles["feature_layer"]["standard"][geom_type]
+            additional_attributes["type"] = LayerType.feature_layer
+            additional_attributes["feature_layer_type"] = FeatureLayerType.standard
+            additional_attributes["feature_layer_geometry_type"] = geom_type
+            additional_attributes["extent"] = layer_attributes["data_types"]["geometry"]["extent"]
+            additional_attributes = IFeatureLayerStandardCreateAdditionalAttributes(
+                **additional_attributes
+            ).dict()
+        else:
+            additional_attributes["type"] = LayerType.table
+            additional_attributes = ITableLayerCreateAdditionalAttributes(
+                **additional_attributes
+            ).dict()
+
+        # Populate layer_in with additional attributes
+        layer_in = Layer(
+            **layer_in.dict(exclude_none=True),
+            **additional_attributes,
+        )
+        layer = await self.create(
+            db=async_session,
+            obj_in=layer_in,
+        )
         return layer
 
     @run_background_or_immediately(settings)
@@ -44,7 +128,11 @@ class CRUDLayer(CRUDBase):
 
         # Save file
         result = await file_upload.save_file(file=file, job_id=job_id)
-        if result["status"] in [JobStatusType.failed.value, JobStatusType.timeout.value, JobStatusType.killed.value]:
+        if result["status"] in [
+            JobStatusType.failed.value,
+            JobStatusType.timeout.value,
+            JobStatusType.killed.value,
+        ]:
             return result
 
         # Build folder path
@@ -58,7 +146,11 @@ class CRUDLayer(CRUDBase):
         )
         # Validate file before uploading
         validation_result = await ogr_file_handling.validate(job_id=job_id)
-        if validation_result["status"] in [JobStatusType.failed.value, JobStatusType.timeout.value, JobStatusType.killed.value]:
+        if validation_result["status"] in [
+            JobStatusType.failed.value,
+            JobStatusType.timeout.value,
+            JobStatusType.killed.value,
+        ]:
             return validation_result
 
         # Get file size in bytes
@@ -88,7 +180,7 @@ class CRUDLayer(CRUDBase):
         background_tasks: BackgroundTasks,
         async_session: AsyncSession,
         job_id: UUID,
-        upload_job: Job,
+        validate_job: Job,
         user_id: UUID,
         layer_id: UUID,
         file_path: str,
@@ -105,7 +197,7 @@ class CRUDLayer(CRUDBase):
 
         # Create attribute mapping out of valid attributes
         attribute_mapping = {}
-        for field_type, field_names in upload_job.response["data_types"]["valid"].items():
+        for field_type, field_names in validate_job.response["data_types"]["valid"].items():
             cnt = 1
             for field_name in field_names:
                 attribute_mapping[field_name] = field_type + "_attr" + str(cnt)
@@ -113,16 +205,16 @@ class CRUDLayer(CRUDBase):
 
         # Populate Layer Object with file metadata
         additional_attributes = {
-            "size": upload_job.response,
+            "size": validate_job.response,
             "user_id": user_id,
             "attribute_mapping": attribute_mapping,
         }
-        if upload_job.response["layer_type"] == "feature_layer":
+        if validate_job.response["layer_type"] == "feature_layer":
             geom_type = SupportedOgrGeomType[
-                upload_job.response["data_types"]["geometry"]["type"]
+                validate_job.response["data_types"]["geometry"]["type"]
             ].value
             additional_attributes["feature_layer_geometry_type"] = geom_type
-            additional_attributes["extent"] = upload_job.response["data_types"]["geometry"][
+            additional_attributes["extent"] = validate_job.response["data_types"]["geometry"][
                 "extent"
             ]
             additional_attributes["style"] = base_styles["feature_layer"]["standard"][geom_type]
@@ -134,18 +226,26 @@ class CRUDLayer(CRUDBase):
             temp_table_name=temp_table_name,
             job_id=job_id,
         )
-        if result["status"] in [JobStatusType.failed.value, JobStatusType.timeout.value, JobStatusType.killed.value]:
+        if result["status"] in [
+            JobStatusType.failed.value,
+            JobStatusType.timeout.value,
+            JobStatusType.killed.value,
+        ]:
             return result
 
         # Migrate temporary table to target table
         result = await ogr_file_upload.migrate_target_table(
-            validation_result=upload_job.response,
+            validation_result=validate_job.response,
             attribute_mapping=attribute_mapping,
             temp_table_name=temp_table_name,
             layer_id=layer_id,
             job_id=job_id,
         )
-        if result["status"] in [JobStatusType.failed.value, JobStatusType.timeout.value, JobStatusType.killed.value]:
+        if result["status"] in [
+            JobStatusType.failed.value,
+            JobStatusType.timeout.value,
+            JobStatusType.killed.value,
+        ]:
             await async_session.rollback()
             return result
 
@@ -154,36 +254,21 @@ class CRUDLayer(CRUDBase):
         await crud_job.update(
             db=async_session,
             db_obj=job,
-            obj_in={"layer_ids": [str(layer_id)]},
+            obj_in={
+                "layer_ids": [str(layer_id)],
+                "response": {"validate_job_id": str(validate_job.id)},
+            },
         )
         return result
 
+    async def delete_layer_data(self, async_session: AsyncSession, layer_id: UUID, table_name: str):
+        """Delete layer data which is in the user data tables."""
+
+        # Delete layer data
+        await async_session.execute(
+            text(f"DELETE FROM {table_name} WHERE layer_id = '{layer_id}'")
+        )
+        await async_session.commit()
+
+
 layer = CRUDLayer(Layer)
-
-
-# Run create_table_or_feature_layer in isolation for development
-async def main():
-    from src.db.session import async_session
-    from src.endpoints.deps import get_user_id
-    from src.schemas.layer import ILayerCreate, request_examples
-
-    layer_in = ILayerCreate(**request_examples["create"]["feature_layer_standard"]["value"])
-    file = UploadFile(
-        filename="valid_feature_layer.gpkg",
-        file=open("/app/tests/data/valid_feature_layer.gpkg", "rb"),
-    )
-    user_id = get_user_id(authorization=None)
-
-    await layer.create_table_or_feature_layer(
-        async_session=async_session(),
-        file=file,
-        user_id=user_id,
-        layer_in=layer_in,
-        payload={},
-    )
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(main())
