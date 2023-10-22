@@ -188,9 +188,9 @@ async def read_layers(
         example="created_at",
     ),
     order: OrderEnum = Query(
-        "ascendent",
+        "descendent",
         description="Specify the order to apply. There are the option ascendent or descendent.",
-        example="ascendent",
+        example="descendent",
     ),
 ):
     """This endpoints returns a list of layers based one the specified filters."""

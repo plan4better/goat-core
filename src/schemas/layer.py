@@ -117,7 +117,9 @@ class FeatureLayerBase(LayerBase, GeospatialAttributes):
     """Base model for feature layers."""
 
     data_store_id: UUID = Field(..., description="Data store ID of the layer")
-    feature_layer_type: "FeatureLayerType" = Field(..., description="Feature layer type")
+    feature_layer_type: "FeatureLayerType" = Field(
+        ..., description="Feature layer type"
+    )
     size: int = Field(..., description="Size of the layer in bytes")
     style: dict = Field(..., description="Style of the layer")
 
@@ -128,26 +130,32 @@ class FeatureLayerBase(LayerBase, GeospatialAttributes):
 # Base models
 
 
-class FeatureLayerCreateBase(LayerCreateBaseAttributes, LayerBase, GeospatialAttributes):
+class FeatureLayerCreateBase(
+    LayerCreateBaseAttributes, LayerBase, GeospatialAttributes
+):
     """Base model for feature layer creates."""
 
-    feature_layer_type: "FeatureLayerType" = Field(..., description="Feature layer type")
+    feature_layer_type: "FeatureLayerType" = Field(
+        ..., description="Feature layer type"
+    )
 
 
-class FeatureLayerReadBaseAttributes(LayerReadBaseAttributes, LayerBase, GeospatialAttributes):
+class FeatureLayerReadBaseAttributes(
+    LayerReadBaseAttributes, LayerBase, GeospatialAttributes
+):
     """Base model for feature layer reads."""
 
-    feature_layer_type: "FeatureLayerType" = Field(..., description="Feature layer type")
+    feature_layer_type: "FeatureLayerType" = Field(
+        ..., description="Feature layer type"
+    )
     size: int = Field(..., description="Size of the layer in bytes")
     style: dict = Field(..., description="Style of the layer")
-    # query: dict = Field(..., description="Query to filter the layer data")
 
 
 class FeatureLayerUpdateBase(LayerBase, GeospatialAttributes):
     """Base model for feature layer updates."""
 
     style: dict | None = Field(None, description="Style ID of the layer")
-    # query: dict | None = Field(None, description="Query to filter the layer data")
 
 
 feature_layer_update_base_example = {
@@ -203,7 +211,9 @@ feature_layer_indicator_attributes_example = {
 }
 
 
-class IFeatureLayerIndicatorCreate(FeatureLayerCreateBase, FeatureLayerIndicatorAttributesBase):
+class IFeatureLayerIndicatorCreate(
+    FeatureLayerCreateBase, FeatureLayerIndicatorAttributesBase
+):
     """Model to create feature layer indicator."""
 
     pass
@@ -237,7 +247,9 @@ feature_layer_scenario_attributes_example = {
 }
 
 
-class IFeatureLayerScenarioCreate(FeatureLayerCreateBase, FeatureLayerScenarioAttributesBase):
+class IFeatureLayerScenarioCreate(
+    FeatureLayerCreateBase, FeatureLayerScenarioAttributesBase
+):
     """Model to create feature layer scenario."""
 
     pass
@@ -281,7 +293,10 @@ imagery_layer_attributes_example = {
 
 
 class IImageryLayerCreate(
-    LayerCreateBaseAttributes, LayerBase, GeospatialAttributes, ImageryLayerAttributesBase
+    LayerCreateBaseAttributes,
+    LayerBase,
+    GeospatialAttributes,
+    ImageryLayerAttributesBase,
 ):
     """Model to create a imagery layer."""
 
@@ -342,7 +357,11 @@ class ITileLayerCreate(
 
 
 class ITileLayerRead(
-    LayerReadBaseAttributes, LayerBase, GeospatialAttributes, TileLayerAttributesBase, DateTimeBase
+    LayerReadBaseAttributes,
+    LayerBase,
+    GeospatialAttributes,
+    TileLayerAttributesBase,
+    DateTimeBase,
 ):
     """Model to read a tile layer."""
 
@@ -434,7 +453,10 @@ class ILayerUpdate(BaseModel):
 
 request_examples = {
     "get": {
-        "ids": ["e7dcaae4-1750-49b7-89a5-9510bf2761ad", "e7dcaae4-1750-49b7-89a5-9510bf2761ad"],
+        "ids": [
+            "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
+            "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
+        ],
     },
     "create": {
         "table_layer": {
@@ -452,16 +474,6 @@ request_examples = {
                 **layer_base_example,
                 "type": "feature_layer",
                 "feature_layer_type": "standard",
-            },
-        },
-        "layer_scenario": {
-            "summary": "Layer Scenario",
-            "value": {
-                **content_base_example,
-                **layer_base_example,
-                **feature_layer_scenario_attributes_example,
-                "type": "feature_layer",
-                "feature_layer_type": "scenario",
             },
         },
         "imagery_layer": {
