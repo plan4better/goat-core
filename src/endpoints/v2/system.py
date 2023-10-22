@@ -36,7 +36,8 @@ async def read_system_settings(
         system_settings = await crud_system_setting.create(
             async_session, obj_in=default_system_settings_obj_in
         )
-    return system_settings
+        system_settings = [system_settings]
+    return system_settings[0]
 
 
 @router.put(
@@ -63,7 +64,7 @@ async def update_system_settings(
         system_settings = await crud_system_setting.create(
             async_session, obj_in=new_system_settings
         )
-
+        system_settings = [system_settings]
         return system_settings
 
     system_settings = await crud_system_setting.update(

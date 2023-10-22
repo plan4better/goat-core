@@ -1,11 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi import status
-from src.db.models.user import User
-from src.schemas.error import HTTPError
-from src.db.session import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import UUID4
-from src.endpoints.deps import get_user_id, get_db
+
 from src.crud.crud_user import user as crud_user
+from src.db.models.user import User
+from src.db.session import AsyncSession
+from src.endpoints.deps import get_db, get_user_id
 
 router = APIRouter()
 

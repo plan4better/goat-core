@@ -23,6 +23,7 @@ class AnalysisType(str, Enum):
 
     intersects = "intersects"
 
+
 # It was decided against using MIME types here because for e.g. gpkg they are commonly just generic application/octet-stream
 class FileUploadType(str, Enum):
     """File upload types."""
@@ -34,6 +35,7 @@ class FileUploadType(str, Enum):
     kml = "kml"
     zip = "zip"  # Commonly used for shapefiles
 
+
 class MaxFileSizeType(str, Enum):
     """Max file size types in bytes."""
 
@@ -44,11 +46,13 @@ class MaxFileSizeType(str, Enum):
     kml = 300000000
     zip = 300000000
 
+
 class TableDataType(str, Enum):
     """Table data types."""
 
     csv = "csv"
     xlsx = "xlsx"
+
 
 class SupportedOgrGeomType(Enum):
     Point = "point"
@@ -58,24 +62,27 @@ class SupportedOgrGeomType(Enum):
     Polygon = "polygon"
     Multi_Polygon = "polygon"
 
+
 class OgrPostgresType(str, Enum):
-    Integer= "integer"
+    Integer = "integer"
     Integer64 = "bigint"
-    Real="float"
-    String= "text"
-    Date= "timestamp"
-    Time= "timestamp"
-    DateTime= "timestamp"
+    Real = "float"
+    String = "text"
+    Date = "timestamp"
+    Time = "timestamp"
+    DateTime = "timestamp"
+
 
 class OgrDriverType(str, Enum):
     """OGR driver types."""
 
     geojson = "GeoJSON"
-    csv = "XLSX" # Using XLSX driver for CSV files as the file is converted to XLSX to keep data types
+    csv = "XLSX"  # Using XLSX driver for CSV files as the file is converted to XLSX to keep data types
     xlsx = "XLSX"
     gpkg = "GPKG"
     kml = "KML"
     zip = "ESRI Shapefile"
+
 
 class NumberColumnsPerType(int, Enum):
     """Number of columns per type."""
@@ -120,28 +127,27 @@ class FeatureLayerBase(LayerBase, GeospatialAttributes):
 ################################################################################
 # Base models
 
-class FeatureLayerCreateBase(
-    LayerCreateBaseAttributes, LayerBase, GeospatialAttributes
-):
+
+class FeatureLayerCreateBase(LayerCreateBaseAttributes, LayerBase, GeospatialAttributes):
     """Base model for feature layer creates."""
+
     feature_layer_type: "FeatureLayerType" = Field(..., description="Feature layer type")
 
 
-class FeatureLayerReadBaseAttributes(
-    LayerReadBaseAttributes, LayerBase, GeospatialAttributes
-):
+class FeatureLayerReadBaseAttributes(LayerReadBaseAttributes, LayerBase, GeospatialAttributes):
     """Base model for feature layer reads."""
+
     feature_layer_type: "FeatureLayerType" = Field(..., description="Feature layer type")
     size: int = Field(..., description="Size of the layer in bytes")
     style: dict = Field(..., description="Style of the layer")
-    query: dict = Field(..., description="Query to filter the layer data")
+    # query: dict = Field(..., description="Query to filter the layer data")
 
 
 class FeatureLayerUpdateBase(LayerBase, GeospatialAttributes):
     """Base model for feature layer updates."""
 
     style: dict | None = Field(None, description="Style ID of the layer")
-    query: dict | None = Field(None, description="Query to filter the layer data")
+    # query: dict | None = Field(None, description="Query to filter the layer data")
 
 
 feature_layer_update_base_example = {
@@ -465,7 +471,7 @@ request_examples = {
                 **layer_base_example,
                 **imagery_layer_attributes_example,
                 "type": "imagery_layer",
-                "extent": "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)), ((2 2, 2 3, 3 3, 3 2, 2 2)))"
+                "extent": "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)), ((2 2, 2 3, 3 3, 3 2, 2 2)))",
             },
         },
         "tile_layer": {
@@ -475,7 +481,7 @@ request_examples = {
                 **layer_base_example,
                 **tile_layer_attributes_example,
                 "type": "tile_layer",
-                "extent": "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)), ((2 2, 2 3, 3 3, 3 2, 2 2)))"
+                "extent": "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)), ((2 2, 2 3, 3 3, 3 2, 2 2)))",
             },
         },
     },
