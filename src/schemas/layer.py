@@ -86,6 +86,7 @@ class OgrDriverType(str, Enum):
     zip = "ESRI Shapefile"  # Using SHP driver for ZIP files as the file is converted to SHP to keep data types
 
 
+
 class NumberColumnsPerType(int, Enum):
     """Number of columns per type."""
 
@@ -332,7 +333,11 @@ class ITileLayerCreate(LayerBase, GeospatialAttributes, TileLayerAttributesBase)
 
 
 class ITileLayerRead(
-    LayerReadBaseAttributes, LayerBase, GeospatialAttributes, TileLayerAttributesBase, DateTimeBase
+    LayerReadBaseAttributes,
+    LayerBase,
+    GeospatialAttributes,
+    TileLayerAttributesBase,
+    DateTimeBase,
 ):
     """Model to read a tile layer."""
 
@@ -455,7 +460,10 @@ request_examples = {
         "validate_job_id": "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
     },
     "get": {
-        "ids": ["e7dcaae4-1750-49b7-89a5-9510bf2761ad", "e7dcaae4-1750-49b7-89a5-9510bf2761ad"],
+        "ids": [
+            "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
+            "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
+        ],
     },
     "create_internal": {
         "table_layer": {

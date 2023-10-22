@@ -1,10 +1,18 @@
+from datetime import datetime
+from typing import List
+from uuid import UUID
+
+from fastapi import HTTPException, status
+from fastapi_pagination import Params as PaginationParams
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.crud.base import CRUDBase
 from src.db.models.job import Job
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, select, func
 from uuid import UUID
 from datetime import datetime
-from fastapi_pagination import Params as PaginationParams
 from src.schemas.common import OrderEnum
 from fastapi import HTTPException, status
 from src.schemas.job import JobType, job_mapping, JobStatusType, MsgType
@@ -12,6 +20,9 @@ from typing import List
 from src.core.config import settings
 from src.utils import sanitize_error_message
 from sqlalchemy.orm.attributes import flag_modified
+from src.schemas.common import OrderEnum
+from src.schemas.job import JobType
+
 
 class CRUDJob(CRUDBase):
     async def check_and_create(
@@ -119,10 +130,10 @@ class CRUDJob(CRUDBase):
         if job_type:
             and_conditions.append(Job.type.in_(job_type))
 
-        if read:
+        if read is not None:
             and_conditions.append(Job.read == read)
 
-        if project_id:
+        if project_id is not None:
             and_conditions.append(Job.project_id == project_id)
 
         query = select(Job).where(and_(*and_conditions))
