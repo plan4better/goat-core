@@ -7,6 +7,7 @@ from sqlmodel import (
     Field,
     ForeignKey,
     Relationship,
+    UniqueConstraint
 )
 
 from src.db.models._base_class import DateTimeBase
@@ -17,6 +18,8 @@ if TYPE_CHECKING:
     from _link_model import UserProjectLink
     from _link_model import LayerProjectLink
     from .job import Job
+
+
 class Project(ContentBaseAttributes, DateTimeBase, table=True):
     __tablename__ = "project"
     __table_args__ = {"schema": "customer"}
@@ -60,3 +63,5 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
     jobs: List["Job"] = Relationship(
         back_populates="project"
     )
+
+UniqueConstraint(Project.__table__.c.folder_id, Project.__table__.c.name)
