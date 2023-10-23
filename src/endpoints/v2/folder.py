@@ -13,6 +13,8 @@ from src.schemas.folder import (
     FolderCreate,
     FolderRead,
     FolderUpdate,
+)
+from src.schemas.folder import (
     request_examples as folder_request_examples,
 )
 
@@ -100,9 +102,6 @@ async def read_folders(
         order=order,
     )
 
-    if len(folders.items) == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No Folders Found")
-
     return folders
 
 
@@ -161,4 +160,3 @@ async def delete_folder(
 
     await crud_folder.remove(async_session, id=db_obj[0].id)
     return
-
