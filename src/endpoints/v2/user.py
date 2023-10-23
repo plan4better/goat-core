@@ -12,7 +12,7 @@ router = APIRouter()
 @router.post(
     "",
     response_model=User,
-    summary="Create a user. This will read the user ID from the JWT token or use the pre-defined user_id if running without authentication.",
+    summary="Create a user.",
     status_code=201,
 )
 async def create_user(
@@ -20,7 +20,7 @@ async def create_user(
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
 ):
-    """Create a user."""
+    """Create a user. This will read the user ID from the JWT token or use the pre-defined user_id if running without authentication."""
 
     # Check if user already exists
     user = await crud_user.get(async_session, id=user_id)
@@ -46,7 +46,7 @@ async def create_user(
 @router.get(
     "",
     response_model=User,
-    summary="Get a user. This will read the user ID saved in the GOAT DB.",
+    summary="Get a user.",
     status_code=200,
 )
 async def get_user(
@@ -54,7 +54,7 @@ async def get_user(
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
 ):
-    """Get a user."""
+    """Get a user. This will read the user ID saved in the GOAT DB."""
     user = await crud_user.get(async_session, id=user_id)
     if user:
         return user
@@ -64,7 +64,7 @@ async def get_user(
 @router.delete(
     "",
     response_model=None,
-    summary="Delete a user and all of the related contents. This will read the user ID from the JWT token or use the pre-defined user_id if running without authentication.",
+    summary="Delete a user and all of the related contents.",
     status_code=204,
 )
 async def delete_user(
@@ -72,7 +72,7 @@ async def delete_user(
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
 ):
-    """Delete a user and all of the related contents."""
+    """Delete a user and all of the related contents. This will read the user ID from the JWT token or use the pre-defined user_id if running without authentication."""
     user = await crud_user.get(async_session, id=user_id)
 
     if user:
