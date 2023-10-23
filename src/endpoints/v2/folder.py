@@ -1,3 +1,5 @@
+from typing import List
+
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
@@ -62,7 +64,9 @@ async def read_folder(
     )
 
     if len(folder) == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
+        )
 
     return folder[0]
 
@@ -70,7 +74,7 @@ async def read_folder(
 @router.get(
     "",
     summary="Retrieve a list of folders",
-    response_model=Page[FolderRead],
+    response_model=List[FolderRead],
     response_model_exclude_none=True,
     status_code=200,
 )
@@ -78,7 +82,6 @@ async def read_folders(
     *,
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
-    page_params: PaginationParams = Depends(),
     search: str = Query(None, description="Searches the name of the folder"),
     order_by: str = Query(
         None,
@@ -96,7 +99,6 @@ async def read_folders(
     folders = await crud_folder.get_multi(
         async_session,
         query=query,
-        page_params=page_params,
         search_text={"name": search} if search else {},
         order_by=order_by,
         order=order,
@@ -128,7 +130,9 @@ async def update_folder(
     )
 
     if len(db_obj) == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
+        )
 
     folder = await crud_folder.update(async_session, db_obj=db_obj[0], obj_in=folder_in)
     return folder
@@ -156,7 +160,9 @@ async def delete_folder(
     )
     # Check if folder exists
     if len(db_obj) == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
+        )
 
     await crud_folder.remove(async_session, id=db_obj[0].id)
     return

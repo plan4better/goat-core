@@ -12,6 +12,7 @@ from sqlmodel import (
     Relationship,
     SQLModel,
     Text,
+    UniqueConstraint
 )
 from geoalchemy2 import WKBElement
 from geoalchemy2.shape import to_shape
@@ -231,5 +232,6 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         else:
             return v
 
-
+# Constraints
+UniqueConstraint(Layer.__table__.c.folder_id, Layer.__table__.c.name)
 Layer.update_forward_refs()

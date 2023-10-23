@@ -17,7 +17,7 @@ router = APIRouter()
     "/{id}",
     response_model=Job,
     response_model_exclude_none=True,
-    status_code=201,
+    status_code=200,
     summary="Get a job by its ID.",
 )
 async def get_job(
@@ -36,7 +36,7 @@ async def get_job(
     "",
     response_model=Page[Job],
     response_model_exclude_none=True,
-    status_code=201,
+    status_code=200,
     summary="Retrieve a list of jobs using different filters.",
 )
 async def read_jobs(

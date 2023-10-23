@@ -129,6 +129,8 @@ async def read_project(
 
     # Get project
     project = await crud_project.get(async_session, id=id)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     return IProjectRead(**project.dict())
 
 
@@ -228,6 +230,7 @@ async def update_project(
     )
     return project
 
+
 @router.delete(
     "/{id}",
     response_model=None,
@@ -241,9 +244,17 @@ async def delete_project(
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
 ):
-    return await delete_content_by_id(
-        async_session=async_session, id=id, model=Project, crud_content=crud_project
-    )
+    """Delete a project by its ID."""
+
+    # Get project
+    project = await crud_project.get(async_session, id=id)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    # Delete project
+    await crud_project.delete(db=async_session, id=id)
+    return
+
 
 @router.get(
     "/{id}/initial-view-state",

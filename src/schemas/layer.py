@@ -1,9 +1,7 @@
 from enum import Enum
 from typing import List
 from uuid import UUID
-
 from pydantic import BaseModel, Field, ValidationError
-
 from src.db.models._base_class import DateTimeBase, content_base_example
 from src.db.models.layer import (
     FeatureLayerType,
@@ -15,6 +13,7 @@ from src.db.models.layer import (
     ScenarioType,
     TileLayerDataType,
     layer_base_example,
+    FeatureLayerGeometryType,
 )
 
 
@@ -24,19 +23,7 @@ class AnalysisType(str, Enum):
     intersects = "intersects"
 
 
-# It was decided against using MIME types here because for e.g. gpkg they are commonly just generic application/octet-stream
-class FileUploadType(str, Enum):
-    """File upload types."""
-
-    geojson = "geojson"
-    csv = "csv"
-    xlsx = "xlsx"
-    gpkg = "gpkg"
-    kml = "kml"
-    zip = "zip"  # Commonly used for shapefiles
-
-
-class MaxFileSizeType(str, Enum):
+class MaxFileSizeType(int, Enum):
     """Max file size types in bytes."""
 
     geojson = 300000000
@@ -47,12 +34,26 @@ class MaxFileSizeType(str, Enum):
     zip = 300000000
 
 
-class TableDataType(str, Enum):
+class TableUploadType(str, Enum):
     """Table data types."""
 
     csv = "csv"
     xlsx = "xlsx"
 
+
+# It was decided against using MIME types here because for e.g. gpkg they are commonly just generic application/octet-stream
+class FeatureLayerUploadType(str, Enum):
+    """File upload types."""
+
+    geojson = "geojson"
+    gpkg = "gpkg"
+    kml = "kml"
+    zip = "zip"  # Commonly used for shapefiles
+
+
+FileUploadType = Enum(
+    "FileUploadType", {**TableUploadType.__members__, **FeatureLayerUploadType.__members__}
+)
 
 class SupportedOgrGeomType(Enum):
     Point = "point"
@@ -81,7 +82,9 @@ class OgrDriverType(str, Enum):
     xlsx = "XLSX"
     gpkg = "GPKG"
     kml = "KML"
-    zip = "ESRI Shapefile"
+    shp = "ESRI Shapefile"  # Using SHP driver for ZIP files as the file is converted to SHP to keep data types
+    zip = "ESRI Shapefile"  # Using SHP driver for ZIP files as the file is converted to SHP to keep data types
+
 
 
 class NumberColumnsPerType(int, Enum):
@@ -96,6 +99,7 @@ class NumberColumnsPerType(int, Enum):
     arrint = 3
     arrtext = 3
     jsonb = 3
+    boolean = 3
 
 
 class LayerReadBaseAttributes(BaseModel):
@@ -104,50 +108,19 @@ class LayerReadBaseAttributes(BaseModel):
     type: LayerType = Field(..., description="Layer type")
 
 
-class LayerCreateBaseAttributes(BaseModel):
-    type: LayerType = Field(..., description="Layer type")
-
-
-################################################################################
-# LayerBase
-################################################################################
-
-
-class FeatureLayerBase(LayerBase, GeospatialAttributes):
-    """Base model for feature layers."""
-
-    data_store_id: UUID = Field(..., description="Data store ID of the layer")
-    feature_layer_type: "FeatureLayerType" = Field(
-        ..., description="Feature layer type"
-    )
-    size: int = Field(..., description="Size of the layer in bytes")
-    style: dict = Field(..., description="Style of the layer")
-
-
 ################################################################################
 # Feature Layer DTOs
 ################################################################################
 # Base models
 
-
-class FeatureLayerCreateBase(
-    LayerCreateBaseAttributes, LayerBase, GeospatialAttributes
-):
-    """Base model for feature layer creates."""
-
-    feature_layer_type: "FeatureLayerType" = Field(
-        ..., description="Feature layer type"
-    )
-
-
-class FeatureLayerReadBaseAttributes(
-    LayerReadBaseAttributes, LayerBase, GeospatialAttributes
-):
+class FeatureLayerReadBaseAttributes(LayerReadBaseAttributes, LayerBase, GeospatialAttributes):
     """Base model for feature layer reads."""
 
-    feature_layer_type: "FeatureLayerType" = Field(
-        ..., description="Feature layer type"
+    feature_layer_type: "FeatureLayerType" = Field(..., description="Feature layer type")
+    feature_layer_geometry_type: "FeatureLayerGeometryType" = Field(
+        ..., description="Feature layer geometry type"
     )
+    attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
     size: int = Field(..., description="Size of the layer in bytes")
     style: dict = Field(..., description="Style of the layer")
 
@@ -187,9 +160,23 @@ class LayerProjectAttributesBase(BaseModel):
 
 
 # Feature Layer Standard
-class IFeatureLayerStandardCreate(FeatureLayerCreateBase):
-    pass
+class IInternalLayerCreate(LayerBase):
+    import_job_id: UUID = Field(..., description="Job ID of the import job")
 
+
+class IFeatureLayerStandardCreateAdditionalAttributes(BaseModel):
+    """Model for second internal validation with extended attributes."""
+    id: UUID = Field(..., description="Content ID of the layer", alias="id")
+    user_id: UUID = Field(..., description="User ID of the owner")
+    type: LayerType = Field(..., description="Layer type")
+    feature_layer_type: FeatureLayerType = Field(..., description="Feature layer type")
+    feature_layer_geometry_type: FeatureLayerGeometryType = Field(
+        ..., description="Feature layer geometry type"
+    )
+    size: int = Field(..., description="Size of the layer in bytes")
+    style: dict = Field(..., description="Style of the layer")
+    extent: str = Field(..., description="Geographical Extent of the layer")
+    attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
 
 class IFeatureLayerStandardRead(FeatureLayerReadBaseAttributes, DateTimeBase):
     pass
@@ -211,9 +198,7 @@ feature_layer_indicator_attributes_example = {
 }
 
 
-class IFeatureLayerIndicatorCreate(
-    FeatureLayerCreateBase, FeatureLayerIndicatorAttributesBase
-):
+class IFeatureLayerIndicatorCreate(LayerBase, FeatureLayerIndicatorAttributesBase):
     """Model to create feature layer indicator."""
 
     pass
@@ -247,9 +232,7 @@ feature_layer_scenario_attributes_example = {
 }
 
 
-class IFeatureLayerScenarioCreate(
-    FeatureLayerCreateBase, FeatureLayerScenarioAttributesBase
-):
+class IFeatureLayerScenarioCreate(LayerBase, FeatureLayerScenarioAttributesBase):
     """Model to create feature layer scenario."""
 
     pass
@@ -292,15 +275,10 @@ imagery_layer_attributes_example = {
 }
 
 
-class IImageryLayerCreate(
-    LayerCreateBaseAttributes,
-    LayerBase,
-    GeospatialAttributes,
-    ImageryLayerAttributesBase,
-):
+class IImageryLayerCreate(LayerBase, GeospatialAttributes, ImageryLayerAttributesBase):
     """Model to create a imagery layer."""
 
-    pass
+    type: LayerType = Field(..., description="Layer type")
 
 
 class IImageryLayerRead(
@@ -348,12 +326,10 @@ tile_layer_attributes_example = {
 }
 
 
-class ITileLayerCreate(
-    LayerCreateBaseAttributes, LayerBase, GeospatialAttributes, TileLayerAttributesBase
-):
+class ITileLayerCreate(LayerBase, GeospatialAttributes, TileLayerAttributesBase):
     """Model to create a tile layer."""
 
-    pass
+    type: LayerType = Field(..., description="Layer type")
 
 
 class ITileLayerRead(
@@ -383,29 +359,28 @@ tile_layer_update_example = {
 ################################################################################
 
 
-class ITableLayerCreate(LayerCreateBaseAttributes, LayerBase):
-    pass
+class ITableLayerCreateAdditionalAttributes(BaseModel):
+    """Model for second internal validation with extended attributes."""
+    id: UUID = Field(..., description="Content ID of the layer", alias="id")
+    user_id: UUID = Field(..., description="User ID of the owner")
+    type: LayerType = Field(..., description="Layer type")
+    size: int = Field(..., description="Size of the layer in bytes")
+    attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
 
 
 class ITableLayerRead(LayerBase, LayerReadBaseAttributes, DateTimeBase):
+    """Model to read a table layer."""
+
     pass
 
 
 class ITableLayerUpdate(LayerBase):
+    """Model to update a table layer."""
+
     pass
 
 
-def get_layer_class(class_type: str, **kwargs):
-    layer_creator_class = {
-        "table": ITableLayerCreate,
-        "tile_layer": ITileLayerCreate,
-        "imagery_layer": IImageryLayerCreate,
-        "feature_layer": {
-            "standard": IFeatureLayerStandardCreate,
-            "indicator": IFeatureLayerIndicatorCreate,
-            "scenario": IFeatureLayerScenarioCreate,
-        },
-    }
+def get_layer_class(class_type: str, layer_creator_class: dict, **kwargs):
     try:
         layer_type = kwargs["type"]
     except KeyError:
@@ -421,11 +396,11 @@ def get_layer_class(class_type: str, **kwargs):
         layer_class = layer_class[feature_layer_type]
 
     layer_class_name = layer_class.__name__
-    if class_type == "read":
-        layer_class_name = layer_class_name.replace("Create", "Read")
+    if class_type == "create":
+        layer_class_name = layer_class_name.replace("Read", "Create")
     elif class_type == "update":
-        layer_class_name = layer_class_name.replace("Create", "Update")
-    elif class_type == "create":
+        layer_class_name = layer_class_name.replace("Read", "Update")
+    elif class_type == "read":
         pass
     else:
         raise ValueError(f"Layer class type ({class_type}) is invalid")
@@ -433,49 +408,82 @@ def get_layer_class(class_type: str, **kwargs):
     return globals()[layer_class_name]
 
 
-class ILayerCreate(BaseModel):
+layer_creator_class = {
+    "internal": {
+        "table": ITableLayerRead,
+        "feature_layer": {
+            "standard": IFeatureLayerStandardRead,
+            "indicator": IFeatureLayerIndicatorRead,
+            "scenario": IFeatureLayerScenarioRead,
+        },
+    },
+    "external": {
+        "imagery_layer": IImageryLayerRead,
+        "tile_layer": ITileLayerRead,
+    },
+}
+
+class ILayerExternalCreate(BaseModel):
     def __new__(cls, *args, **kwargs):
-        layer_create_class = get_layer_class("create", **kwargs)
+        layer_create_class = get_layer_class("create", layer_creator_class["external"], **kwargs)
         return layer_create_class(**kwargs)
 
 
 class ILayerRead(BaseModel):
     def __new__(cls, *args, **kwargs):
-        layer_read_class = get_layer_class("read", **kwargs)
+        layer_read_class = get_layer_class(
+            "read",
+            {**layer_creator_class["internal"], **layer_creator_class["external"]},
+            **kwargs,
+        )
         return layer_read_class(**kwargs)
 
 
 class ILayerUpdate(BaseModel):
     def __new__(cls, *args, **kwargs):
-        layer_update_class = get_layer_class("update", **kwargs)
+        layer_update_class = get_layer_class(
+            "update",
+            {**layer_creator_class["internal"], **layer_creator_class["external"]},
+            **kwargs,
+        )
         return layer_update_class(**kwargs)
 
 
+class IValidateJobId(BaseModel):
+    """Model to import a file object."""
+
+    validate_job_id: UUID = Field(..., description="Upload job ID")
+
+
 request_examples = {
+    "validate_job_id": {
+        "validate_job_id": "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
+    },
     "get": {
         "ids": [
             "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
             "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
         ],
     },
-    "create": {
+    "create_internal": {
         "table_layer": {
             "summary": "Table Layer",
             "value": {
+                "import_job_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
                 **content_base_example,
                 **layer_base_example,
-                "type": "table",
             },
         },
         "feature_layer_standard": {
             "summary": "Layer Standard",
             "value": {
+                "import_job_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
                 **content_base_example,
                 **layer_base_example,
-                "type": "feature_layer",
-                "feature_layer_type": "standard",
             },
         },
+    },
+    "create_external": {
         "imagery_layer": {
             "summary": "Imagery Layer",
             "value": {
