@@ -4,12 +4,11 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy import text
-
 from src.core.config import settings
 from src.endpoints.deps import get_db, session_manager
 from src.main import app
 from src.schemas.layer import request_examples as layer_request_examples
-from src.schemas.project import request_examples as project_request_examples
+from src.schemas.project import request_examples as project_request_examples, initial_view_state_example
 from tests.utils import (
     upload_file,
     validate_invalid_file,
@@ -22,6 +21,7 @@ settings.RUN_AS_BACKGROUND_TASK = True
 settings.USER_DATA_SCHEMA = "test_user_data"
 schema_customer = "test_customer"
 schema_user_data = "test_user_data"
+settings.MAX_FOLDER_COUNT = 10
 
 
 @pytest_asyncio.fixture
@@ -101,6 +101,23 @@ async def fixture_get_home_folder(client: AsyncClient):
 
 
 @pytest.fixture
+async def fixture_create_exceed_folders(client: AsyncClient, fixture_create_user):
+    max_folder_cnt = settings.MAX_FOLDER_COUNT
+    folder_names = [f"test{i}" for i in range(1, max_folder_cnt + 1)]
+
+    # Setup: Create multiple folders
+    cnt = 0
+    for name in folder_names:
+        cnt += 1
+        # Request to create a folder
+        response = await client.post(f"{settings.API_V2_STR}/folder", json={"name": name})
+        if cnt >= max_folder_cnt:
+            assert response.status_code == 429  # Too Many Requests
+        else:
+            assert response.status_code == 201
+
+
+@pytest.fixture
 async def fixture_create_folders(client: AsyncClient, fixture_create_user):
     folder_names = ["test1", "test2", "test3"]
     created_folders = []
@@ -161,6 +178,25 @@ async def fixture_create_projects(client: AsyncClient, fixture_create_user, fixt
         await client.delete(f"{settings.API_V2_STR}/project/{project['id']}")
 
 
+@pytest.fixture
+async def fixture_create_layer_project(
+    client: AsyncClient,
+    fixture_create_project,
+    fixture_create_internal_layer,
+):
+    project_id = fixture_create_project["id"]
+    layer_id = fixture_create_internal_layer["id"]
+
+    # Add layers to project
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer", json={"layer_ids": [layer_id]}
+    )
+    assert response.status_code == 200
+    return response.json()
+
+
+
+
 @pytest.fixture(autouse=True)
 def set_testing_config():
     settings.TESTING = True
@@ -216,6 +252,8 @@ async def create_internal_layer(
 
 
 internal_layers = ["feature_layer_standard", "table_layer"]
+
+
 @pytest.fixture(params=internal_layers)
 async def fixture_create_internal_layers(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder, request
@@ -232,9 +270,8 @@ async def fixture_create_internal_layers(
         )
     return layer
 
-async def create_external_layer(
-    client: AsyncClient, fixture_get_home_folder, layer_type
-):
+
+async def create_external_layer(client: AsyncClient, fixture_get_home_folder, layer_type):
     # Get table layer dict and add layer ID
     external_layer_dict = layer_request_examples["create_external"][layer_type]["value"]
     external_layer_dict["folder_id"] = fixture_get_home_folder["id"]
@@ -245,11 +282,14 @@ async def create_external_layer(
 
 
 external_layers = ["tile_layer", "imagery_layer"]
+
+
 @pytest.fixture(params=external_layers)
 async def fixture_create_external_layers(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder, request
 ):
     return await create_external_layer(client, fixture_get_home_folder, request.param)
+
 
 @pytest.fixture
 async def fixture_create_external_layer(
@@ -268,11 +308,8 @@ async def fixture_create_internal_layer(
     )
 
 
-
 @pytest.fixture
-async def fixture_delete_internal_layers(
-    client: AsyncClient, fixture_create_internal_layers
-):
+async def fixture_delete_internal_layers(client: AsyncClient, fixture_create_internal_layers):
     layer = fixture_create_internal_layers
     layer_id = layer["id"]
     response = await client.delete(f"{settings.API_V2_STR}/layer/{layer_id}")
@@ -298,10 +335,9 @@ async def fixture_delete_internal_layers(
         )
         assert result.scalar() == 0
 
+
 @pytest.fixture
-async def fixture_delete_external_layers(
-    client: AsyncClient, fixture_create_external_layers
-):
+async def fixture_delete_external_layers(client: AsyncClient, fixture_create_external_layers):
     layer = fixture_create_external_layers
     layer_id = layer["id"]
     response = await client.delete(f"{settings.API_V2_STR}/layer/{layer_id}")
@@ -309,5 +345,3 @@ async def fixture_delete_external_layers(
 
     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}")
     assert response.status_code == 404  # Not Found
-
-

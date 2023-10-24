@@ -2,8 +2,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
-from sqlalchemy import select
-
+from sqlalchemy import select, func
 from src.crud.crud_folder import folder as crud_folder
 from src.db.models.folder import Folder
 from src.db.session import AsyncSession
@@ -16,6 +15,7 @@ from src.schemas.folder import (
     request_examples as folder_request_examples,
 )
 from typing import List
+from src.core.config import settings
 
 router = APIRouter()
 
@@ -34,6 +34,17 @@ async def create_folder(
     folder_in: FolderCreate = Body(..., example=folder_request_examples["create"]),
 ):
     """Create a new folder."""
+    # Count already existing folders for the user
+    folder_cnt = await async_session.execute(select(func.count(Folder.id)).filter(Folder.user_id == user_id))
+    folder_cnt = folder_cnt.scalar()
+
+    # Check if the user has already reached the maximum number of folders
+    if folder_cnt >= settings.MAX_FOLDER_COUNT:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"The maximum number of folders ({settings.MAX_FOLDER_COUNT}) has been reached.",
+        )
+
     folder_in.user_id = user_id
     folder = await crud_folder.create(async_session, obj_in=folder_in)
     return folder

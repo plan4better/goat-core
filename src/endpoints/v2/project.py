@@ -22,7 +22,6 @@ from src.schemas.project import (
 from src.db.models._link_model import UserProjectLink
 from src.core.content import (
     create_content,
-    delete_content_by_id,
 )
 from typing import List
 from src.schemas.project import (
@@ -87,14 +86,12 @@ async def create_project(
     ),
 ):
     """This will create an empty project with a default initial view state. The project does not contains layers or reports."""
-    project = await create_content(
-        async_session=async_session,
-        model=Project,
-        crud_content=crud_project,
-        content_in=project_in,
-        other_params={"user_id": user_id},
-    )
 
+    # Create project
+    project = await crud_project.create(
+        db=async_session,
+        obj_in=Project(**project_in.dict(exclude_none=True), user_id=user_id),
+    )
     # Create link between user and project for initial view state
     await crud_user_project.create(
         async_session,

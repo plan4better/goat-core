@@ -1,13 +1,15 @@
 import pytest
 from httpx import AsyncClient
-
 from src.core.config import settings
-
+from tests.utils import get_with_wrong_id
 
 @pytest.mark.asyncio
 async def test_create_folder(client: AsyncClient, fixture_create_folder):
     assert fixture_create_folder["id"] is not None
 
+@pytest.mark.asyncio
+async def test_created_exceed_folders(client: AsyncClient, fixture_create_exceed_folders):
+    return
 
 @pytest.mark.asyncio
 async def test_get_folder(
@@ -19,6 +21,12 @@ async def test_get_folder(
     )
     assert response.status_code == 200
     assert response.json()["id"] == fixture_create_folder["id"]
+
+
+@pytest.mark.asyncio
+async def test_get_folder_wrong_id(client: AsyncClient, fixture_create_folder):
+    await get_with_wrong_id(client, "folder")
+
 
 
 @pytest.mark.asyncio

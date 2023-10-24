@@ -5,7 +5,7 @@ from src.core.config import settings
 from src.schemas.job import JobStatusType
 from typing import List
 from src.schemas.layer import request_examples as layer_request_examples
-from uuid import UUID
+from uuid import UUID, uuid4
 
 async def check_if_job_finished(client: AsyncClient, job_id: str):
     """Check if job is finished."""
@@ -144,3 +144,12 @@ async def upload_file(client: AsyncClient, validate_job_id: int):
     job_id = response.json()["job_id"]
     await check_if_job_finished(client, job_id)
     return job_id
+
+async def get_with_wrong_id(client: AsyncClient, item: str):
+    """Get item with wrong ID."""
+
+    id = uuid4()
+    response = await client.get(
+        f"{settings.API_V2_STR}/{item}/{id}",
+    )
+    assert response.status_code == 404

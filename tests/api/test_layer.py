@@ -1,8 +1,7 @@
 import pytest
 from httpx import AsyncClient
-
 from src.core.config import settings
-from tests.utils import upload_file
+from tests.utils import upload_file, get_with_wrong_id
 
 
 @pytest.mark.asyncio
@@ -49,6 +48,10 @@ async def test_get_external_layer(client: AsyncClient, fixture_create_external_l
     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}")
     assert response.status_code == 200
     assert response.json()["id"] == layer_id
+
+@pytest.mark.asyncio
+async def test_get_layer_wrong_id(client: AsyncClient, fixture_create_external_layer):
+    await get_with_wrong_id(client, "layer")
 
 
 @pytest.mark.asyncio

@@ -90,6 +90,8 @@ class Settings(BaseSettings):
     MAX_NUMBER_PARALLEL_JOBS: Optional[int] = 6
     TESTING: Optional[bool] = False
 
+    MAX_FOLDER_COUNT: Optional[int] = 100
+
     class Config:
         case_sensitive = True
 

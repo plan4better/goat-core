@@ -161,8 +161,8 @@ class OGRFileHandling:
         max_point.Transform(transform)
 
         # Get the transformed coordinates
-        minX_transformed, minY_transformed, _ = min_point.GetPoint()
-        maxX_transformed, maxY_transformed, _ = max_point.GetPoint()
+        minY_transformed, minX_transformed, _ = min_point.GetPoint()
+        maxY_transformed, maxX_transformed, _ = max_point.GetPoint()
 
         # Create a Multipolygon from the extent
         multipolygon_wkt = f"MULTIPOLYGON((({minX_transformed} {minY_transformed}, {minX_transformed} {maxY_transformed}, {maxX_transformed} {maxY_transformed}, {maxX_transformed} {minY_transformed}, {minX_transformed} {minY_transformed})))"
