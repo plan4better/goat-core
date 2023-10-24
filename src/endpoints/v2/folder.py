@@ -1,6 +1,5 @@
+from typing import List
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
-from fastapi_pagination import Page
-from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
 from sqlalchemy import select, func
 from src.crud.crud_folder import folder as crud_folder
@@ -12,9 +11,10 @@ from src.schemas.folder import (
     FolderCreate,
     FolderRead,
     FolderUpdate,
+)
+from src.schemas.folder import (
     request_examples as folder_request_examples,
 )
-from typing import List
 from src.core.config import settings
 
 router = APIRouter()
@@ -72,7 +72,9 @@ async def read_folder(
     )
 
     if len(folder) == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
+        )
 
     return folder[0]
 
@@ -109,11 +111,8 @@ async def read_folders(
         order_by=order_by,
         order=order,
     )
-
-    if folders == []:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No Folders Found")
-
     folders = [folder[0] for folder in folders]
+
     return folders
 
 
@@ -140,7 +139,9 @@ async def update_folder(
     )
 
     if len(db_obj) == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
+        )
 
     folder = await crud_folder.update(async_session, db_obj=db_obj[0], obj_in=folder_in)
     return folder
@@ -168,8 +169,9 @@ async def delete_folder(
     )
     # Check if folder exists
     if len(db_obj) == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
+        )
 
     await crud_folder.remove(async_session, id=db_obj[0].id)
     return
-
