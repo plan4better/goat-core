@@ -1,8 +1,106 @@
 from typing import List, Optional
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, validator, Field
 from src.resources.enums import ReturnType
 from enum import Enum
 from uuid import UUID
+from src.schemas.toolbox_base import ResultTarget, IsochroneStartingPoints
+
+
+class RoutingPTMode(str, Enum):
+    """Routing public transport mode schema."""
+
+    bus = "bus"
+    tram = "tram"
+    rail = "rail"
+    subway = "subway"
+    ferry = "ferry"
+    cable_car = "cable_car"
+    gondola = "gondola"
+    funicular = "funicular"
+
+
+class RoutingPTEgressMode(str, Enum):
+    walk = "walk"
+    bicycle = "bicycle"
+
+
+class RoutingPTAccessMode(str, Enum):
+    """Routing public transport access mode schema."""
+
+    walk = "walk"
+    bicycle = "bicycle"
+    car = "car"
+
+
+class RoutingPTType(BaseModel):
+    """Routing public transport type schema."""
+
+    mode: List[RoutingPTMode] = Field(
+        ...,
+        title="Mode",
+        description="The mode of the public transport.",
+    )
+    egress_mode: RoutingPTEgressMode = Field(
+        ...,
+        title="Egress Mode",
+        description="The egress mode of the public transport.",
+    )
+    access_mode: RoutingPTAccessMode = Field(
+        ...,
+        title="Access Mode",
+        description="The access mode of the public transport.",
+    )
+
+
+class TravelTimeCostPublicTransport(BaseModel):
+    """Travel time cost schema."""
+
+    max_traveltime: int = Field(
+        ...,
+        title="Max Travel Time",
+        description="The maximum travel time in minutes.",
+        ge=1,
+        le=60,
+    )
+    traveltime_step: int = Field(
+        ...,
+        title="Travel Time Step",
+        description="The travel time step in minutes.",
+    )
+
+
+class IIsochronePT(BaseModel):
+    """Model for the public transport isochrone"""
+
+    starting_points: IsochroneStartingPoints = Field(
+        ...,
+        title="Starting Points",
+        description="The starting points of the isochrone.",
+    )
+    routing_type: RoutingPTType = Field(
+        ...,
+        title="Routing Type",
+        description="The routing type of the isochrone.",
+    )
+    travel_cost: TravelTimeCostPublicTransport = Field(
+        ...,
+        title="Travel Cost",
+        description="The travel cost of the isochrone.",
+    )
+    weekday: Optional[int] = Field(
+        0, ge=0, le=6, description="(PT) Departure weekday, 0=Monday, 6=Sunday"
+    )
+    from_time: Optional[int] = Field(
+        25200, gt=0, lt=86400, description="(PT) From time. Number of seconds since midnight"
+    )
+    to_time: Optional[int] = Field(
+        39600, gt=0, lt=86400, description="(PT) To time . Number of seconds since midnight"
+    )
+    result_target: ResultTarget = Field(
+        ...,
+        title="Result Target",
+        description="The target location of the produced layer.",
+    )
 
 
 class CountLimitPerTool(int, Enum):
@@ -61,6 +159,58 @@ class CalculateOevGueteklassenParameters(BaseModel):
 #         "715": "C",  # demand and response bus service
 #         "900": "B",  # tram
 #     }
+
+request_examples_isochrone_pt = {
+    # 1. Isochrone for public transport with all modes
+    "all_modes_pt": {
+        "summary": "Isochrone using all PT modes",
+        "value": {
+            "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
+            "routing_type": {
+                "mode": [
+                    "bus",
+                    "tram",
+                    "rail",
+                    "subway",
+                ],
+                "egress_mode": "walk",
+                "access_mode": "walk",
+            },
+            "travel_cost": {"max_traveltime": 40, "traveltime_step": 10},
+            "weekday": 1,
+            "from_time": 25200,
+            "to_time": 32400,
+            "result_target": {
+                "layer_name": "AllModesPTIsochrone",
+                "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
+            },
+        },
+    },
+    # 2. Isochrone for public transport excluding bus mode
+    "exclude_bus_mode_pt": {
+        "summary": "Isochrone excluding bus mode",
+        "value": {
+            "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
+            "routing_type": {
+                "mode": [
+                    "tram",
+                    "rail",
+                    "subway",
+                ],
+                "egress_mode": "walk",
+                "access_mode": "walk",
+            },
+            "travel_cost": {"max_traveltime": 35, "traveltime_step": 5},
+            "weekday": 1,
+            "from_time": 25200,
+            "to_time": 32400,
+            "result_target": {
+                "layer_name": "ExcludeBusPTIsochrone",
+                "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
+            },
+        },
+    },
+}
 
 
 station_config_example = {
