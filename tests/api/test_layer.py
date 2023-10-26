@@ -81,43 +81,21 @@ async def test_delete_external_layers(client: AsyncClient, fixture_delete_extern
     return
 
 
+# @pytest.mark.asyncio
+# async def test_get_unique_values_layer(client: AsyncClient, fixture_create_internal_layer):
+#     layer_id = fixture_create_internal_layer["id"]
+#     column = "name"
+#     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}/{column}/unique-values")
+#     assert response.status_code == 200
+#     assert response.json() is not None
+
+
+
+
 # Some further test cases
 """Valid File Import
-
-First, upload and validate a file (as in test #1)
-Then, use the job ID to trigger an import
-Ensure a successful response with a new job ID
-Invalid Job ID for Import
-
 Use an invalid job ID for import
 Ensure the API responds with the proper HTTP error (404 Not Found)
-
-Layer CRUD
-Create Internal Layer
-
-Provide valid data to create an internal layer
-Ensure a successful response and that the returned data matches the provided input
-Create External Layer
-
-Provide valid data to create an external layer
-Ensure a successful response and that the returned data matches the provided input
-Update Existing Layer
-
-First, create a layer (either internal or external)
-Update some of its attributes using its ID
-Ensure the API returns the updated data and that the changes persist
-Retrieve Layer by ID
-
-Create a layer (either type)
-Retrieve it using its ID
-Ensure the data matches what was created
-Delete Layer
-
-Create a layer
-Delete it using its ID
-Try to retrieve it again and ensure it's not found
-Advanced Layer Retrieval
-Retrieve Multiple Layers by IDs
 
 Create multiple layers
 Use the "get-by-ids" endpoint to retrieve them in bulk using their IDs

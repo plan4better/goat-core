@@ -336,6 +336,7 @@ class OGRFileHandling:
         """Validate kml."""
         return self.validate_ogr(self.file_path)
 
+    @timeout(120)
     @job_log(job_step_name="validation")
     async def validate(self, job_id: UUID):
         """Validate file before uploading."""
@@ -369,6 +370,7 @@ class OGRFileHandling:
         """Delete folder if validation fails."""
         await async_delete_dir(folder_path)
 
+    @timeout(120)
     @job_log(job_step_name="upload")
     async def upload_ogr2ogr(self, temp_table_name: str, job_id: UUID):
         """Upload file to database."""

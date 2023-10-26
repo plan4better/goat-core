@@ -79,6 +79,10 @@ class CRUDJob(CRUDBase):
         if job.status_simple == JobStatusType.killed.value:
             job.status[job_step_name]["status"] = JobStatusType.killed.value
             msg_text = "Job killed."
+        elif status_simple == JobStatusType.finished.value:
+            job.status[job_step_name]["status"] = status_simple
+            # Don't update status_siplified if finished as there might follow up steps
+            status_simple = job.status_simple
         else:
             job.status[job_step_name]["status"] = status_simple
 

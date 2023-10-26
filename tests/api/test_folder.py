@@ -28,7 +28,6 @@ async def test_get_folder_wrong_id(client: AsyncClient, fixture_create_folder):
     await get_with_wrong_id(client, "folder")
 
 
-
 @pytest.mark.asyncio
 async def test_get_folders(
     client: AsyncClient,

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Path, Query, Body
+from fastapi import APIRouter, Depends, Path, Query, Body, HTTPException
 from src.crud.crud_job import job as crud_job
 from src.db.models.job import Job
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +10,7 @@ from src.schemas.job import JobType
 from typing import List
 from datetime import datetime
 from src.schemas.common import OrderEnum
+
 router = APIRouter()
 
 
@@ -27,10 +28,16 @@ async def get_job(
         description="The ID of the layer to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
+    user_id: UUID4 = Depends(get_user_id),
 ):
     """Retrieve a job by its ID."""
-    job = await crud_job.get(db=async_session, id=id)
-    return job
+    job = await crud_job.get_by_multi_keys(db=async_session, keys={"id": id, "user_id": user_id})
+
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return job[0]
+
 
 @router.get(
     "",
@@ -48,19 +55,23 @@ async def read_jobs(
         None,
         description="Job type to filter by. Can be multiple. If not specified, all job types will be returned.",
     ),
-    project_id: UUID4 | None = Query(
+    project_id: UUID4
+    | None = Query(
         None,
         description="Project ID to filter by. If not specified, all projects will be returned.",
     ),
-    start_data: datetime | None = Query(
+    start_data: datetime
+    | None = Query(
         None,
         description="Specify the start date to filter the jobs. If not specified, all jobs will be returned.",
     ),
-    end_data: datetime | None = Query(
+    end_data: datetime
+    | None = Query(
         None,
         description="Specify the end date to filter the jobs. If not specified, all jobs will be returned.",
     ),
-    read: bool | None = Query(
+    read: bool
+    | None = Query(
         False,
         description="Specify if the job should be read. If not specified, all jobs will be returned.",
     ),
@@ -90,11 +101,12 @@ async def read_jobs(
         order=order,
     )
 
+
 @router.put(
     "/read",
     response_model=List[Job],
     response_model_exclude_none=True,
-    status_code=201,
+    status_code=200,
     summary="Mark jobs as read.",
 )
 async def mark_jobs_as_read(
@@ -107,4 +119,32 @@ async def mark_jobs_as_read(
     ),
 ):
     """Mark jobs as read."""
-    return await crud_job.mark_as_read(async_session=async_session, user_id=user_id, job_ids=job_ids)
+    return await crud_job.mark_as_read(
+        async_session=async_session, user_id=user_id, job_ids=job_ids
+    )
+
+
+@router.put(
+    "/kill/{job_id}",
+    response_model=Job,
+    response_model_exclude_none=True,
+    status_code=200,
+    summary="Kill a job.",
+)
+async def kill_job(
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+    job_id: UUID4 = Path(
+        ...,
+        description="Job ID to kill.",
+        example="7e5eeb1f-3605-4ff7-87f8-2aed7094e4de",
+    ),
+):
+    """Kill a job. It will let the job finish already started tasks and then kill it. All data produced by the job will be deleted."""
+
+    job = await crud_job.get_by_multi_keys(db=async_session, keys={"id": job_id, "user_id": user_id})
+
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    job = job[0]
+    return await crud_job.update(db=async_session, db_obj=job, obj_in={"status_simple": "killed"})

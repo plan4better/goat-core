@@ -84,6 +84,12 @@ class CRUDLayerProject(CRUDBase):
             query=select(Layer).where(Layer.id.in_(layer_ids)),
         )
 
+        if len(layers) != len(layer_ids):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="One or several Layers were not found",
+            )
+
         # Create link between project and layer
         for layer in layers:
             layer = layer[0]

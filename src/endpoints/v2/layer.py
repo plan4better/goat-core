@@ -1,7 +1,9 @@
+# Standard Libraries
 import os
 from typing import List
 from uuid import uuid4
 
+# Third-party Libraries
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -15,12 +17,12 @@ from fastapi import (
     status,
 )
 from fastapi.responses import JSONResponse
-from fastapi_pagination import Page
-from fastapi_pagination import Params as PaginationParams
+from fastapi_pagination import Page, Params as PaginationParams
 from pydantic import UUID4
 from sqlalchemy import and_, or_, select
+
+# Local application imports
 from src.core.content import (
-    delete_content_by_id,
     read_content_by_id,
     read_contents_by_ids,
     update_content_by_id,
@@ -45,6 +47,7 @@ from src.schemas.layer import (
 )
 from src.schemas.layer import request_examples as layer_request_examples
 from src.utils import check_file_size, get_user_table
+
 
 router = APIRouter()
 
@@ -200,7 +203,7 @@ async def create_layer_external(
     user_id: UUID4 = Depends(get_user_id),
     layer_in: ILayerExternalCreate = Body(
         ...,
-        example=layer_request_examples["create_external"],
+        examples=layer_request_examples["create_external"],
         description="Layer to create",
     ),
 ):

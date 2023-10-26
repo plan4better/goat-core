@@ -8,7 +8,9 @@ from src.core.config import settings
 from src.endpoints.deps import get_db, session_manager
 from src.main import app
 from src.schemas.layer import request_examples as layer_request_examples
-from src.schemas.project import request_examples as project_request_examples, initial_view_state_example
+from src.schemas.project import (
+    request_examples as project_request_examples,
+)
 from tests.utils import (
     upload_file,
     validate_invalid_file,
@@ -16,6 +18,16 @@ from tests.utils import (
     validate_valid_files,
 )
 from src.utils import get_user_table
+from src.schemas.active_mobility import request_examples as active_mobility_request_examples
+from src.schemas.motorized_mobility import (
+    request_examples_isochrone_pt,
+    request_examples_isochrone_car,
+    request_example_oev_gueteklasse,
+)
+from src.schemas.tool import (
+    request_examples_aggregation,
+    request_examples_join,
+)
 
 settings.RUN_AS_BACKGROUND_TASK = True
 settings.USER_DATA_SCHEMA = "test_user_data"
@@ -189,12 +201,10 @@ async def fixture_create_layer_project(
 
     # Add layers to project
     response = await client.post(
-        f"{settings.API_V2_STR}/project/{project_id}/layer", json={"layer_ids": [layer_id]}
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_id}"
     )
     assert response.status_code == 200
-    return response.json()
-
-
+    return {"layer_project": response.json(), "project_id": project_id}
 
 
 @pytest.fixture(autouse=True)
@@ -345,3 +355,44 @@ async def fixture_delete_external_layers(client: AsyncClient, fixture_create_ext
 
     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}")
     assert response.status_code == 404  # Not Found
+
+
+def get_payload_types(request_examples: dict) -> list:
+    return request_examples
+
+
+def create_generic_toolbox_fixture(endpoint: str, request_examples: dict):
+    @pytest.fixture(params=get_payload_types(request_examples))
+    async def generic_post_fixture(client: AsyncClient, fixture_create_project, request):
+        payload = request_examples[request.param]["value"]
+        response = await client.post(f"{settings.API_V2_STR}{endpoint}", json=payload)
+        assert response.status_code == 201
+        return response.json()
+
+    return generic_post_fixture
+
+
+fixture_isochrone_active_mobility = create_generic_toolbox_fixture(
+    "/active-mobility/isochrone", active_mobility_request_examples["isochrone_active_mobility"]
+)
+
+fixture_isochrone_pt = create_generic_toolbox_fixture(
+    "/motorized-mobility/pt/isochrone",
+    request_examples_isochrone_pt,
+)
+
+fixture_isochrone_car = create_generic_toolbox_fixture(
+    "/motorized-mobility/car/isochrone",
+    request_examples_isochrone_car,
+)
+
+fixture_oev_gueteklasse = create_generic_toolbox_fixture(
+    "/motorized-mobility/oev-gueteklassen", request_example_oev_gueteklasse
+)
+
+fixture_aggregation_points = create_generic_toolbox_fixture(
+    "/tool/aggregate-points", request_examples_aggregation
+)
+
+fixture_join = create_generic_toolbox_fixture("/tool/join", request_examples_join)
+

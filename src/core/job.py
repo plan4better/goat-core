@@ -69,7 +69,8 @@ def job_log(job_step_name: str, timeout: int = 120):
             job_id = kwargs["job_id"]
             job = await crud_job.get(db=async_session, id=job_id)
 
-            # Update job status
+
+            # Update job status if not killed
             job = await crud_job.update_status(
                 async_session=async_session,
                 job_id=job_id,
@@ -77,8 +78,9 @@ def job_log(job_step_name: str, timeout: int = 120):
                 job_step_name=job_step_name,
             )
 
-            # Exit if job is killed
+            # Exit if job is killed before starting
             if job.status_simple == JobStatusType.killed.value:
+                await run_failure_func(self, func, **kwargs)
                 return
 
             # Execute function
@@ -134,7 +136,7 @@ def job_log(job_step_name: str, timeout: int = 120):
             )
             # Check if job is killed and run failure function if exists
             if job.status_simple in [JobStatusType.killed.value, JobStatusType.failed.value]:
-                run_failure_func(self, func, **kwargs)
+                await run_failure_func(self, func, **kwargs)
                 return
 
             return result
