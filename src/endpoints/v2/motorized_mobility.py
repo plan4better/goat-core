@@ -1,7 +1,7 @@
 from src.schemas.motorized_mobility import (
-    CalculateOevGueteklassenParameters,
-    oev_gueteklasse_config_example,
-    oev_gueteklasse_station_config_layer_base, 
+    IOevGueteklasse,
+    request_example_oev_gueteklasse,
+    oev_gueteklasse_station_config_layer_base,
     oev_gueteklasse_config_layer_base,
 )
 from src.db.session import AsyncSession
@@ -15,14 +15,21 @@ from sqlalchemy import select
 from src.db.models.layer import Layer
 from datetime import datetime
 from src.crud.crud_motorized_mobility import crud_oev_gueteklasse
-from src.schemas.motorized_mobility import IIsochronePT, request_examples_isochrone_pt
+from src.schemas.motorized_mobility import (
+    IIsochronePT,
+    request_examples_isochrone_pt,
+    request_examples_isochrone_car,
+    IIsochroneCar,
+    request_example_oev_gueteklasse,
+)
 from src.schemas.toolbox_base import IToolResponse
 from uuid import uuid4
+
 router = APIRouter()
 
 
 @router.post(
-    "/isochrone",
+    "/pt/isochrone",
     summary="Compute isochrones for public transport.",
     response_model=IToolResponse,
     status_code=201,
@@ -41,13 +48,39 @@ async def compute_pt_isochrone(
     return {"job_id": uuid4()}
 
 
+@router.post(
+    "/car/isochrone",
+    summary="Compute isochrones for car.",
+    response_model=IToolResponse,
+    status_code=201,
+)
+async def compute_car_isochrone(
+    *,
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_user_id),
+    params: IIsochroneCar = Body(
+        ...,
+        examples=request_examples_isochrone_car,
+        description="The isochrone parameters.",
+    ),
+):
+    """Compute isochrones for car."""
+    return {"job_id": uuid4()}
 
-@router.post("/oev-gueteklassen")
+
+@router.post(
+    "/oev-gueteklassen",
+    summary="Calculate ÖV-Güteklassen.",
+    response_model=IToolResponse,
+    status_code=201,
+)
 async def calculate_oev_gueteklassen(
     *,
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID = Depends(get_user_id),
-    params: CalculateOevGueteklassenParameters = Body(..., example=oev_gueteklasse_config_example),
+    params: IOevGueteklasse = Body(
+        ..., examples=request_example_oev_gueteklasse
+    ),
 ):
     """
     ÖV-Güteklassen (The public transport quality classes) is an indicator for access to public transport.
@@ -89,8 +122,8 @@ async def calculate_oev_gueteklassen(
     #     reference_area_id=layer_stations.id,
     # )
     # TODO: Save layer in layer table and create a layer for the stations
-    # TODO: Send task into background    
+    # TODO: Send task into background
 
-    #TODO: Add layer to project if project_id is given
+    # TODO: Add layer to project if project_id is given
 
     return {"job_id": uuid4()}

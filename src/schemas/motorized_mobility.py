@@ -1,9 +1,25 @@
-from typing import List, Optional
-from pydantic import BaseModel, validator, Field
-from src.resources.enums import ReturnType
+from typing import List
+from pydantic import BaseModel, Field, root_validator
 from enum import Enum
 from uuid import UUID
-from src.schemas.toolbox_base import ResultTarget, IsochroneStartingPoints
+from src.schemas.toolbox_base import ResultTarget, IsochroneStartingPointsBase, PTSupportedDay
+
+
+class IsochroneStartingPointsMotorizedMobility(IsochroneStartingPointsBase):
+    """Model for the active mobility isochrone starting points."""
+
+    # Check that the starting points for active mobility are below 20
+    @root_validator(pre=True)
+    def check_starting_points(cls, values):
+        lat = values.get("latitude")
+        long = values.get("longitude")
+        max_points = 20
+        if lat and long:
+            if len(lat) > max_points:
+                raise ValueError(f"The maximum number of starting points is {max_points}.")
+            if len(long) > max_points:
+                raise ValueError(f"The maximum number of starting points is {max_points}.")
+        return values
 
 
 class RoutingPTMode(str, Enum):
@@ -52,7 +68,7 @@ class RoutingPTType(BaseModel):
     )
 
 
-class TravelTimeCostPublicTransport(BaseModel):
+class TravelTimeCostMotorizedMobility(BaseModel):
     """Travel time cost schema."""
 
     max_traveltime: int = Field(
@@ -69,10 +85,23 @@ class TravelTimeCostPublicTransport(BaseModel):
     )
 
 
+class PTTimeWindow(BaseModel):
+    weekday: PTSupportedDay = Field(
+        title="Weekday",
+        description="The weekday of the isochrone. There are three options: weekday, saturday, sunday."
+    )
+    from_time: int = Field(
+        25200, gt=0, lt=86400, description="(PT) From time. Number of seconds since midnight"
+    )
+    to_time: int = Field(
+        39600, gt=0, lt=86400, description="(PT) To time . Number of seconds since midnight"
+    )
+
+
 class IIsochronePT(BaseModel):
     """Model for the public transport isochrone"""
 
-    starting_points: IsochroneStartingPoints = Field(
+    starting_points: IsochroneStartingPointsMotorizedMobility = Field(
         ...,
         title="Starting Points",
         description="The starting points of the isochrone.",
@@ -82,19 +111,46 @@ class IIsochronePT(BaseModel):
         title="Routing Type",
         description="The routing type of the isochrone.",
     )
-    travel_cost: TravelTimeCostPublicTransport = Field(
+    travel_cost: TravelTimeCostMotorizedMobility = Field(
         ...,
         title="Travel Cost",
         description="The travel cost of the isochrone.",
     )
-    weekday: Optional[int] = Field(
-        0, ge=0, le=6, description="(PT) Departure weekday, 0=Monday, 6=Sunday"
+    time_window: PTTimeWindow = Field(
+        ...,
+        title="Time Window",
+        description="The time window of the isochrone.",
     )
-    from_time: Optional[int] = Field(
-        25200, gt=0, lt=86400, description="(PT) From time. Number of seconds since midnight"
+    result_target: ResultTarget = Field(
+        ...,
+        title="Result Target",
+        description="The target location of the produced layer.",
     )
-    to_time: Optional[int] = Field(
-        39600, gt=0, lt=86400, description="(PT) To time . Number of seconds since midnight"
+
+
+class RoutingCarType(str, Enum):
+    """Routing car type schema."""
+
+    car_peak = "car_peak"
+
+
+class IIsochroneCar(BaseModel):
+    """Model for the car isochrone"""
+
+    starting_points: IsochroneStartingPointsMotorizedMobility = Field(
+        ...,
+        title="Starting Points",
+        description="The starting points of the isochrone.",
+    )
+    routing_type: RoutingCarType = Field(
+        ...,
+        title="Routing Type",
+        description="The routing type of the isochrone.",
+    )
+    travel_cost: TravelTimeCostMotorizedMobility = Field(
+        ...,
+        title="Travel Cost",
+        description="The travel cost of the isochrone.",
     )
     result_target: ResultTarget = Field(
         ...,
@@ -105,6 +161,8 @@ class IIsochronePT(BaseModel):
 
 class CountLimitPerTool(int, Enum):
     oev_gueteklasse = 1000
+    isochrone_active_mobility = 1000
+    isochrone_motorized_mobility = 20
 
 
 class AreaLimitPerTool(int, Enum):
@@ -112,53 +170,49 @@ class AreaLimitPerTool(int, Enum):
 
 
 class StationConfig(BaseModel):
-    groups: dict
-    time_frequency: List[int]
-    categories: List[dict]
-    classification: dict
+    groups: dict = Field(
+        ...,
+        title="Groups",
+        description="The groups of the station config.",
+    )
+    time_frequency: List[int] = Field(
+        ...,
+        title="Time Frequency",
+        description="The time frequency of the station config.",
+    )
+    categories: List[dict] = Field(
+        ...,
+        title="Categories",
+        description="The categories of the station config.",
+    )
+    classification: dict = Field(
+        ...,
+        title="Classification",
+        description="The classification of the station config.",
+    )
 
 
-class CalculateOevGueteklassenParameters(BaseModel):
-    folder_id: UUID
-    project_id: UUID = None
-    start_time: int = 25200
-    end_time: int = 32400
-    weekday: int = 1
-    reference_area: UUID  # UUID of layers
-    station_config: StationConfig
-
-    @validator("start_time", "end_time")
-    def seconds_validator(cls, v):
-        if v < 0 or v > 86400:
-            raise ValueError("Should be between or equal to 0 and 86400")
-        return v
-
-    @validator("weekday")
-    def weekday_validator(cls, v):
-        if v < 1 or v > 7:
-            raise ValueError("weekday should be between or equal to 1 and 7")
-        return v
-
-
-# {
-#         "0": "B",  # tram
-#         "1": "A",  # metro
-#         "2": "A",  # train
-#         "3": "A",  # bus
-#         "100": "A",  # rail
-#         "101": "A",  # highspeed train
-#         "102": "A",  # long distance train
-#         "103": "A",  # interregional train
-#         "105": "A",  # car sleeper train
-#         "106": "A",  # regional train
-#         "109": "A",  # suburban train
-#         "400": "A",  # urban rail
-#         "402": "A",  # underground service
-#         "700": "C",  # bus service
-#         "704": "C",  # local bus service
-#         "715": "C",  # demand and response bus service
-#         "900": "B",  # tram
-#     }
+class IOevGueteklasse(BaseModel):
+    time_window: PTTimeWindow = Field(
+        ...,
+        title="Time Window",
+        description="The time window of the ÖV-Güteklasse.",
+    )
+    reference_area: UUID = Field(
+        ...,
+        title="Reference Area",
+        description="The reference area of the ÖV-Güteklasse.",
+    )
+    station_config: StationConfig = Field(
+        ...,
+        title="Station Config",
+        description="The station config of the ÖV-Güteklasse.",
+    )
+    result_target: ResultTarget = Field(
+        ...,
+        title="Result Target",
+        description="The target location of the produced layer.",
+    )
 
 request_examples_isochrone_pt = {
     # 1. Isochrone for public transport with all modes
@@ -177,12 +231,11 @@ request_examples_isochrone_pt = {
                 "access_mode": "walk",
             },
             "travel_cost": {"max_traveltime": 40, "traveltime_step": 10},
-            "weekday": 1,
-            "from_time": 25200,
-            "to_time": 32400,
+            "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
             "result_target": {
                 "layer_name": "AllModesPTIsochrone",
                 "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
+                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
             },
         },
     },
@@ -201,18 +254,51 @@ request_examples_isochrone_pt = {
                 "access_mode": "walk",
             },
             "travel_cost": {"max_traveltime": 35, "traveltime_step": 5},
-            "weekday": 1,
-            "from_time": 25200,
-            "to_time": 32400,
+            "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
             "result_target": {
-                "layer_name": "ExcludeBusPTIsochrone",
+                "layer_name": "AllModesPTIsochrone",
                 "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
+                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
             },
         },
     },
 }
 
+request_examples_isochrone_car = {
+    # 1. Isochrone for car
+    "single_point_car": {
+        "summary": "Isochrone for a single starting point using car",
+        "value": {
+            "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
+            "routing_type": "car_peak",
+            "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
+            "result_target": {
+                "layer_name": "AllModesPTIsochrone",
+                "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
+                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            },
+        },
+    },
+    # 2. Multiisochrone for car
+    "multi_point_car": {
+        "summary": "Isochrone for multiple starting points using car",
+        "value": {
+            "starting_points": {
+                "latitude": [13.4050, 13.4150, 13.4250],
+                "longitude": [52.5200, 52.5250, 52.5300],
+            },
+            "routing_type": "car_peak",
+            "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
+            "result_target": {
+                "layer_name": "AllModesPTIsochrone",
+                "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
+                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            },
+        },
+    },
+}
 
+# Check for extended route_type defintion: https://developers.google.com/transit/gtfs/reference/extended-route-types
 station_config_example = {
     "groups": {
         "0": "B",
@@ -282,13 +368,35 @@ station_config_example = {
     },
 }
 
-oev_gueteklasse_config_example = {
-    "folder_id": "732fc631-e1a4-44c5-b7ef-27c7d49e65f7",
-    "start_time": 21600,
-    "end_time": 72000,
-    "weekday": 1,
-    "reference_area": "99261caf-bb4a-42ef-8212-423a3dd6d613",
-    "station_config": station_config_example,
+request_example_oev_gueteklasse = {
+    "oev_gueteklasse_weekday":{
+        "summary": "ÖV-Güteklassen Weekday",
+        "value": {
+            "folder_id": "732fc631-e1a4-44c5-b7ef-27c7d49e65f7",
+            "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
+            "reference_area": "99261caf-bb4a-42ef-8212-423a3dd6d613",
+            "station_config": station_config_example,
+            "result_target": {
+                "layer_name": "Öv-Güteklassen Weekday",
+                "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
+                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            },
+        },
+    },
+    "oev_gueteklasse_saturday":{
+        "summary": "ÖV-Güteklassen Saturday",
+        "value": {
+            "folder_id": "732fc631-e1a4-44c5-b7ef-27c7d49e65f7",
+            "time_window": {"weekday": "saturday", "from_time": 25200, "to_time": 32400},
+            "reference_area": "99261caf-bb4a-42ef-8212-423a3dd6d613",
+            "station_config": station_config_example,
+            "result_target": {
+                "layer_name": "Öv-Güteklassen Saturday",
+                "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
+                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            },
+        },
+    }
 }
 
 oev_gueteklasse_station_config_layer_base = {

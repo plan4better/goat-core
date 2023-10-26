@@ -1,16 +1,20 @@
+# Standard Libraries
+from uuid import UUID, uuid4
+
+# Third-party Libraries
+from fastapi import APIRouter, Body, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+# Project-specific Modules
+from src.endpoints.deps import get_db, get_user_id
 from src.schemas.active_mobility import (
     IIsochroneActiveMobility,
     request_examples as active_mobility_request_examples,
 )
-from uuid import UUID
-from uuid import uuid4
-from src.core.config import settings
-from sqlalchemy.ext.asyncio import AsyncSession
-from src.endpoints.deps import get_db, get_user_id
-from fastapi import APIRouter, Depends, HTTPException, Body, status
 from src.schemas.toolbox_base import IToolResponse
-router = APIRouter()
 
+
+router = APIRouter()
 
 @router.post(
     "/isochrone",

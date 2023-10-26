@@ -2,7 +2,7 @@ from enum import Enum
 from typing import List
 from uuid import UUID
 from pydantic import BaseModel, Field, validator
-from toolbox_base import ColumnStatistic, ResultTarget
+from src.schemas.toolbox_base import ColumnStatistic, ResultTarget, ColumStatisticsOperation
 
 class IJoin(BaseModel):
     """Join indicator schema."""
@@ -31,6 +31,11 @@ class IJoin(BaseModel):
         None,
         title="Column Statistics",
         description="The column statistics to be calculated.",
+    )
+    result_target: ResultTarget = Field(
+        ...,
+        title="Result Target",
+        description="The target location of the produced layer.",
     )
 
 
@@ -100,3 +105,82 @@ class IAggregationPoint(BaseModel):
                     "Cannot specify both area_layer_id and h3_resolution at the same time."
                 )
         return v
+
+request_examples_join = {
+    "join_count": {
+        "summary": "Join Count",
+        "value": {
+            "target_layer_id": "12345678-1234-5678-1234-567812345678",
+            "target_field": "target_field_example",
+            "join_layer_id": "87654321-8765-4321-8765-432187654321",
+            "join_field": "join_field_example",
+            "column_statistics": {
+                "operation": ColumStatisticsOperation.count.value,
+                "field": "field_example1"
+            },
+            "result_target": {
+                "layer_name": "IJoin Result Layer Example",
+                "folder_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
+                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+        }
+    },
+    "join_mean": {
+        "summary": "Join Mean",
+        "value": {
+            "target_layer_id": "23456789-2345-6789-2345-678923456789",
+            "target_field": "target_field_example2",
+            "join_layer_id": "98765432-9876-5432-9876-543298765432",
+            "join_field": "join_field_example2",
+            "column_statistics": {
+                "operation": ColumStatisticsOperation.mean.value,
+                "field": "field_example2"
+            },
+            "result_target": {
+                "layer_name": "IJoin Result Layer Example 2",
+                "folder_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
+                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+        }
+    }
+}
+
+request_examples_aggregation = {
+    "aggregation_feature_layer": {
+        "summary": "Aggregation Feature Layer",
+        "value": {
+            "point_layer_id": "abcdef12-3456-7890-fedc-ba9876543210",
+            "area_type": "feature_layer",
+            "area_layer_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
+            "column_statistics": {
+                "operation": "sum",
+                "field": "field_example1"
+            },
+            "area_group_by_field": ["group_by_example1"],
+            "result_target": {
+                "layer_name": "Aggregation Result Layer Feature Layer",
+                "folder_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
+            },
+        }
+    },
+    "aggregation_h3_grid": {
+        "summary": "Aggregation H3 Grid",
+        "value": {
+            "point_layer_id": "fedcba98-7654-3210-0123-456789abcdef",
+            "area_type": "h3_grid",
+            "h3_resolution": 6,
+            "column_statistics": {
+                "operation": "mean",
+                "field": "field_example2"
+            },
+            "area_group_by_field": ["group_by_example2"],
+            "result_target": {
+                "layer_name": "Aggregation Result Layer H3 Grid",
+                "folder_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
+                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+        }
+    }
+}
+
+IAggregationPoint(**request_examples_aggregation["aggregation_h3_grid"]["value"])

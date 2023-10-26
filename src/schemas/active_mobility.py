@@ -1,7 +1,24 @@
 from enum import Enum
 from uuid import UUID
-from pydantic import BaseModel, Field, validator
-from src.schemas.toolbox_base import ResultTarget, IsochroneStartingPoints
+from pydantic import BaseModel, Field, validator, root_validator
+from src.schemas.toolbox_base import ResultTarget, IsochroneStartingPointsBase
+
+
+class IsochroneStartingPointsActiveMobility(IsochroneStartingPointsBase):
+    """Model for the active mobility isochrone starting points."""
+
+    # Check that the starting points for active mobility are below 1000
+    @root_validator(pre=True)
+    def check_starting_points(cls, values):
+        lat = values.get("latitude")
+        long = values.get("longitude")
+
+        if lat and long:
+            if len(lat) > 1000:
+                raise ValueError("The maximum number of starting points is 1000.")
+            if len(long) > 1000:
+                raise ValueError("The maximum number of starting points is 1000.")
+        return values
 
 
 class RoutingActiveMobilityType(str, Enum):
@@ -26,6 +43,13 @@ class TravelTimeCostActiveMobility(BaseModel):
         ...,
         title="Travel Time Step",
         description="The travel time step in minutes.",
+    )
+    speed: int = Field(
+        ...,
+        title="Speed",
+        description="The speed in km/h.",
+        ge=1,
+        le=25,
     )
 
 
@@ -57,7 +81,7 @@ class TravelDistanceCostActiveMobility(BaseModel):
 class IIsochroneActiveMobility(BaseModel):
     """Model for the active mobility isochrone"""
 
-    starting_points: IsochroneStartingPoints = Field(
+    starting_points: IsochroneStartingPointsActiveMobility = Field(
         ...,
         title="Starting Points",
         description="The starting points of the isochrone.",
@@ -92,10 +116,11 @@ request_examples = {
             "value": {
                 "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
                 "routing_type": "walking",
-                "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
+                "travel_cost": {"max_traveltime": 30, "traveltime_step": 10, "speed": 5},
                 "result_target": {
                     "layer_name": "WalkingIsochroneExample1",
                     "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
+                    "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
                 },
             },
         },
@@ -105,7 +130,7 @@ request_examples = {
             "value": {
                 "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
                 "routing_type": "bicycle",
-                "travel_cost": {"max_traveltime": 15, "traveltime_step": 5},
+                "travel_cost": {"max_traveltime": 15, "traveltime_step": 5, "speed": 15},
                 "result_target": {
                     "layer_name": "CyclingIsochroneExample1",
                     "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
@@ -118,7 +143,7 @@ request_examples = {
             "value": {
                 "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
                 "routing_type": "walking",
-                "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
+                "travel_cost": {"max_traveltime": 30, "traveltime_step": 10, "speed": 5},
                 "result_target": {
                     "layer_name": "WalkingIsochroneExample1",
                     "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
@@ -157,7 +182,7 @@ request_examples = {
                     ],
                 },
                 "routing_type": "walking",
-                "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
+                "travel_cost": {"max_traveltime": 30, "traveltime_step": 10, "speed": 5},
                 "result_target": {
                     "layer_name": "WalkingMultiIsochroneExample1",
                     "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
@@ -195,7 +220,7 @@ request_examples = {
                     ],
                 },
                 "routing_type": "bicycle",
-                "travel_cost": {"max_traveltime": 15, "traveltime_step": 5},
+                "travel_cost": {"max_traveltime": 15, "traveltime_step": 5, "speed": 15},
                 "result_target": {
                     "layer_name": "CyclingMultiIsochroneExample1",
                     "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
@@ -207,10 +232,10 @@ request_examples = {
             "summary": "Layer based isochrone walking",
             "value": {
                 "starting_points": {
-                    "layer_id": "12345678-1234-1234-1234-123456789012"  # Sample UUID for the layer
+                    "layer_id": "39e16c27-2b03-498e-8ccc-68e798c64b8d"  # Sample UUID for the layer
                 },
                 "routing_type": "walking",
-                "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
+                "travel_cost": {"max_traveltime": 30, "traveltime_step": 10, "speed": 5},
                 "result_target": {
                     "layer_name": "LayerBasedWalkingIsochrone",
                     "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",

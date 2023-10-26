@@ -11,7 +11,7 @@ from src.db.models import Layer
 from src.schemas.motorized_mobility import (
     StationConfig,
     oev_gueteklasse_station_config_layer_base,
-    CalculateOevGueteklassenParameters
+    IOevGueteklasse
 )
 from src.utils import get_user_table, get_layer_columns
 
@@ -25,7 +25,7 @@ class CRUDOevGueteklasse:
         self,
         async_session: AsyncSession,
         user_id: UUID,
-        params: CalculateOevGueteklassenParameters,
+        params: IOevGueteklasse,
         reference_table_name: str,
     ):
         """Get count of public transport stations for every service."""

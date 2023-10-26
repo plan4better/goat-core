@@ -1,7 +1,10 @@
+# Standard Libraries
 from enum import Enum
-from uuid import UUID
-from pydantic import BaseModel, Field, root_validator
 from typing import List
+from uuid import UUID
+
+# Third-party Libraries
+from pydantic import BaseModel, Field, root_validator
 
 
 class ColumStatisticsOperation(str, Enum):
@@ -33,6 +36,11 @@ class ResultTarget(BaseModel):
         title="Folder ID",
         description="The ID of the folder where the layer will be created.",
     )
+    project_id: UUID | None = Field(
+        None,
+        title="Project ID",
+        description="The ID of the project where the layer will be created.",
+    )
 
 
 class IToolResponse(BaseModel):
@@ -45,7 +53,7 @@ class IToolResponse(BaseModel):
     )
 
 
-class IsochroneStartingPoints(BaseModel):
+class IsochroneStartingPointsBase(BaseModel):
     """Base model for isochrone attributes."""
 
     latitude: List[float] | None = Field(
@@ -70,19 +78,29 @@ class IsochroneStartingPoints(BaseModel):
         long = values.get("longitude")
         layer_id = values.get("layer_id")
 
-        if (lat and long) and layer_id:
-            raise ValueError("Either provide latitude and longitude or layer_id, not both.")
+        if lat and long:
+            if layer_id:
+                raise ValueError("Either provide latitude and longitude or layer_id, not both.")
+            if len(lat) != len(long):
+                raise ValueError("Latitude and longitude must have the same length.")
+
+            # Check if lat/lon are within WGS84 bounds
+            for lat_val in lat:
+                if lat_val < -90 or lat_val > 90:
+                    raise ValueError("Latitude must be between -90 and 90.")
+            for lon_val in long:
+                if lon_val < -180 or lon_val > 180:
+                    raise ValueError("Longitude must be between -180 and 180.")
+
         if not (lat and long) and not layer_id:
             raise ValueError("Must provide either latitude and longitude or layer_id.")
-        if len(lat) != len(long):
-            raise ValueError("Latitude and longitude must have the same length.")
-
-        # Check if lat/lon are within WGS84 bounds
-        for lat_val in lat:
-            if lat_val < -90 or lat_val > 90:
-                raise ValueError("Latitude must be between -90 and 90.")
-        for lon_val in long:
-            if lon_val < -180 or lon_val > 180:
-                raise ValueError("Longitude must be between -180 and 180.")
 
         return values
+
+
+class PTSupportedDay(str, Enum):
+    """PT supported days schema."""
+
+    weekday = "weekday"
+    saturday = "saturday"
+    sunday = "sunday"
