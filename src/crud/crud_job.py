@@ -4,24 +4,16 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from fastapi_pagination import Params as PaginationParams
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
+from src.core.config import settings
 from src.crud.base import CRUDBase
 from src.db.models.job import Job
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import and_, select, func
-from uuid import UUID
-from datetime import datetime
 from src.schemas.common import OrderEnum
-from fastapi import HTTPException, status
 from src.schemas.job import JobType, job_mapping, JobStatusType, MsgType
-from typing import List
-from src.core.config import settings
 from src.utils import sanitize_error_message
-from sqlalchemy.orm.attributes import flag_modified
-from src.schemas.common import OrderEnum
-from src.schemas.job import JobType
 
 
 class CRUDJob(CRUDBase):
@@ -69,32 +61,31 @@ class CRUDJob(CRUDBase):
         async_session: AsyncSession,
         job_id: UUID,
         job_step_name: str,
-        status_simple: JobStatusType = JobStatusType.running,
+        status: JobStatusType = JobStatusType.running,
         msg_text: str = "",
     ):
         """Update job status."""
 
-        # Get job and check if job is killed.
+        #TODO: Find another way to avoid refetching the job again here.
+        # Get job and check if job is killed. This is needed at the moment as the job is not updated in here but in the DB.
         job = await self.get(db=async_session, id=job_id)
-        if job.status_simple == JobStatusType.killed.value:
-            job.status[job_step_name]["status"] = JobStatusType.killed.value
-            msg_text = "Job killed."
-        elif status_simple == JobStatusType.finished.value:
-            job.status[job_step_name]["status"] = status_simple
-            # Don't update status_siplified if finished as there might follow up steps
-            status_simple = job.status_simple
-        else:
-            job.status[job_step_name]["status"] = status_simple
+        async_session.expire(job)
+        job = await self.get(db=async_session, id=job_id)
 
         # Update job step
         job.status[job_step_name]["timestamp_end"] = str(datetime.now())
+        job.status[job_step_name]["status"] = status
 
         # Populate job step msg
         job.status[job_step_name]["msg"] = {
             "type": MsgType.info.value,
-            "text": sanitize_error_message(msg_text.replace("'", "''"))
+            "text": sanitize_error_message(msg_text.replace("'", "''")),
         }
-        job.status_simple = status_simple
+        if status == JobStatusType.finished:
+            job.status_simple = JobStatusType.running.value
+        else:
+            job.status_simple = status
+
         flag_modified(job, "status")
         flag_modified(job, "status_simple")
         # Update job

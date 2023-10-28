@@ -2,7 +2,7 @@ import pytest
 from httpx import AsyncClient
 from src.core.config import settings
 from tests.utils import upload_file, get_with_wrong_id
-
+import os
 
 @pytest.mark.asyncio
 async def test_files_validate_valid(client: AsyncClient, fixture_validate_files):
@@ -21,7 +21,10 @@ async def test_files_import(client: AsyncClient, fixture_validate_files):
 
 @pytest.mark.asyncio
 async def test_files_validate_invalid(client: AsyncClient, fixture_validate_file_invalid):
-    assert fixture_validate_file_invalid is not None
+    job_id = fixture_validate_file_invalid
+
+    # Check if folder was deleted with the data using os
+    assert os.path.exists(f"{settings.DATA_DIR}/{job_id}") is False
 
 
 @pytest.mark.asyncio

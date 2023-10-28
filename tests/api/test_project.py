@@ -99,7 +99,7 @@ async def test_update_initial_view_state(client: AsyncClient, fixture_create_pro
 
 @pytest.mark.asyncio
 async def test_create_layer_project(client: AsyncClient, fixture_create_layer_project):
-    assert fixture_create_layer_project[0]["id"] is not None
+    assert fixture_create_layer_project["project_id"] is not None
 
 
 @pytest.mark.asyncio

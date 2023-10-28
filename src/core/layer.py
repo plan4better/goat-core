@@ -21,7 +21,7 @@ from src.utils import (
     async_scandir,
 )
 from src.schemas.job import JobStatusType, Msg, MsgType
-from src.core.job import job_log, timeout
+from src.core.job import job_log
 import aiofiles
 import aiofiles.os as aos
 import time
@@ -336,7 +336,6 @@ class OGRFileHandling:
         """Validate kml."""
         return self.validate_ogr(self.file_path)
 
-    @timeout(120)
     @job_log(job_step_name="validation")
     async def validate(self, job_id: UUID):
         """Validate file before uploading."""
@@ -370,7 +369,6 @@ class OGRFileHandling:
         """Delete folder if validation fails."""
         await async_delete_dir(folder_path)
 
-    @timeout(120)
     @job_log(job_step_name="upload")
     async def upload_ogr2ogr(self, temp_table_name: str, job_id: UUID):
         """Upload file to database."""
@@ -418,11 +416,11 @@ class OGRFileHandling:
 
     async def upload_ogr2ogr_fail(self, temp_table_name: str):
         """Delete folder if ogr2ogr upload fails."""
-        self.validate_fail(self.folder_path)
+        await self.validate_fail(self.folder_path)
         await self.async_session.execute(text(f"DROP TABLE IF EXISTS {temp_table_name}"))
         await self.async_session.commit()
 
-    @timeout(120)
+    #@timeout(120)
     @job_log(job_step_name="migration")
     async def migrate_target_table(
         self,

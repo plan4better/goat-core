@@ -220,7 +220,7 @@ class CRUDLayer(CRUDBase):
             additional_attributes["style"] = base_styles["feature_layer"]["standard"][geom_type]
 
         # Upload file to temporary table
-        temp_table_name = f'{settings.USER_DATA_SCHEMA}."{str(uuid4()).replace("-", "")}"'
+        temp_table_name = f'{settings.USER_DATA_SCHEMA}."{str(job_id).replace("-", "")}"'
 
         result = await ogr_file_upload.upload_ogr2ogr(
             temp_table_name=temp_table_name,

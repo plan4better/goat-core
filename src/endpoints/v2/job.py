@@ -6,7 +6,7 @@ from src.endpoints.deps import get_db, get_user_id
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
-from src.schemas.job import JobType
+from src.schemas.job import JobType, JobStatusType
 from typing import List
 from datetime import datetime
 from src.schemas.common import OrderEnum
@@ -33,7 +33,7 @@ async def get_job(
     """Retrieve a job by its ID."""
     job = await crud_job.get_by_multi_keys(db=async_session, keys={"id": id, "user_id": user_id})
 
-    if job is None:
+    if job == []:
         raise HTTPException(status_code=404, detail="Job not found")
 
     return job[0]
@@ -147,4 +147,8 @@ async def kill_job(
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
     job = job[0]
+
+    if job.status_simple not in [JobStatusType.pending.value, JobStatusType.running.value]:
+        raise HTTPException(status_code=400, detail="Job is not pending or running. Therefore it cannot be killed.")
+
     return await crud_job.update(db=async_session, db_obj=job, obj_in={"status_simple": "killed"})
