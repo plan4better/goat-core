@@ -1,13 +1,11 @@
 from fastapi import APIRouter, Body, Depends, Path, Query, status, HTTPException
 from fastapi_pagination import Page
-from pydantic import parse_obj_as, ValidationError
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
 
 from src.crud.crud_project import project as crud_project
 from src.crud.crud_user_project import user_project as crud_user_project
 from src.crud.crud_layer_project import layer_project as crud_layer_project
-from src.crud.crud_layer import layer as crud_layer
 from src.db.models.project import Project
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_user_id
@@ -20,9 +18,6 @@ from src.schemas.project import (
     request_examples as project_request_examples,
 )
 from src.db.models._link_model import UserProjectLink
-from src.core.content import (
-    create_content,
-)
 from typing import List
 from src.schemas.project import (
     ITileLayerProjectRead,
@@ -32,41 +27,12 @@ from src.schemas.project import (
     IFeatureLayerIndicatorProjectRead,
     IFeatureLayerScenarioProjectRead,
     layer_type_mapping_read,
-    layer_type_mapping_update,
 )
 
 router = APIRouter()
 
 
-def layer_projects_to_schemas(layers_project):
-    """Convert layer projects to schemas."""
-    layer_projects_schemas = []
 
-    # Loop through layer and layer projects
-    for layer_project_tuple in layers_project:
-        layer = layer_project_tuple[0]
-        layer_project = layer_project_tuple[1]
-
-        # Get layer type
-        if layer.feature_layer_type is not None:
-            layer_type = layer.type + "_" + layer.feature_layer_type
-        else:
-            layer_type = layer.type
-
-        # Convert to dicts and update layer
-        layer = layer.dict()
-        layer_project = layer_project.dict()
-
-        # Delete id from layer project
-        del layer_project["id"]
-
-        # Update layer
-        layer.update(layer_project)
-
-        # Write into correct schema
-        layer_projects_schemas.append(layer_type_mapping_read[layer_type](**layer))
-
-    return layer_projects_schemas
 
 
 ### Project endpoints
@@ -338,14 +304,13 @@ async def add_layers_to_project(
     """Add layers to a project by its ID."""
 
     # Add layers to project
-    layers = await crud_layer_project.create(
+    layers_project = await crud_layer_project.create(
         async_session=async_session,
         project_id=id,
         layer_ids=layer_ids,
     )
-    layers = layer_projects_to_schemas(layers)
 
-    return layers
+    return layers_project
 
 
 @router.get(
@@ -371,31 +336,44 @@ async def get_layers_from_project(
 ):
     """Get layers from a project by its ID."""
 
-    # Get layers from project
-    layers_project = await crud_layer_project.get_all(
-        async_session=async_session,
+    # Get all layers from project
+    layers_project = await crud_layer_project.get_layers(
+        async_session,
         project_id=id,
     )
-    layers_response = []
+    return layers_project
 
-    for layer_project in layers_project:
-        layer = layer_project[0].dict()
-        layer_project_link = layer_project[1].dict()
+@router.get(
+    "/{id}/layer/{layer_id}",
+    response_model=IFeatureLayerStandardProjectRead
+    | IFeatureLayerIndicatorProjectRead
+    | IFeatureLayerScenarioProjectRead
+    | ITableLayerProjectRead
+    | ITileLayerProjectRead
+    | IImageryLayerProjectRead,
+    response_model_exclude_none=True,
+    status_code=200,
+)
+async def get_layer_from_project(
+    async_session: AsyncSession = Depends(get_db),
+    id: UUID4 = Path(
+        ...,
+        description="The ID of the project to get",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    layer_id: UUID4 = Path(
+        ...,
+        description="Layer ID to get",
+        example="e7dcaae4-1750-49b7-89a5-9510bf2761ad",
+    ),
+):
+    layer_project = await crud_layer_project.get_by_ids(
+        async_session,
+        project_id=id,
+        layer_ids=[layer_id],
+    )
+    return layer_project[0]
 
-        # Delete id column
-        del layer_project_link["id"]
-        # Update layer
-        layer.update(layer_project_link)
-
-        # Add feature layer type if exists else ''
-        if layer["feature_layer_type"] is not None:
-            layer_type = layer["type"] + "_" + layer["feature_layer_type"]
-        else:
-            layer_type = layer["type"]
-
-        layers_response.append(layer_type_mapping_read[layer_type](**layer))
-
-    return layers_response
 
 
 @router.put(
@@ -429,44 +407,18 @@ async def update_layer_in_project(
 ):
     """Update layer in a project by its ID."""
 
-    # Get base layer object
-    layer = await crud_layer.get(async_session, id=layer_id)
-
-    # Get layer type
-    if layer.feature_layer_type is not None:
-        layer_type = layer.type + "_" + layer.feature_layer_type
-    else:
-        layer_type = layer.type
-
-    # Determine the type based on the retrieved layer
-    model_type = layer_type_mapping_update.get(layer_type)
-
-    # Parse and validate the data against the model
-    try:
-        layer_in = parse_obj_as(model_type, layer_in)
-    except ValidationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(e),
-        )
+    #NOTE: Avoid getting layer_id from layer_in as the authorization is running against the query params.
 
     # Update layer in project
     layer_project = await crud_layer_project.update(
         async_session=async_session,
         project_id=id,
         layer_id=layer_id,
-        layer_project=layer_in,
+        layer_in=layer_in,
     )
 
-    # Convert to dict
-    layer_project = layer_project.dict()
-    # Delete id column
-    del layer_project["id"]
-    # Update layer
-    layer = layer.dict()
-    layer.update(layer_project)
-
-    return layer_type_mapping_read[layer_type](**layer)
+    # Get layers in project
+    return layer_project
 
 
 @router.delete(

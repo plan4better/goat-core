@@ -86,32 +86,44 @@ class IFeatureLayerBaseProject(BaseModel):
         description="Style of the layer",
     )
 
-class IFeatureLayerStandardProjectRead(IFeatureLayerStandardRead, IFeatureLayerBaseProject):
+
+class IFeatureLayerBaseProjectRead(IFeatureLayerBaseProject):
+    total_count: int = Field(..., description="Total count of features in the layer")
+    filtered_count: int | None = Field(None, description="Filtered count of features in the layer")
+
+
+class IFeatureLayerStandardProjectRead(IFeatureLayerStandardRead, IFeatureLayerBaseProjectRead):
     pass
 
 
-class IFeatureLayerIndicatorProjectRead(IFeatureLayerIndicatorRead, IFeatureLayerBaseProject):
+class IFeatureLayerIndicatorProjectRead(IFeatureLayerIndicatorRead, IFeatureLayerBaseProjectRead):
     pass
 
 
-class IFeatureLayerScenarioProjectRead(IFeatureLayerScenarioRead, IFeatureLayerBaseProject):
+class IFeatureLayerScenarioProjectRead(IFeatureLayerScenarioRead, IFeatureLayerBaseProjectRead):
     pass
+
 
 @optional
 class IFeatureLayerStandardProjectUpdate(IFeatureLayerBaseProject):
     pass
 
+
 @optional
 class IFeatureLayerIndicatorProjectUpdate(IFeatureLayerBaseProject):
     pass
+
 
 @optional
 class IFeatureLayerScenarioProjectUpdate(IFeatureLayerBaseProject):
     pass
 
+
 class ITableLayerProjectRead(ITableLayerRead):
     group: str = Field(None, description="Layer group name")
     query: dict | None = Field(None, description="CQL2-JSON filter to query the layer")
+    total_count: int = Field(..., description="Total count of features in the layer")
+    filtered_count: int | None = Field(None, description="Filtered count of features in the layer")
 
 
 class ITableLayerProjectUpdate(BaseModel):

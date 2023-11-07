@@ -13,11 +13,49 @@ from src.schemas.project import (
     IFeatureLayerScenarioProjectUpdate,
     IImageryLayerProjectUpdate,
     ITableLayerProjectUpdate,
+    layer_type_mapping_read,
+    layer_type_mapping_update,
 )
-
+from src.schemas.layer import LayerType, UserDataGeomType
+from pydantic import parse_obj_as, ValidationError
+from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
 
 class CRUDLayerProject(CRUDBase):
-    async def get_all(
+    async def layer_projects_to_schemas(self, async_session: AsyncSession, layers_project):
+        """Convert layer projects to schemas."""
+        layer_projects_schemas = []
+
+        # Loop through layer and layer projects
+        for layer_project_tuple in layers_project:
+            layer = layer_project_tuple[0]
+            layer_project = layer_project_tuple[1]
+
+            # Get layer type
+            if layer.feature_layer_type is not None:
+                layer_type = layer.type + "_" + layer.feature_layer_type
+            else:
+                layer_type = layer.type
+
+            # Convert to dicts and update layer
+            layer = layer.dict()
+            layer_project = layer_project.dict()
+
+            # Delete id from layer project
+            del layer_project["id"]
+
+            # Update layer
+            layer.update(layer_project)
+
+            # Get feature cnt for all feature layers and tables
+            feature_cnt = await crud_layer.get_feature_cnt(
+                async_session=async_session, layer=layer
+            )
+            # Write into correct schema
+            layer_projects_schemas.append(layer_type_mapping_read[layer_type](**layer, **feature_cnt))
+
+        return layer_projects_schemas
+
+    async def get_layers(
         self,
         async_session: AsyncSession,
         project_id: UUID,
@@ -30,11 +68,14 @@ class CRUDLayerProject(CRUDBase):
         )
 
         # Get all layers from project
-        layer_projects = await self.get_multi(
+        layers_project = await self.get_multi(
             async_session,
             query=query,
         )
-        return layer_projects
+        layer_projects_to_schemas = await self.layer_projects_to_schemas(
+            async_session, layers_project
+        )
+        return layer_projects_to_schemas
 
     async def get_by_ids(
         self,
@@ -53,6 +94,9 @@ class CRUDLayerProject(CRUDBase):
         layer_projects = await self.get_multi(
             async_session,
             query=query,
+        )
+        layer_projects = await self.layer_projects_to_schemas(
+            async_session, layer_projects
         )
         return layer_projects
 
@@ -94,10 +138,7 @@ class CRUDLayerProject(CRUDBase):
         for layer in layers:
             layer = layer[0]
             layer_project = LayerProjectLink(
-                project_id=project_id,
-                layer_id=layer.id,
-                name=layer.name,
-                query={}
+                project_id=project_id, layer_id=layer.id, name=layer.name, query={}
             )
             # Add style if exists
             if layer.style is not None:
@@ -117,14 +158,43 @@ class CRUDLayerProject(CRUDBase):
         async_session: AsyncSession,
         project_id: UUID,
         layer_id: UUID,
-        layer_project: IFeatureLayerStandardProjectUpdate
-        | IFeatureLayerIndicatorProjectUpdate
-        | IFeatureLayerScenarioProjectUpdate
-        | ITableLayerProjectUpdate
-        | ITileLayerProjectUpdate
-        | IImageryLayerProjectUpdate,
+        layer_in: dict,
     ):
         """Update a link between a project and a layer"""
+
+        # Get base layer object
+        layer = await crud_layer.get(async_session, id=layer_id)
+        layer_dict = layer.dict()
+
+        # Get right schema for respective layer type
+        if layer.feature_layer_type is not None:
+            model_type_update = layer_type_mapping_update.get(
+                layer.type + "_" + layer.feature_layer_type
+            )
+            model_type_read = layer_type_mapping_read.get(
+                layer.type + "_" + layer.feature_layer_type
+            )
+        else:
+            model_type_update = layer_type_mapping_update.get(layer.type)
+            model_type_read = layer_type_mapping_read.get(layer.type)
+
+        # Parse and validate the data against the model
+        try:
+            layer_in = parse_obj_as(model_type_update, layer_in)
+        except ValidationError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(e),
+            )
+        # Validate query
+        if layer_in.query:
+            try:
+                cql2_json_parser(layer_in.query)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="CQL filter is not valid",
+                )
 
         # Get layer project
         layer_project_old = await self.get_by_multi_keys(
@@ -140,9 +210,16 @@ class CRUDLayerProject(CRUDBase):
         layer_project = await CRUDBase(LayerProjectLink).update(
             async_session,
             db_obj=layer_project_old[0],
-            obj_in=layer_project,
+            obj_in=layer_in,
         )
-        return layer_project
+        layer_project_dict = layer_project.dict()
+        del layer_project_dict["id"]
+        # Update layer
+        layer_dict.update(layer_project_dict)
+
+        # Get feature cnt
+        feature_cnt = await crud_layer.get_feature_cnt(async_session, layer=layer_dict)
+        return model_type_read(**layer_dict, **feature_cnt)
 
 
 layer_project = CRUDLayerProject(LayerProjectLink)

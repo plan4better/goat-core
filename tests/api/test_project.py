@@ -1,9 +1,9 @@
 import pytest
 from httpx import AsyncClient
 from src.core.config import settings
-from tests.utils import get_with_wrong_id
 from src.schemas.project import initial_view_state_example
-
+from tests.utils import get_with_wrong_id
+from uuid import uuid4
 
 @pytest.mark.asyncio
 async def test_create_project(client: AsyncClient, fixture_create_project):
@@ -20,9 +20,6 @@ async def test_get_project(
     )
     assert response.status_code == 200
     assert response.json()["id"] == fixture_create_project["id"]
-
-
-
 
 
 @pytest.mark.asyncio
@@ -104,6 +101,14 @@ async def test_create_layer_project(client: AsyncClient, fixture_create_layer_pr
 
 @pytest.mark.asyncio
 async def test_get_layer_project(client: AsyncClient, fixture_create_layer_project):
+    layer_id = fixture_create_layer_project["layer_project"][0]["id"]
+    response = await client.get(
+        f"{settings.API_V2_STR}/project/{fixture_create_layer_project['project_id']}/layer/{layer_id}",
+    )
+    assert response.status_code == 200
+
+@pytest.mark.asyncio
+async def test_get_layers_project(client: AsyncClient, fixture_create_layer_project):
     response = await client.get(
         f"{settings.API_V2_STR}/project/{fixture_create_layer_project['project_id']}/layer",
     )
@@ -111,17 +116,40 @@ async def test_get_layer_project(client: AsyncClient, fixture_create_layer_proje
     assert response.json()[0]["id"] == fixture_create_layer_project["layer_project"][0]["id"]
 
 
-# TODO: Add test for style and query
+# TODO: Add test for style
 @pytest.mark.asyncio
 async def test_update_layer_project(client: AsyncClient, fixture_create_layer_project):
     project_id = fixture_create_layer_project["project_id"]
     layer_id = fixture_create_layer_project["layer_project"][0]["id"]
     response = await client.put(
         f"{settings.API_V2_STR}/project/{project_id}/layer?layer_id={layer_id}",
-        json={"name": "test2"},
+        json={
+            "name": "test2",
+            "query": {"op": "=", "args": [{"property": "category"}, "bus_stop"]},
+        },
     )
     assert response.status_code == 200
-    assert response.json()["name"] == "test2"
+    res = response.json()
+    assert res["name"] == "test2"
+    # Check if feature count is correct
+    assert res["total_count"] == 26
+    assert res["filtered_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_update_layer_project_bad_format_query(
+    client: AsyncClient, fixture_create_layer_project
+):
+    project_id = fixture_create_layer_project["project_id"]
+    layer_id = fixture_create_layer_project["layer_project"][0]["id"]
+    response = await client.put(
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_id={layer_id}",
+        json={
+            "name": "test2",
+            "query": {"op": "=", "args": "wrong"},
+        },
+    )
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio

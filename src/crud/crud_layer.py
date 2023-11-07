@@ -1,5 +1,5 @@
 import os
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import BackgroundTasks, UploadFile, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,10 +18,14 @@ from src.schemas.layer import (
     FeatureLayerType,
     IFeatureLayerStandardCreateAdditionalAttributes,
     ITableLayerCreateAdditionalAttributes,
+    UserDataGeomType,
 )
 from src.schemas.style import base_styles
 from src.schemas.job import JobType
 from sqlalchemy import text
+from pygeofilter.backends.sql import to_sql_where
+from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
+
 
 class CRUDLayer(CRUDBase):
     """CRUD class for Layer."""
@@ -76,7 +80,7 @@ class CRUDLayer(CRUDBase):
             cnt = 0
             for column in layer_attributes["data_types"]["valid"][data_type]:
                 cnt += 1
-                attribute_mapping[data_type + "_" + str(cnt)] = column
+                attribute_mapping[data_type + "_attr" + str(cnt)] = column
 
         additional_attributes["attribute_mapping"] = attribute_mapping
 
@@ -200,24 +204,26 @@ class CRUDLayer(CRUDBase):
         for field_type, field_names in validate_job.response["data_types"]["valid"].items():
             cnt = 1
             for field_name in field_names:
+                if field_name == "id":
+                    continue
                 attribute_mapping[field_name] = field_type + "_attr" + str(cnt)
                 cnt += 1
 
         # Populate Layer Object with file metadata
-        additional_attributes = {
-            "size": validate_job.response,
-            "user_id": user_id,
-            "attribute_mapping": attribute_mapping,
-        }
-        if validate_job.response["layer_type"] == "feature_layer":
-            geom_type = SupportedOgrGeomType[
-                validate_job.response["data_types"]["geometry"]["type"]
-            ].value
-            additional_attributes["feature_layer_geometry_type"] = geom_type
-            additional_attributes["extent"] = validate_job.response["data_types"]["geometry"][
-                "extent"
-            ]
-            additional_attributes["style"] = base_styles["feature_layer"]["standard"][geom_type]
+        # additional_attributes = {
+        #     "size": validate_job.response,
+        #     "user_id": user_id,
+        #     "attribute_mapping": attribute_mapping,
+        # }
+        # if validate_job.response["layer_type"] == "feature_layer":
+        #     geom_type = SupportedOgrGeomType[
+        #         validate_job.response["data_types"]["geometry"]["type"]
+        #     ].value
+        #     additional_attributes["feature_layer_geometry_type"] = geom_type
+        #     additional_attributes["extent"] = validate_job.response["data_types"]["geometry"][
+        #         "extent"
+        #     ]
+        #     additional_attributes["style"] = base_styles["feature_layer"]["standard"][geom_type]
 
         # Upload file to temporary table
         temp_table_name = f'{settings.USER_DATA_SCHEMA}."{str(job_id).replace("-", "")}"'
@@ -261,7 +267,9 @@ class CRUDLayer(CRUDBase):
         )
         return result
 
-    async def delete_layer_data(self, async_session: AsyncSession, layer_id: UUID, table_name: str):
+    async def delete_layer_data(
+        self, async_session: AsyncSession, layer_id: UUID, table_name: str
+    ):
         """Delete layer data which is in the user data tables."""
 
         # Delete layer data
@@ -269,6 +277,42 @@ class CRUDLayer(CRUDBase):
             text(f"DELETE FROM {table_name} WHERE layer_id = '{layer_id}'")
         )
         await async_session.commit()
+
+    async def get_feature_cnt(
+        self,
+        async_session: AsyncSession,
+        layer: dict,
+    ):
+        """Get feature count for a layer."""
+
+        if layer["type"] in (LayerType.table.value, LayerType.feature_layer.value):
+            geom_type = layer.get(
+                "feature_layer_geometry_type", UserDataGeomType.no_geometry.value
+            )
+            layer_id = layer["id"]
+        else:
+            return {}
+
+        # Get table name
+        table_name = (
+            f'{settings.USER_DATA_SCHEMA}."{geom_type}_{str(layer["user_id"]).replace("-", "")}"'
+        )
+
+        # Get feature count total
+        feature_cnt = {}
+        sql_query = f"SELECT COUNT(*) FROM {table_name} WHERE layer_id = '{str(layer_id)}'"
+        result = await async_session.execute(text(sql_query))
+        feature_cnt["total_count"] = result.scalar_one()
+
+        # Get feature count filtered
+        if layer.get("query", None):
+            ast = cql2_json_parser(layer.get("query"))
+            attribute_mapping = {value: key for key, value in layer["attribute_mapping"].items()}
+            where = to_sql_where(ast, attribute_mapping)
+            sql_query += f" AND {where}"
+            result = await async_session.execute(text(sql_query))
+            feature_cnt["filtered_count"] = result.scalar_one()
+        return feature_cnt
 
 
 layer = CRUDLayer(Layer)

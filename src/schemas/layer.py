@@ -55,6 +55,7 @@ FileUploadType = Enum(
     "FileUploadType", {**TableUploadType.__members__, **FeatureLayerUploadType.__members__}
 )
 
+
 class SupportedOgrGeomType(Enum):
     Point = "point"
     Multi_Point = "point"
@@ -62,6 +63,13 @@ class SupportedOgrGeomType(Enum):
     Multi_Line_String = "line"
     Polygon = "polygon"
     Multi_Polygon = "polygon"
+
+
+class UserDataGeomType(Enum):
+    point = "point"
+    line = "line"
+    polygon = "polygon"
+    no_geometry = "no_geometry"
 
 
 class OgrPostgresType(str, Enum):
@@ -84,7 +92,6 @@ class OgrDriverType(str, Enum):
     kml = "KML"
     shp = "ESRI Shapefile"  # Using SHP driver for ZIP files as the file is converted to SHP to keep data types
     zip = "ESRI Shapefile"  # Using SHP driver for ZIP files as the file is converted to SHP to keep data types
-
 
 
 class NumberColumnsPerType(int, Enum):
@@ -112,6 +119,7 @@ class LayerReadBaseAttributes(BaseModel):
 # Feature Layer DTOs
 ################################################################################
 # Base models
+
 
 class FeatureLayerReadBaseAttributes(LayerReadBaseAttributes, LayerBase, GeospatialAttributes):
     """Base model for feature layer reads."""
@@ -166,6 +174,7 @@ class IInternalLayerCreate(LayerBase):
 
 class IFeatureLayerStandardCreateAdditionalAttributes(BaseModel):
     """Model for second internal validation with extended attributes."""
+
     id: UUID = Field(..., description="Content ID of the layer", alias="id")
     user_id: UUID = Field(..., description="User ID of the owner")
     type: LayerType = Field(..., description="Layer type")
@@ -177,6 +186,7 @@ class IFeatureLayerStandardCreateAdditionalAttributes(BaseModel):
     style: dict = Field(..., description="Style of the layer")
     extent: str = Field(..., description="Geographical Extent of the layer")
     attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
+
 
 class IFeatureLayerStandardRead(FeatureLayerReadBaseAttributes, DateTimeBase):
     pass
@@ -361,6 +371,7 @@ tile_layer_update_example = {
 
 class ITableLayerCreateAdditionalAttributes(BaseModel):
     """Model for second internal validation with extended attributes."""
+
     id: UUID = Field(..., description="Content ID of the layer", alias="id")
     user_id: UUID = Field(..., description="User ID of the owner")
     type: LayerType = Field(..., description="Layer type")
@@ -422,6 +433,7 @@ layer_creator_class = {
         "tile_layer": ITileLayerRead,
     },
 }
+
 
 class ILayerExternalCreate(BaseModel):
     def __new__(cls, *args, **kwargs):
