@@ -40,7 +40,7 @@ class CRUDOevGueteklasse:
         layer = await crud_layer.create(db=async_session, obj_in=layer)
 
         # Get user table
-        user_table = get_user_table(user_id, layer.feature_layer_geometry_type)
+        user_table = get_user_table(layer)
         original_columns, table_columns = get_layer_columns(layer.attribute_mapping, ["geom", "layer_id"])
 
         query = f"""

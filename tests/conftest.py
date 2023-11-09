@@ -1,32 +1,38 @@
+# Standard library imports
 import asyncio
 
+# Third party imports
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy import text
+
+# Local application imports
 from src.core.config import settings
 from src.endpoints.deps import get_db, session_manager
 from src.main import app
+from src.schemas.active_mobility import (
+    request_examples as active_mobility_request_examples,
+)
 from src.schemas.layer import request_examples as layer_request_examples
-from src.schemas.project import (
-    request_examples as project_request_examples,
-)
-from tests.utils import (
-    upload_file,
-    validate_invalid_file,
-    validate_valid_file,
-    validate_valid_files,
-)
-from src.utils import get_user_table
-from src.schemas.active_mobility import request_examples as active_mobility_request_examples
 from src.schemas.motorized_mobility import (
     request_examples_isochrone_pt,
     request_examples_isochrone_car,
     request_example_oev_gueteklasse,
 )
+from src.schemas.project import (
+    request_examples as project_request_examples,
+)
 from src.schemas.tool import (
     request_examples_aggregation,
     request_examples_join,
+)
+from src.utils import get_user_table
+from tests.utils import (
+    upload_file,
+    validate_invalid_file,
+    validate_valid_file,
+    validate_valid_files,
 )
 
 settings.RUN_AS_BACKGROUND_TASK = True
@@ -56,15 +62,23 @@ async def session_fixture(event_loop):
         schema_translate_map={"customer": schema_customer}
     )
     async with session_manager.connect() as connection:
-        await connection.execute(text(f"""CREATE SCHEMA IF NOT EXISTS {schema_customer}"""))
-        await connection.execute(text(f"""CREATE SCHEMA IF NOT EXISTS {schema_user_data}"""))
+        await connection.execute(
+            text(f"""CREATE SCHEMA IF NOT EXISTS {schema_customer}""")
+        )
+        await connection.execute(
+            text(f"""CREATE SCHEMA IF NOT EXISTS {schema_user_data}""")
+        )
         await session_manager.drop_all(connection)
         await session_manager.create_all(connection)
     yield
     async with session_manager.connect() as connection:
         pass
-        await connection.execute(text(f"""DROP SCHEMA IF EXISTS {schema_customer} CASCADE"""))
-        await connection.execute(text(f"""DROP SCHEMA IF EXISTS {schema_user_data} CASCADE"""))
+        await connection.execute(
+            text(f"""DROP SCHEMA IF EXISTS {schema_customer} CASCADE""")
+        )
+        await connection.execute(
+            text(f"""DROP SCHEMA IF EXISTS {schema_user_data} CASCADE""")
+        )
     await session_manager.close()
 
 
@@ -122,7 +136,9 @@ async def fixture_create_exceed_folders(client: AsyncClient, fixture_create_user
     for name in folder_names:
         cnt += 1
         # Request to create a folder
-        response = await client.post(f"{settings.API_V2_STR}/folder", json={"name": name})
+        response = await client.post(
+            f"{settings.API_V2_STR}/folder", json={"name": name}
+        )
         if cnt >= max_folder_cnt:
             assert response.status_code == 429  # Too Many Requests
         else:
@@ -136,7 +152,9 @@ async def fixture_create_folders(client: AsyncClient, fixture_create_user):
 
     # Setup: Create multiple folders
     for name in folder_names:
-        response = await client.post(f"{settings.API_V2_STR}/folder", json={"name": name})
+        response = await client.post(
+            f"{settings.API_V2_STR}/folder", json={"name": name}
+        )
         folder = response.json()
         created_folders.append(folder)
 
@@ -148,7 +166,9 @@ async def fixture_create_folders(client: AsyncClient, fixture_create_user):
 
 
 @pytest.fixture
-async def fixture_create_project(client: AsyncClient, fixture_create_user, fixture_create_folder):
+async def fixture_create_project(
+    client: AsyncClient, fixture_create_user, fixture_create_folder
+):
     # Assuming fixture_create_folder yields a folder object
     folder = fixture_create_folder
 
@@ -166,7 +186,9 @@ async def fixture_create_project(client: AsyncClient, fixture_create_user, fixtu
 
 
 @pytest.fixture
-async def fixture_create_projects(client: AsyncClient, fixture_create_user, fixture_create_folder):
+async def fixture_create_projects(
+    client: AsyncClient, fixture_create_user, fixture_create_folder
+):
     project_names = ["test1", "test2", "test3"]
 
     # Assuming fixture_create_folder yields a folder object
@@ -241,7 +263,9 @@ files = [
 
 
 @pytest.fixture(params=files)
-async def fixture_validate_file_invalid(client: AsyncClient, fixture_create_user, request):
+async def fixture_validate_file_invalid(
+    client: AsyncClient, fixture_create_user, request
+):
     return await validate_invalid_file(client, request.param)
 
 
@@ -256,7 +280,9 @@ async def create_internal_layer(
     feature_layer_dict["import_job_id"] = job_id
     feature_layer_dict["folder_id"] = fixture_get_home_folder["id"]
     # Hit endpoint to create internal layer
-    response = await client.post(f"{settings.API_V2_STR}/layer/internal", json=feature_layer_dict)
+    response = await client.post(
+        f"{settings.API_V2_STR}/layer/internal", json=feature_layer_dict
+    )
     assert response.status_code == 201
     return response.json()
 
@@ -281,12 +307,16 @@ async def fixture_create_internal_layers(
     return layer
 
 
-async def create_external_layer(client: AsyncClient, fixture_get_home_folder, layer_type):
+async def create_external_layer(
+    client: AsyncClient, fixture_get_home_folder, layer_type
+):
     # Get table layer dict and add layer ID
     external_layer_dict = layer_request_examples["create_external"][layer_type]["value"]
     external_layer_dict["folder_id"] = fixture_get_home_folder["id"]
     # Hit endpoint to create external layer
-    response = await client.post(f"{settings.API_V2_STR}/layer/external", json=external_layer_dict)
+    response = await client.post(
+        f"{settings.API_V2_STR}/layer/external", json=external_layer_dict
+    )
     assert response.status_code == 201
     return response.json()
 
@@ -319,7 +349,9 @@ async def fixture_create_internal_layer(
 
 
 @pytest.fixture
-async def fixture_delete_internal_layers(client: AsyncClient, fixture_create_internal_layers):
+async def fixture_delete_internal_layers(
+    client: AsyncClient, fixture_create_internal_layers
+):
     layer = fixture_create_internal_layers
     layer_id = layer["id"]
     response = await client.delete(f"{settings.API_V2_STR}/layer/{layer_id}")
@@ -329,11 +361,8 @@ async def fixture_delete_internal_layers(client: AsyncClient, fixture_create_int
     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}")
     assert response.status_code == 404  # Not Found
 
-    # Check if user data table has not data
-    if layer["type"] == "feature_layer":
-        table_name = get_user_table(layer["user_id"], layer["feature_layer_geometry_type"])
-    else:
-        table_name = get_user_table(layer["user_id"], "no_geometry")
+    # Get table name
+    table_name = get_user_table(layer)
 
     # Check if there is data for the layer_id
     async with session_manager.session() as session:
@@ -347,7 +376,9 @@ async def fixture_delete_internal_layers(client: AsyncClient, fixture_create_int
 
 
 @pytest.fixture
-async def fixture_delete_external_layers(client: AsyncClient, fixture_create_external_layers):
+async def fixture_delete_external_layers(
+    client: AsyncClient, fixture_create_external_layers
+):
     layer = fixture_create_external_layers
     layer_id = layer["id"]
     response = await client.delete(f"{settings.API_V2_STR}/layer/{layer_id}")
@@ -363,7 +394,9 @@ def get_payload_types(request_examples: dict) -> list:
 
 def create_generic_toolbox_fixture(endpoint: str, request_examples: dict):
     @pytest.fixture(params=get_payload_types(request_examples))
-    async def generic_post_fixture(client: AsyncClient, fixture_create_project, request):
+    async def generic_post_fixture(
+        client: AsyncClient, fixture_create_project, request
+    ):
         payload = request_examples[request.param]["value"]
         response = await client.post(f"{settings.API_V2_STR}{endpoint}", json=payload)
         assert response.status_code == 201
@@ -373,7 +406,8 @@ def create_generic_toolbox_fixture(endpoint: str, request_examples: dict):
 
 
 fixture_isochrone_active_mobility = create_generic_toolbox_fixture(
-    "/active-mobility/isochrone", active_mobility_request_examples["isochrone_active_mobility"]
+    "/active-mobility/isochrone",
+    active_mobility_request_examples["isochrone_active_mobility"],
 )
 
 fixture_isochrone_pt = create_generic_toolbox_fixture(
@@ -395,4 +429,3 @@ fixture_aggregation_points = create_generic_toolbox_fixture(
 )
 
 fixture_join = create_generic_toolbox_fixture("/tool/join", request_examples_join)
-

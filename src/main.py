@@ -3,7 +3,7 @@ import os
 from contextlib import asynccontextmanager
 
 import sentry_sdk
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -14,7 +14,6 @@ from starlette.middleware.cors import CORSMiddleware
 from src.core.config import settings
 from src.db.session import r5_mongo_db_client, session_manager
 from src.endpoints.v2.api import router as api_router_v2
-from fastapi_pagination import add_pagination
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,9 +36,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+@app.exception_handler(ValueError)
+async def value_error_exception_handler(request: Request, exc: ValueError):
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": str(exc)},
+    )
+
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
 
 @app.get("/api/docs", include_in_schema=False)
 async def swagger_ui_html():

@@ -3,7 +3,6 @@ from httpx import AsyncClient
 from src.core.config import settings
 from src.schemas.project import initial_view_state_example
 from tests.utils import get_with_wrong_id
-from uuid import uuid4
 
 @pytest.mark.asyncio
 async def test_create_project(client: AsyncClient, fixture_create_project):

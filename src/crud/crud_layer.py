@@ -1,9 +1,15 @@
+# Standard library imports
+import json
 import os
 from uuid import UUID
 
-from fastapi import BackgroundTasks, UploadFile, HTTPException, status
+# Third party imports
+from fastapi import BackgroundTasks, HTTPException, status, UploadFile
+from fastapi_pagination import Params as PaginationParams
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# Local application imports
 from src.core.config import settings
 from src.core.job import job_init, run_background_or_immediately
 from src.core.layer import FileUpload, OGRFileHandling
@@ -11,26 +17,26 @@ from src.crud.base import CRUDBase
 from src.crud.crud_job import job as crud_job
 from src.db.models.job import Job
 from src.db.models.layer import Layer
-from src.schemas.job import JobStatusType
+from src.schemas.job import JobStatusType, JobType
 from src.schemas.layer import (
-    LayerType,
-    SupportedOgrGeomType,
+    CQLQuery,
     FeatureLayerType,
     IFeatureLayerStandardCreateAdditionalAttributes,
     ITableLayerCreateAdditionalAttributes,
+    LayerType,
+    SupportedOgrGeomType,
     UserDataGeomType,
 )
 from src.schemas.style import base_styles
-from src.schemas.job import JobType
-from sqlalchemy import text
-from pygeofilter.backends.sql import to_sql_where
-from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
+from src.utils import build_where, get_user_table, search_value
 
 
 class CRUDLayer(CRUDBase):
     """CRUD class for Layer."""
 
-    async def create_internal(self, async_session: AsyncSession, user_id: UUID, layer_in):
+    async def create_internal(
+        self, async_session: AsyncSession, user_id: UUID, layer_in
+    ):
         # Get import job
         import_job = await crud_job.get_by_multi_keys(
             db=async_session,
@@ -89,11 +95,15 @@ class CRUDLayer(CRUDBase):
             geom_type = SupportedOgrGeomType[
                 layer_attributes["data_types"]["geometry"]["type"]
             ].value
-            additional_attributes["style"] = base_styles["feature_layer"]["standard"][geom_type]
+            additional_attributes["style"] = base_styles["feature_layer"]["standard"][
+                geom_type
+            ]
             additional_attributes["type"] = LayerType.feature_layer
             additional_attributes["feature_layer_type"] = FeatureLayerType.standard
             additional_attributes["feature_layer_geometry_type"] = geom_type
-            additional_attributes["extent"] = layer_attributes["data_types"]["geometry"]["extent"]
+            additional_attributes["extent"] = layer_attributes["data_types"][
+                "geometry"
+            ]["extent"]
             additional_attributes = IFeatureLayerStandardCreateAdditionalAttributes(
                 **additional_attributes
             ).dict()
@@ -141,12 +151,17 @@ class CRUDLayer(CRUDBase):
 
         # Build folder path
         file_path = os.path.join(
-            settings.DATA_DIR, str(job_id), "file." + os.path.splitext(file.filename)[-1][1:]
+            settings.DATA_DIR,
+            str(job_id),
+            "file." + os.path.splitext(file.filename)[-1][1:],
         )
 
         # Initialize OGRFileHandling
         ogr_file_handling = OGRFileHandling(
-            async_session=async_session, user_id=user_id, job_id=job_id, file_path=file_path
+            async_session=async_session,
+            user_id=user_id,
+            job_id=job_id,
+            file_path=file_path,
         )
         # Validate file before uploading
         validation_result = await ogr_file_handling.validate(job_id=job_id)
@@ -173,7 +188,9 @@ class CRUDLayer(CRUDBase):
 
         # Update job with validation result
         job = await crud_job.get(db=async_session, id=job_id)
-        await crud_job.update(db=async_session, db_obj=job, obj_in={"response": response})
+        await crud_job.update(
+            db=async_session, db_obj=job, obj_in={"response": response}
+        )
 
         return validation_result
 
@@ -201,7 +218,9 @@ class CRUDLayer(CRUDBase):
 
         # Create attribute mapping out of valid attributes
         attribute_mapping = {}
-        for field_type, field_names in validate_job.response["data_types"]["valid"].items():
+        for field_type, field_names in validate_job.response["data_types"][
+            "valid"
+        ].items():
             cnt = 1
             for field_name in field_names:
                 if field_name == "id":
@@ -209,24 +228,9 @@ class CRUDLayer(CRUDBase):
                 attribute_mapping[field_name] = field_type + "_attr" + str(cnt)
                 cnt += 1
 
-        # Populate Layer Object with file metadata
-        # additional_attributes = {
-        #     "size": validate_job.response,
-        #     "user_id": user_id,
-        #     "attribute_mapping": attribute_mapping,
-        # }
-        # if validate_job.response["layer_type"] == "feature_layer":
-        #     geom_type = SupportedOgrGeomType[
-        #         validate_job.response["data_types"]["geometry"]["type"]
-        #     ].value
-        #     additional_attributes["feature_layer_geometry_type"] = geom_type
-        #     additional_attributes["extent"] = validate_job.response["data_types"]["geometry"][
-        #         "extent"
-        #     ]
-        #     additional_attributes["style"] = base_styles["feature_layer"]["standard"][geom_type]
-
-        # Upload file to temporary table
-        temp_table_name = f'{settings.USER_DATA_SCHEMA}."{str(job_id).replace("-", "")}"'
+        temp_table_name = (
+            f'{settings.USER_DATA_SCHEMA}."{str(job_id).replace("-", "")}"'
+        )
 
         result = await ogr_file_upload.upload_ogr2ogr(
             temp_table_name=temp_table_name,
@@ -267,14 +271,13 @@ class CRUDLayer(CRUDBase):
         )
         return result
 
-    async def delete_layer_data(
-        self, async_session: AsyncSession, layer_id: UUID, table_name: str
-    ):
+    async def delete_layer_data(self, async_session: AsyncSession, layer):
         """Delete layer data which is in the user data tables."""
 
         # Delete layer data
+        table_name = get_user_table(layer)
         await async_session.execute(
-            text(f"DELETE FROM {table_name} WHERE layer_id = '{layer_id}'")
+            text(f"DELETE FROM {table_name} WHERE layer_id = '{layer.id}'")
         )
         await async_session.commit()
 
@@ -285,34 +288,92 @@ class CRUDLayer(CRUDBase):
     ):
         """Get feature count for a layer."""
 
-        if layer["type"] in (LayerType.table.value, LayerType.feature_layer.value):
-            geom_type = layer.get(
-                "feature_layer_geometry_type", UserDataGeomType.no_geometry.value
-            )
-            layer_id = layer["id"]
-        else:
-            return {}
-
         # Get table name
-        table_name = (
-            f'{settings.USER_DATA_SCHEMA}."{geom_type}_{str(layer["user_id"]).replace("-", "")}"'
-        )
+        table_name = get_user_table(layer)
 
         # Get feature count total
         feature_cnt = {}
-        sql_query = f"SELECT COUNT(*) FROM {table_name} WHERE layer_id = '{str(layer_id)}'"
+        sql_query = (
+            f"SELECT COUNT(*) FROM {table_name} WHERE layer_id = '{str(layer['id'])}'"
+        )
         result = await async_session.execute(text(sql_query))
         feature_cnt["total_count"] = result.scalar_one()
 
         # Get feature count filtered
         if layer.get("query", None):
-            ast = cql2_json_parser(layer.get("query"))
-            attribute_mapping = {value: key for key, value in layer["attribute_mapping"].items()}
-            where = to_sql_where(ast, attribute_mapping)
+            where = build_where(
+                query=layer["query"], attribute_mapping=layer["attribute_mapping"]
+            )
             sql_query += f" AND {where}"
             result = await async_session.execute(text(sql_query))
             feature_cnt["filtered_count"] = result.scalar_one()
         return feature_cnt
+
+    async def get_unique_values(
+        self,
+        async_session: AsyncSession,
+        id: UUID,
+        column_name: str,
+        order: str,
+        query: str,
+        page_params: PaginationParams,
+    ):
+        # Get layer
+        layer = await self.get(async_session, id=id)
+        if layer is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Layer not found"
+            )
+
+        # Check if layer_type is feature_layer or table_layer
+        if layer.type not in [LayerType.feature_layer, LayerType.table]:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Layer is not a feature layer or table layer. Unique values can only be requested for internal layers."
+            )
+        
+        column_mapped = search_value(layer.attribute_mapping, column_name)
+        if column_mapped is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Column not found"
+            )
+
+        # Check if internal or external layer. And get table name if external.
+        table_name = get_user_table(layer)
+
+        # Build query
+        if query:
+            # Validate query
+            query = json.loads(query)
+            query_obj = CQLQuery(query=query)
+            where = "AND " + build_where(
+                query=query_obj.query, attribute_mapping=layer.attribute_mapping
+            )
+        else:
+            where = ""
+
+        # Map order
+        order_mapped = {"descendent": "DESC", "ascendent": "ASC"}[order]
+        # Build query
+        sql_query = f"""
+        WITH cnt AS (
+            SELECT {column_mapped} AS {column_name}, COUNT(*) AS count
+            FROM {table_name}
+            WHERE layer_id = '{layer.id}'
+            {where}
+            AND {column_mapped} IS NOT NULL
+            GROUP BY {column_mapped}
+            ORDER BY COUNT(*)
+            {order_mapped}
+            LIMIT {page_params.size}
+            OFFSET {(page_params.page - 1) * page_params.size}
+        )
+        SELECT JSONB_OBJECT_AGG({column_name}, count) FROM cnt
+        """
+
+        # Execute query
+        result = await async_session.execute(text(sql_query))
+        result = result.fetchall()
+        return result[0][0]
 
 
 layer = CRUDLayer(Layer)

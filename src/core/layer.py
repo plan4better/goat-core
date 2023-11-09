@@ -1,5 +1,25 @@
+# Standard library imports
+import asyncio
+import csv
+import os
+import time
+import zipfile
+from uuid import UUID
+
+# Third party imports
+import aiofiles
+import aiofiles.os as aos
+import pandas as pd
 from fastapi import UploadFile
 from openpyxl import load_workbook
+from osgeo import ogr, osr
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import text
+
+# Local application imports
+from src.core.config import settings
+from src.core.job import job_log
+from src.schemas.job import JobStatusType, Msg, MsgType
 from src.schemas.layer import (
     NumberColumnsPerType,
     OgrPostgresType,
@@ -7,26 +27,12 @@ from src.schemas.layer import (
     SupportedOgrGeomType,
     FileUploadType,
 )
-from src.core.config import settings
-import csv
-import zipfile
-import os
-from osgeo import ogr, osr
-import pandas as pd
-from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql import text
 from src.utils import (
     async_delete_dir,
     async_scandir,
+    async_run_command,
 )
-from src.schemas.job import JobStatusType, Msg, MsgType
-from src.core.job import job_log
-import aiofiles
-import aiofiles.os as aos
-import time
-import asyncio
-from src.utils import async_run_command
+
 
 class FileUpload:
     def __init__(self, async_session: AsyncSession, user_id: UUID, job_id: UUID, file: UploadFile):

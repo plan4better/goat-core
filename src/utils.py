@@ -1,4 +1,7 @@
+# Standard library imports
+import asyncio
 import binascii
+import inspect
 import json
 import math
 import os
@@ -14,8 +17,9 @@ import zipfile
 from datetime import datetime, timedelta
 from functools import wraps
 from tempfile import NamedTemporaryFile
-from typing import IO, Any, List, Optional
+from typing import IO, Any, List, Optional, Union
 
+# Third party imports
 import geopandas
 import h3
 import numpy as np
@@ -27,19 +31,23 @@ from geojson import Feature, FeatureCollection
 from geojson import loads as geojsonloads
 from jose import jwt
 from numba import njit
+from pydantic import BaseModel
+from pygeofilter.backends.sql import to_sql_where
+from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
 from rich import print as print
 from shapely import geometry
 from shapely.geometry import GeometryCollection, MultiPolygon, Point, Polygon, box
 from shapely.ops import transform
-from starlette import status
-from starlette.responses import Response
-from src.core.config import settings
-from src.resources.enums import MaxUploadFileSize, MimeTypes
-from pydantic import BaseModel
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-import inspect
-import asyncio
+from starlette import status
+from starlette.responses import Response
+
+# Local application imports
+from src.core.config import settings
+from src.resources.enums import MaxUploadFileSize, MimeTypes
+from src.schemas.layer import LayerType
+from sqlmodel import SQLModel
 
 def optional(*fields):
     def dec(_cls):
@@ -1129,8 +1137,30 @@ def read_results(results, return_type=None):
         )
 
 
-def get_user_table(user_id: int, feature_layer_geometry_type: str):
-    return f"{settings.USER_DATA_SCHEMA}.{feature_layer_geometry_type}_{user_id.replace('-', '')}"
+def get_user_table(layer: Union[dict, SQLModel, BaseModel]):
+    """Get the table with the user data based on the layer metadata."""
+
+    # Check if layer is of type dict or SQLModel/BaseModel
+    if isinstance(layer, dict):
+        if layer["type"] == LayerType.feature_layer.value:
+            feature_layer_geometry_type = layer["feature_layer_geometry_type"]
+        elif layer["type"] == LayerType.table.value:
+            feature_layer_geometry_type = "no_geometry"
+        else:
+            raise ValueError(f"The passed layer type {layer['type']} is not supported.")
+        user_id = layer["user_id"]
+    elif isinstance(layer, (SQLModel, BaseModel)):
+        if layer.type == LayerType.feature_layer.value:
+            feature_layer_geometry_type = layer.feature_layer_geometry_type
+        elif layer.type == LayerType.table.value:
+            feature_layer_geometry_type = 'no_geometry'
+        else:
+            raise ValueError(f"The passed layer type {layer.type} is not supported as internal layer.")
+        user_id = layer.user_id
+    else:
+        raise ValueError(f"The passed layer type {type(layer)} is not supported.")
+
+    return f"{settings.USER_DATA_SCHEMA}.{feature_layer_geometry_type}_{str(user_id).replace('-', '')}"
 
 
 def get_layer_columns(attribute_mapping: dict, base_columns: list):
@@ -1192,3 +1222,15 @@ async def check_file_size(file: UploadFile, max_size: int) -> bool:
 
     await file.seek(0)  # Reset file position for further processing if needed
     return True
+
+def build_where(query: dict, attribute_mapping: dict):
+    ast = cql2_json_parser(query)
+    attribute_mapping = {value: key for key, value in attribute_mapping.items()}
+    where = to_sql_where(ast, attribute_mapping)
+    return where
+
+def search_value(d, target):
+    for key, value in d.items():
+        if value == target:
+            return key
+    return None

@@ -1,8 +1,6 @@
 from enum import Enum
 from uuid import UUID
-
 from pydantic import BaseModel, Field, validator
-
 from src.db.models.layer import ContentBaseAttributes
 from src.db.models._base_class import DateTimeBase
 from src.utils import optional
@@ -13,6 +11,7 @@ from src.schemas.layer import (
     ITableLayerRead,
     ITileLayerRead,
     IImageryLayerRead,
+    CQLQuery,
 )
 
 
@@ -77,10 +76,9 @@ class IProjectBaseUpdate(ContentBaseAttributes):
 # Define layers within project
 
 
-class IFeatureLayerBaseProject(BaseModel):
+class IFeatureLayerBaseProject(CQLQuery):
     name: str = Field(..., description="Layer name")
     group: str | None = Field(None, description="Layer group name")
-    query: dict = Field(..., description="CQL2-JSON filter to query the layer")
     style: dict = Field(
         ...,
         description="Style of the layer",
@@ -119,17 +117,15 @@ class IFeatureLayerScenarioProjectUpdate(IFeatureLayerBaseProject):
     pass
 
 
-class ITableLayerProjectRead(ITableLayerRead):
+class ITableLayerProjectRead(ITableLayerRead, CQLQuery):
     group: str = Field(None, description="Layer group name")
-    query: dict | None = Field(None, description="CQL2-JSON filter to query the layer")
     total_count: int = Field(..., description="Total count of features in the layer")
     filtered_count: int | None = Field(None, description="Filtered count of features in the layer")
 
 
-class ITableLayerProjectUpdate(BaseModel):
+class ITableLayerProjectUpdate(CQLQuery):
     name: str | None = Field(None, description="Layer name")
     group: str | None = Field(None, description="Layer group name")
-    query: dict | None = Field(None, description="CQL2-JSON filter to query the layer")
 
 
 class ITileLayerProjectRead(ITileLayerRead):
@@ -194,7 +190,7 @@ request_examples = {
             "value": {
                 "name": "Feature Layer Standard",
                 "group": "Group 1",
-                "query": {},
+                "query": {"op": "=", "args": [{"property": "category"}, "bus_stop"]},
                 "style": {
                     "type": "circle",
                     "paint": {
@@ -209,7 +205,6 @@ request_examples = {
             "value": {
                 "name": "Feature Layer Indicator",
                 "group": "Group 1",
-                "query": {},
                 "style": {
                     "type": "circle",
                     "paint": {
@@ -224,7 +219,6 @@ request_examples = {
             "value": {
                 "name": "Feature Layer Scenario",
                 "group": "Group 1",
-                "query": {},
                 "style": {
                     "type": "circle",
                     "paint": {
@@ -239,7 +233,6 @@ request_examples = {
             "value": {
                 "name": "Table Layer",
                 "group": "Group 1",
-                "query": {},
             },
         },
         "tile_layer": {

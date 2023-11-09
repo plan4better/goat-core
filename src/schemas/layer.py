@@ -1,7 +1,13 @@
+# Standard library imports
 from enum import Enum
 from typing import List
 from uuid import UUID
-from pydantic import BaseModel, Field, ValidationError
+
+# Third party imports
+from pydantic import BaseModel, Field, ValidationError, validator
+from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
+
+# Local application imports
 from src.db.models._base_class import DateTimeBase, content_base_example
 from src.db.models.layer import (
     FeatureLayerType,
@@ -107,6 +113,23 @@ class NumberColumnsPerType(int, Enum):
     arrtext = 3
     jsonb = 3
     boolean = 3
+
+class CQLQuery(BaseModel):
+    """Model for CQL query."""
+
+    query: dict | None = Field(None, description="CQL query")
+
+    # Validate using cql2_json_parser(query)
+    @validator("query")
+    def validate_query(cls, v):
+        if v is None:
+            return v
+        try:
+            cql2_json_parser(v)
+        except Exception as e:
+            raise ValidationError(f"Invalid CQL query: {e}")
+        return v
+
 
 
 class LayerReadBaseAttributes(BaseModel):
@@ -465,6 +488,7 @@ class IValidateJobId(BaseModel):
     """Model to import a file object."""
 
     validate_job_id: UUID = Field(..., description="Upload job ID")
+
 
 
 request_examples = {

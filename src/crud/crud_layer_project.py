@@ -1,24 +1,22 @@
-from .base import CRUDBase
-from src.db.models._link_model import LayerProjectLink
-from sqlalchemy.ext.asyncio import AsyncSession
+# Standard library imports
 from uuid import UUID
-from src.crud.crud_layer import layer as crud_layer
-from sqlalchemy import select
-from src.db.models.layer import Layer
+
+# Third party imports
 from fastapi import HTTPException, status
+from pydantic import parse_obj_as, ValidationError
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+# Local application imports
+from .base import CRUDBase
+from src.crud.crud_layer import layer as crud_layer
+from src.db.models._link_model import LayerProjectLink
+from src.db.models.layer import Layer
 from src.schemas.project import (
-    ITileLayerProjectUpdate,
-    IFeatureLayerStandardProjectUpdate,
-    IFeatureLayerIndicatorProjectUpdate,
-    IFeatureLayerScenarioProjectUpdate,
-    IImageryLayerProjectUpdate,
-    ITableLayerProjectUpdate,
     layer_type_mapping_read,
     layer_type_mapping_update,
 )
-from src.schemas.layer import LayerType, UserDataGeomType
-from pydantic import parse_obj_as, ValidationError
-from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
+
 
 class CRUDLayerProject(CRUDBase):
     async def layer_projects_to_schemas(self, async_session: AsyncSession, layers_project):
@@ -138,7 +136,7 @@ class CRUDLayerProject(CRUDBase):
         for layer in layers:
             layer = layer[0]
             layer_project = LayerProjectLink(
-                project_id=project_id, layer_id=layer.id, name=layer.name, query={}
+                project_id=project_id, layer_id=layer.id, name=layer.name
             )
             # Add style if exists
             if layer.style is not None:
@@ -186,15 +184,6 @@ class CRUDLayerProject(CRUDBase):
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=str(e),
             )
-        # Validate query
-        if layer_in.query:
-            try:
-                cql2_json_parser(layer_in.query)
-            except Exception as e:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="CQL filter is not valid",
-                )
 
         # Get layer project
         layer_project_old = await self.get_by_multi_keys(

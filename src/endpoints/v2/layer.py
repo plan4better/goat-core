@@ -17,9 +17,10 @@ from fastapi import (
     status,
 )
 from fastapi.responses import JSONResponse
-from fastapi_pagination import Page, Params as PaginationParams
+from fastapi_pagination import Page
+from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, or_, select, text
 
 # Local application imports
 from src.core.content import (
@@ -35,6 +36,7 @@ from src.endpoints.deps import get_db, get_user_id
 from src.schemas.common import ContentIdList, OrderEnum
 from src.schemas.job import JobStatusType, JobType
 from src.schemas.layer import (
+    CQLQuery,
     FeatureLayerUploadType,
     FileUploadType,
     IInternalLayerCreate,
@@ -46,8 +48,8 @@ from src.schemas.layer import (
     TableUploadType,
 )
 from src.schemas.layer import request_examples as layer_request_examples
-from src.utils import check_file_size, get_user_table
-
+from src.utils import build_where, check_file_size, get_user_table, search_value
+import json
 
 router = APIRouter()
 
@@ -81,7 +83,10 @@ async def file_validate(
             detail=f"File type not allowed. Allowed file types are: {', '.join(FileUploadType.__members__.keys())}",
         )
 
-    if await check_file_size(file=file, max_size=MaxFileSizeType[file_ending].value) is False:
+    if (
+        await check_file_size(file=file, max_size=MaxFileSizeType[file_ending].value)
+        is False
+    ):
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"File size too large. Max file size is {round(MaxFileSizeType[file_ending].value / 1048576, 2)} MB",
@@ -386,21 +391,61 @@ async def delete_layer(
 
     layer = await crud_layer.get(async_session, id=id)
     if layer is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Layer not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Layer not found"
+        )
 
     # Check if internal or external layer
-    if layer.type == LayerType.feature_layer.value:
-        # Get data table name
-        table_name = get_user_table(str(layer.user_id), layer.feature_layer_geometry_type)
-        await crud_layer.delete_layer_data(async_session=async_session, layer_id=layer.id, table_name=table_name)
-    elif layer.type == LayerType.table.value:
-        # Get data table name
-        table_name = get_user_table(str(layer.user_id), "no_geometry")
-        await crud_layer.delete_layer_data(async_session=async_session, layer_id=layer.id, table_name=table_name)
-
+    if layer.type in [LayerType.table.value, LayerType.feature_layer.value]:
+        # Delete layer data
+        await crud_layer.delete_layer_data(async_session=async_session, layer=layer)
+    
     # Delete layer metadata
     await crud_layer.delete(
         db=async_session,
         id=id,
     )
     return
+
+
+@router.get(
+    "/{id}/unique-values/{column_name}",
+    summary="Get unique values of a column",
+    response_class=JSONResponse,
+    status_code=200,
+)
+async def get_unique_values(
+    async_session: AsyncSession = Depends(get_db),
+    page_params: PaginationParams = Depends(),
+    id: UUID4 = Path(
+        ...,
+        description="The ID of the layer to get",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    column_name: str = Path(
+        ...,
+        description="The column name to get the unique values from",
+        example="name",
+    ),
+    query: str = Query(
+        "",
+        description="CQL2-Filter in JSON format",
+        example={"op": "=", "args": [{"property": "category"}, "bus_stop"]},
+    ),
+    order: OrderEnum = Query(
+        "descendent",
+        description="Specify the order to apply. There are the option ascendent or descendent.",
+        example="descendent",
+    ),
+):
+    values = await crud_layer.get_unique_values(
+        async_session=async_session,
+        id=id,
+        column_name=column_name,
+        query=query,
+        page_params=page_params,
+        order=order,
+    )
+
+    # Return result
+    return values
