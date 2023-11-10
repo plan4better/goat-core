@@ -356,6 +356,7 @@ class TileLayerAttributesBase(BaseModel):
 
     url: str = Field(..., description="Layer URL")
     data_type: TileLayerDataType = Field(..., description="Content data type")
+    style: dict | None = Field(None, description="Style of the layer")
 
 
 tile_layer_attributes_example = {
