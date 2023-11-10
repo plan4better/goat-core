@@ -46,6 +46,7 @@ from src.schemas.layer import (
     IValidateJobId,
     MaxFileSizeType,
     TableUploadType,
+    ColumnStatisticsOperation,
 )
 from src.schemas.layer import request_examples as layer_request_examples
 from src.utils import build_where, check_file_size, get_user_table, search_value
@@ -399,7 +400,7 @@ async def delete_layer(
     if layer.type in [LayerType.table.value, LayerType.feature_layer.value]:
         # Delete layer data
         await crud_layer.delete_layer_data(async_session=async_session, layer=layer)
-    
+
     # Delete layer metadata
     await crud_layer.delete(
         db=async_session,
@@ -438,6 +439,8 @@ async def get_unique_values(
         example="descendent",
     ),
 ):
+    """Get unique values of a column. Based on the passed CQL-filter and order."""
+
     values = await crud_layer.get_unique_values(
         async_session=async_session,
         id=id,
@@ -449,3 +452,51 @@ async def get_unique_values(
 
     # Return result
     return values
+
+# @router.get(
+#     "/{id}/class-breaks/{operation}/{column_name}",
+#     summary="Get statistics of a column",
+#     response_class=JSONResponse,
+#     status_code=200,
+# )
+# async def class_breaks(
+#     async_session: AsyncSession = Depends(get_db),
+#     id: UUID4 = Path(
+#         ...,
+#         description="The ID of the layer to get",
+#         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+#     ),
+#     operation: ColumnStatisticsOperation = Path(
+#         ...,
+#         description="The operation to perform",
+#         example="quantile",
+#     ),
+#     column_name: str = Path(
+#         ...,
+#         description="The column name to get the statistics from. It needs to be a number column.",
+#         example="name",
+#     ),
+#     query: str = Query(
+#         "",
+#         description="CQL2-Filter in JSON format",
+#         example={"op": "=", "args": [{"property": "category"}, "bus_stop"]},
+#     ),
+#     stripe_zeros: bool = Query(
+#         True,
+#         description="Stripe zeros from the column before performing the operation",
+#         example=True,
+#     ),
+# ):
+#     """Get statistics of a column. Based on the saved layer filter in the project."""
+
+#     statistics = await crud_layer.get_statistics_column(
+#         async_session=async_session,
+#         id=id,
+#         operation=operation,
+#         column_name=column_name,
+#         query=query,
+#         stripe_zeros=stripe_zeros,
+#     )
+
+#     # Return result
+#     return statistics

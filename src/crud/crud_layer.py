@@ -26,6 +26,7 @@ from src.schemas.layer import (
     LayerType,
     SupportedOgrGeomType,
     UserDataGeomType,
+    ColumnStatisticsOperation,
 )
 from src.schemas.style import base_styles
 from src.utils import build_where, get_user_table, search_value
@@ -309,14 +310,8 @@ class CRUDLayer(CRUDBase):
             feature_cnt["filtered_count"] = result.scalar_one()
         return feature_cnt
 
-    async def get_unique_values(
-        self,
-        async_session: AsyncSession,
-        id: UUID,
-        column_name: str,
-        order: str,
-        query: str,
-        page_params: PaginationParams,
+    async def check_layer_suitable_for_stats(
+        self, async_session: AsyncSession, id: UUID, column_name: str, query: str
     ):
         # Get layer
         layer = await self.get(async_session, id=id)
@@ -328,9 +323,10 @@ class CRUDLayer(CRUDBase):
         # Check if layer_type is feature_layer or table_layer
         if layer.type not in [LayerType.feature_layer, LayerType.table]:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Layer is not a feature layer or table layer. Unique values can only be requested for internal layers."
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Layer is not a feature layer or table layer. Unique values can only be requested for internal layers.",
             )
-        
+
         column_mapped = search_value(layer.attribute_mapping, column_name)
         if column_mapped is None:
             raise HTTPException(
@@ -351,6 +347,30 @@ class CRUDLayer(CRUDBase):
         else:
             where = ""
 
+        return {
+            "layer": layer,
+            "column_mapped": column_mapped,
+            "table_name": table_name,
+            "where": where,
+        }
+
+    async def get_unique_values(
+        self,
+        async_session: AsyncSession,
+        id: UUID,
+        column_name: str,
+        order: str,
+        query: str,
+        page_params: PaginationParams,
+    ):
+        # Check if layer is suitable for stats
+        res_check = await self.check_layer_suitable_for_stats(
+            async_session=async_session, id=id, column_name=column_name, query=query
+        )
+        layer = res_check["layer"]
+        column_mapped = res_check["column_mapped"]
+        table_name = res_check["table_name"]
+        where = res_check["where"]
         # Map order
         order_mapped = {"descendent": "DESC", "ascendent": "ASC"}[order]
         # Build query
@@ -374,6 +394,33 @@ class CRUDLayer(CRUDBase):
         result = await async_session.execute(text(sql_query))
         result = result.fetchall()
         return result[0][0]
+
+    async def get_class_breaks(
+        self,
+        async_session: AsyncSession,
+        id: UUID,
+        operation: ColumnStatisticsOperation,
+        query: str,
+        column_name: str,
+        stripe_zeros: bool,
+    ):
+        # Check if layer is suitable for stats
+        column_mapped, table_name, where = await self.check_layer_suitable_for_stats(
+            async_session=async_session, id=id, column_name=column_name, query=query
+        )
+
+        # Build query
+        sql_query = f"""
+        WITH cnt AS (
+            SELECT {column_mapped} AS {column_name}, COUNT(*) AS count
+            FROM {table_name}
+            WHERE layer_id = '{layer.id}'
+            {where}
+            AND {column_mapped} IS NOT NULL
+            GROUP BY {column_mapped}
+        )
+        SELECT {operation}(count) FROM cnt
+        """
 
 
 layer = CRUDLayer(Layer)

@@ -16,9 +16,9 @@ from src.schemas.active_mobility import (
 )
 from src.schemas.layer import request_examples as layer_request_examples
 from src.schemas.motorized_mobility import (
-    request_examples_isochrone_pt,
-    request_examples_isochrone_car,
     request_example_oev_gueteklasse,
+    request_examples_isochrone_car,
+    request_examples_isochrone_pt,
 )
 from src.schemas.project import (
     request_examples as project_request_examples,
@@ -33,6 +33,7 @@ from tests.utils import (
     validate_invalid_file,
     validate_valid_file,
     validate_valid_files,
+    generate_random_string,
 )
 
 settings.RUN_AS_BACKGROUND_TASK = True
@@ -216,14 +217,15 @@ async def fixture_create_projects(
 async def fixture_create_layer_project(
     client: AsyncClient,
     fixture_create_project,
-    fixture_create_internal_layer,
+    fixture_create_internal_and_external_layer
 ):
     project_id = fixture_create_project["id"]
-    layer_id = fixture_create_internal_layer["id"]
-
+    internal_layer, external_layer = fixture_create_internal_and_external_layer
+    internal_layer_id = internal_layer["id"]
+    external_layer_id = external_layer["id"]
     # Add layers to project
     response = await client.post(
-        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_id}"
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={internal_layer_id}&layer_ids={external_layer_id}"
     )
     assert response.status_code == 200
     return {"layer_project": response.json(), "project_id": project_id}
@@ -308,11 +310,14 @@ async def fixture_create_internal_layers(
 
 
 async def create_external_layer(
-    client: AsyncClient, fixture_get_home_folder, layer_type
+    client: AsyncClient, home_folder, layer_type
 ):
     # Get table layer dict and add layer ID
     external_layer_dict = layer_request_examples["create_external"][layer_type]["value"]
-    external_layer_dict["folder_id"] = fixture_get_home_folder["id"]
+    external_layer_dict["folder_id"] = home_folder["id"]
+
+    # Give layer a random name
+    external_layer_dict["name"] = generate_random_string(10)
     # Hit endpoint to create external layer
     response = await client.post(
         f"{settings.API_V2_STR}/layer/external", json=external_layer_dict
@@ -337,14 +342,33 @@ async def fixture_create_external_layer(
 ):
     return await create_external_layer(client, fixture_get_home_folder, "tile_layer")
 
-
 @pytest.fixture
-async def fixture_create_internal_layer(
+async def fixture_create_internal_feature_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
     validate_job_id = await validate_valid_file(client, "point")
     return await create_internal_layer(
         client, validate_job_id, fixture_get_home_folder, "feature_layer_standard"
+    )
+
+@pytest.fixture
+async def fixture_create_internal_and_external_layer(
+    client: AsyncClient, fixture_create_user, fixture_get_home_folder
+):
+    validate_job_id = await validate_valid_file(client, "point")
+    internal_layer = await create_internal_layer(
+        client, validate_job_id, fixture_get_home_folder, "feature_layer_standard"
+    )
+    external_layer = await create_external_layer(client, fixture_get_home_folder, "tile_layer")
+    return internal_layer, external_layer
+
+@pytest.fixture
+async def fixture_create_internal_table_layer(
+    client: AsyncClient, fixture_create_user, fixture_get_home_folder
+):
+    validate_job_id = await validate_valid_file(client, "no_geometry")
+    return await create_internal_layer(
+        client, validate_job_id, fixture_get_home_folder, "table_layer"
     )
 
 

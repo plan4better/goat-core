@@ -16,7 +16,7 @@ from src.schemas.project import (
     layer_type_mapping_read,
     layer_type_mapping_update,
 )
-
+from src.schemas.layer import LayerType
 
 class CRUDLayerProject(CRUDBase):
     async def layer_projects_to_schemas(self, async_session: AsyncSession, layers_project):
@@ -45,9 +45,13 @@ class CRUDLayerProject(CRUDBase):
             layer.update(layer_project)
 
             # Get feature cnt for all feature layers and tables
-            feature_cnt = await crud_layer.get_feature_cnt(
-                async_session=async_session, layer=layer
-            )
+            if layer["type"] in [LayerType.feature_layer.value, LayerType.table.value]:
+                feature_cnt = await crud_layer.get_feature_cnt(
+                    async_session=async_session, layer=layer
+                )
+            else:
+                feature_cnt = {}
+
             # Write into correct schema
             layer_projects_schemas.append(layer_type_mapping_read[layer_type](**layer, **feature_cnt))
 

@@ -5,6 +5,9 @@ from src.core.config import settings
 from src.schemas.job import JobStatusType
 from typing import List
 from uuid import uuid4
+import random
+import string
+
 
 async def check_if_job_finished(client: AsyncClient, job_id: str):
     """Check if job is finished."""
@@ -152,3 +155,10 @@ async def get_with_wrong_id(client: AsyncClient, item: str):
         f"{settings.API_V2_STR}/{item}/{str(id)}",
     )
     assert response.status_code == 404
+
+def generate_random_string(length):
+    # Define the characters to use in the string
+    characters = string.ascii_letters + string.digits
+    # Generate the random string
+    random_string = ''.join(random.choice(characters) for i in range(length))
+    return random_string

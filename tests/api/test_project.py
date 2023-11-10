@@ -164,7 +164,8 @@ async def test_delete_layer_project(client: AsyncClient, fixture_create_layer_pr
 
     # Check if layer is deleted
     response = await client.get(
-        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_id}",
+        f"{settings.API_V2_STR}/project/{project_id}/layer",
     )
     assert response.status_code == 200
-    assert len(response.json()) == 0
+    assert len(response.json()) == 1
+    assert response.json()[0]["id"] == fixture_create_layer_project["layer_project"][1]["id"]

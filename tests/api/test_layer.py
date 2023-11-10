@@ -1,9 +1,11 @@
-import pytest
-from httpx import AsyncClient
-from src.core.config import settings
-from tests.utils import upload_file, get_with_wrong_id
 import os
 from uuid import uuid4
+
+import pytest
+from httpx import AsyncClient
+
+from src.core.config import settings
+from tests.utils import get_with_wrong_id, upload_file
 
 
 @pytest.mark.asyncio
@@ -46,8 +48,10 @@ async def test_create_external_layers(
 
 
 @pytest.mark.asyncio
-async def test_get_internal_layer(client: AsyncClient, fixture_create_internal_layer):
-    layer_id = fixture_create_internal_layer["id"]
+async def test_get_internal_layer(
+    client: AsyncClient, fixture_create_internal_feature_layer
+):
+    layer_id = fixture_create_internal_feature_layer["id"]
     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}")
     assert response.status_code == 200
     assert response.json()["id"] == layer_id
@@ -68,10 +72,10 @@ async def test_get_layer_wrong_id(client: AsyncClient, fixture_create_external_l
 
 @pytest.mark.asyncio
 async def test_update_internal_layer(
-    client: AsyncClient, fixture_create_internal_layer
+    client: AsyncClient, fixture_create_internal_feature_layer
 ):
-    layer_id = fixture_create_internal_layer["id"]
-    layer_dict = fixture_create_internal_layer
+    layer_id = fixture_create_internal_feature_layer["id"]
+    layer_dict = fixture_create_internal_feature_layer
     layer_dict["name"] = "Updated name"
     layer_dict["description"] = "Updated description"
     layer_dict["tags"] = ["Update tag 1", "Update tag 2"]
@@ -103,9 +107,9 @@ async def test_delete_external_layers(
 
 @pytest.mark.asyncio
 async def test_get_unique_values_layer_pagination(
-    client: AsyncClient, fixture_create_internal_layer
+    client: AsyncClient, fixture_create_internal_feature_layer
 ):
-    layer_id = fixture_create_internal_layer["id"]
+    layer_id = fixture_create_internal_feature_layer["id"]
     column = "name"
 
     # Request the first 5 unique values
@@ -143,9 +147,9 @@ async def test_get_unique_values_layer_pagination(
 
 @pytest.mark.asyncio
 async def test_get_unique_values_layer_query(
-    client: AsyncClient, fixture_create_internal_layer
+    client: AsyncClient, fixture_create_internal_feature_layer
 ):
-    layer_id = fixture_create_internal_layer["id"]
+    layer_id = fixture_create_internal_feature_layer["id"]
     column = "name"
     query = '{"op": "=", "args": [{"property": "category"}, "bus_stop"]}'
 
@@ -162,7 +166,7 @@ async def test_get_unique_values_layer_query(
 
 @pytest.mark.asyncio
 async def test_get_unique_values_wrong_layer_id(
-    client: AsyncClient, fixture_create_internal_layer
+    client: AsyncClient, fixture_create_internal_feature_layer
 ):
     layer_id = uuid4()
     column = "name"
@@ -192,9 +196,9 @@ async def test_get_unique_values_wrong_layer_type(
 
 @pytest.mark.asyncio
 async def test_get_unique_value_wrong_column_name(
-    client: AsyncClient, fixture_create_internal_layer
+    client: AsyncClient, fixture_create_internal_feature_layer
 ):
-    layer_id = fixture_create_internal_layer["id"]
+    layer_id = fixture_create_internal_feature_layer["id"]
     column = "wrong_column"
 
     # Request the first 5 unique values
@@ -203,6 +207,21 @@ async def test_get_unique_value_wrong_column_name(
     )
     assert response.status_code == 404
     return
+
+
+# @pytest.mark.asyncio
+# async def test_get_statistics_column(
+#     client: AsyncClient, fixture_create_internal_table_layer
+# ):
+#     layer_id = fixture_create_internal_table_layer["id"]
+#     column = "einwohnerzahl_ewz"
+
+#     # Request the first 5 unique values
+#     response = await client.get(
+#         f"{settings.API_V2_STR}/layer/{layer_id}/statistics/quantile/{column}?class_count=5&stripe_zeros=true"
+#     )
+#     assert response.status_code == 200
+#     return
 
 
 # Some further test cases

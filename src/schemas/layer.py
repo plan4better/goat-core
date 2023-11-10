@@ -130,7 +130,12 @@ class CQLQuery(BaseModel):
             raise ValidationError(f"Invalid CQL query: {e}")
         return v
 
+class ColumnStatisticsOperation(BaseModel):
+    """Allowed operations on numeric columsn."""
 
+    quantile = "quantile"
+    standard_deviation = "standard_deviation"
+    equal_interval = "equal_interval"
 
 class LayerReadBaseAttributes(BaseModel):
     id: UUID = Field(..., description="Content ID of the layer", alias="id")
