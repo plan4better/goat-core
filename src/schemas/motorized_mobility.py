@@ -1,8 +1,14 @@
-from typing import List
-from pydantic import BaseModel, Field, root_validator
 from enum import Enum
+from typing import List
 from uuid import UUID
-from src.schemas.toolbox_base import ResultTarget, IsochroneStartingPointsBase, PTSupportedDay
+
+from pydantic import BaseModel, Field, root_validator
+
+from src.schemas.toolbox_base import (
+    IsochroneStartingPointsBase,
+    PTSupportedDay,
+    ResultTarget,
+)
 
 
 class IsochroneStartingPointsMotorizedMobility(IsochroneStartingPointsBase):
@@ -16,9 +22,13 @@ class IsochroneStartingPointsMotorizedMobility(IsochroneStartingPointsBase):
         max_points = 20
         if lat and long:
             if len(lat) > max_points:
-                raise ValueError(f"The maximum number of starting points is {max_points}.")
+                raise ValueError(
+                    f"The maximum number of starting points is {max_points}."
+                )
             if len(long) > max_points:
-                raise ValueError(f"The maximum number of starting points is {max_points}.")
+                raise ValueError(
+                    f"The maximum number of starting points is {max_points}."
+                )
         return values
 
 
@@ -88,13 +98,19 @@ class TravelTimeCostMotorizedMobility(BaseModel):
 class PTTimeWindow(BaseModel):
     weekday: PTSupportedDay = Field(
         title="Weekday",
-        description="The weekday of the isochrone. There are three options: weekday, saturday, sunday."
+        description="The weekday of the isochrone. There are three options: weekday, saturday, sunday.",
     )
     from_time: int = Field(
-        25200, gt=0, lt=86400, description="(PT) From time. Number of seconds since midnight"
+        25200,
+        gt=0,
+        lt=86400,
+        description="(PT) From time. Number of seconds since midnight",
     )
     to_time: int = Field(
-        39600, gt=0, lt=86400, description="(PT) To time . Number of seconds since midnight"
+        39600,
+        gt=0,
+        lt=86400,
+        description="(PT) To time . Number of seconds since midnight",
     )
 
 
@@ -213,6 +229,7 @@ class IOevGueteklasse(BaseModel):
         title="Result Target",
         description="The target location of the produced layer.",
     )
+
 
 request_examples_isochrone_pt = {
     # 1. Isochrone for public transport with all modes
@@ -369,7 +386,7 @@ station_config_example = {
 }
 
 request_example_oev_gueteklasse = {
-    "oev_gueteklasse_weekday":{
+    "oev_gueteklasse_weekday": {
         "summary": "ÖV-Güteklassen Weekday",
         "value": {
             "folder_id": "732fc631-e1a4-44c5-b7ef-27c7d49e65f7",
@@ -383,11 +400,15 @@ request_example_oev_gueteklasse = {
             },
         },
     },
-    "oev_gueteklasse_saturday":{
+    "oev_gueteklasse_saturday": {
         "summary": "ÖV-Güteklassen Saturday",
         "value": {
             "folder_id": "732fc631-e1a4-44c5-b7ef-27c7d49e65f7",
-            "time_window": {"weekday": "saturday", "from_time": 25200, "to_time": 32400},
+            "time_window": {
+                "weekday": "saturday",
+                "from_time": 25200,
+                "to_time": 32400,
+            },
             "reference_area": "99261caf-bb4a-42ef-8212-423a3dd6d613",
             "station_config": station_config_example,
             "result_target": {
@@ -396,13 +417,13 @@ request_example_oev_gueteklasse = {
                 "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
             },
         },
-    }
+    },
 }
 
 oev_gueteklasse_station_config_layer_base = {
     "name": "ÖV-Güteklassen stations",
     "description": "ÖV-Güteklassen Categories on the station level",
-    "type": "feature_layer",
+    "type": "feature",
     "feature_layer_geometry_type": "point",
     "indicator_type": "oev_gueteklasse",
     "thumbnail_url": "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png",

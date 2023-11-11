@@ -3,23 +3,27 @@ from uuid import UUID
 
 # Third party imports
 from fastapi import HTTPException, status
-from pydantic import parse_obj_as, ValidationError
+from pydantic import ValidationError, parse_obj_as
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Local application imports
-from .base import CRUDBase
 from src.crud.crud_layer import layer as crud_layer
 from src.db.models._link_model import LayerProjectLink
 from src.db.models.layer import Layer
+from src.schemas.layer import LayerType
 from src.schemas.project import (
     layer_type_mapping_read,
     layer_type_mapping_update,
 )
-from src.schemas.layer import LayerType
+
+# Local application imports
+from .base import CRUDBase
+
 
 class CRUDLayerProject(CRUDBase):
-    async def layer_projects_to_schemas(self, async_session: AsyncSession, layers_project):
+    async def layer_projects_to_schemas(
+        self, async_session: AsyncSession, layers_project
+    ):
         """Convert layer projects to schemas."""
         layer_projects_schemas = []
 
@@ -45,7 +49,7 @@ class CRUDLayerProject(CRUDBase):
             layer.update(layer_project)
 
             # Get feature cnt for all feature layers and tables
-            if layer["type"] in [LayerType.feature_layer.value, LayerType.table.value]:
+            if layer["type"] in [LayerType.feature.value, LayerType.table.value]:
                 feature_cnt = await crud_layer.get_feature_cnt(
                     async_session=async_session, layer=layer
                 )
@@ -53,7 +57,9 @@ class CRUDLayerProject(CRUDBase):
                 feature_cnt = {}
 
             # Write into correct schema
-            layer_projects_schemas.append(layer_type_mapping_read[layer_type](**layer, **feature_cnt))
+            layer_projects_schemas.append(
+                layer_type_mapping_read[layer_type](**layer, **feature_cnt)
+            )
 
         return layer_projects_schemas
 
@@ -66,7 +72,8 @@ class CRUDLayerProject(CRUDBase):
 
         # Get all layers from project
         query = select([Layer, LayerProjectLink]).where(
-            LayerProjectLink.project_id == project_id, Layer.id == LayerProjectLink.layer_id
+            LayerProjectLink.project_id == project_id,
+            Layer.id == LayerProjectLink.layer_id,
         )
 
         # Get all layers from project
@@ -113,7 +120,9 @@ class CRUDLayerProject(CRUDBase):
         # Get number of layers in project
         layer_projects = await self.get_multi(
             async_session,
-            query=select(LayerProjectLink).where(LayerProjectLink.project_id == project_id),
+            query=select(LayerProjectLink).where(
+                LayerProjectLink.project_id == project_id
+            ),
         )
 
         # Check if maximum number of layers in project is reached. In case layer_project is empty just go on.

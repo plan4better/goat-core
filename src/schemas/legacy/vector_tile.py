@@ -34,7 +34,7 @@ from src.resources.enums import MimeTypes
 
 # TODO: Refactor this part to use with the new schemas further down
 # =========================VECTOR TILE SCHEMAS=========================
-class VectorTileLayer(BaseModel, metaclass=abc.ABCMeta):
+class ExternalVectorTile(BaseModel, metaclass=abc.ABCMeta):
     """Layer's Abstract BaseClass.
     Attributes:
         id (str): Layer's name.
@@ -52,7 +52,7 @@ class VectorTileLayer(BaseModel, metaclass=abc.ABCMeta):
     tileurl: Optional[str]
 
 
-class VectorTileTable(VectorTileLayer):
+class VectorTileTable(ExternalVectorTile):
     """Table Reader.
     Attributes:
         id (str): Layer's name.
@@ -85,7 +85,7 @@ class VectorTileFunction(VectorTileTable):
         tileurl (str, optional): Layer's tiles url.
         type (str): Layer's type.
         function_name (str): Nane of the SQL function to call. Defaults to `id`.
-        sql (str): Valid SQL function which returns Tile data.
+        sql (str): Valid SQL function which returns VectorTile data.
         options (list, optional): options available for the SQL function.
     """
 

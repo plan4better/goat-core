@@ -29,11 +29,11 @@ from src.schemas.tool import (
 )
 from src.utils import get_user_table
 from tests.utils import (
+    generate_random_string,
     upload_file,
     validate_invalid_file,
     validate_valid_file,
     validate_valid_files,
-    generate_random_string,
 )
 
 settings.RUN_AS_BACKGROUND_TASK = True
@@ -217,7 +217,7 @@ async def fixture_create_projects(
 async def fixture_create_layer_project(
     client: AsyncClient,
     fixture_create_project,
-    fixture_create_internal_and_external_layer
+    fixture_create_internal_and_external_layer,
 ):
     project_id = fixture_create_project["id"]
     internal_layer, external_layer = fixture_create_internal_and_external_layer
@@ -289,7 +289,7 @@ async def create_internal_layer(
     return response.json()
 
 
-internal_layers = ["feature_layer_standard", "table_layer"]
+internal_layers = ["feature_layer_standard", "table"]
 
 
 @pytest.fixture(params=internal_layers)
@@ -301,7 +301,7 @@ async def fixture_create_internal_layers(
         layer = await create_internal_layer(
             client, validate_job_id, fixture_get_home_folder, request.param
         )
-    elif request.param == "table_layer":
+    elif request.param == "table":
         validate_job_id = await validate_valid_file(client, "no_geometry")
         layer = await create_internal_layer(
             client, validate_job_id, fixture_get_home_folder, request.param
@@ -309,9 +309,7 @@ async def fixture_create_internal_layers(
     return layer
 
 
-async def create_external_layer(
-    client: AsyncClient, home_folder, layer_type
-):
+async def create_external_layer(client: AsyncClient, home_folder, layer_type):
     # Get table layer dict and add layer ID
     external_layer_dict = layer_request_examples["create_external"][layer_type]["value"]
     external_layer_dict["folder_id"] = home_folder["id"]
@@ -326,7 +324,7 @@ async def create_external_layer(
     return response.json()
 
 
-external_layers = ["tile_layer", "imagery_layer"]
+external_layers = ["external_vector_tile", "external_imagery"]
 
 
 @pytest.fixture(params=external_layers)
@@ -340,7 +338,10 @@ async def fixture_create_external_layers(
 async def fixture_create_external_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
-    return await create_external_layer(client, fixture_get_home_folder, "tile_layer")
+    return await create_external_layer(
+        client, fixture_get_home_folder, "external_vector_tile"
+    )
+
 
 @pytest.fixture
 async def fixture_create_internal_feature_layer(
@@ -351,6 +352,7 @@ async def fixture_create_internal_feature_layer(
         client, validate_job_id, fixture_get_home_folder, "feature_layer_standard"
     )
 
+
 @pytest.fixture
 async def fixture_create_internal_and_external_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
@@ -359,8 +361,11 @@ async def fixture_create_internal_and_external_layer(
     internal_layer = await create_internal_layer(
         client, validate_job_id, fixture_get_home_folder, "feature_layer_standard"
     )
-    external_layer = await create_external_layer(client, fixture_get_home_folder, "tile_layer")
+    external_layer = await create_external_layer(
+        client, fixture_get_home_folder, "external_vector_tile"
+    )
     return internal_layer, external_layer
+
 
 @pytest.fixture
 async def fixture_create_internal_table_layer(
@@ -368,7 +373,7 @@ async def fixture_create_internal_table_layer(
 ):
     validate_job_id = await validate_valid_file(client, "no_geometry")
     return await create_internal_layer(
-        client, validate_job_id, fixture_get_home_folder, "table_layer"
+        client, validate_job_id, fixture_get_home_folder, "table"
     )
 
 

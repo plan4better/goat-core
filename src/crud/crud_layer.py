@@ -4,7 +4,7 @@ import os
 from uuid import UUID
 
 # Third party imports
-from fastapi import BackgroundTasks, HTTPException, status, UploadFile
+from fastapi import BackgroundTasks, HTTPException, UploadFile, status
 from fastapi_pagination import Params as PaginationParams
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,14 +19,13 @@ from src.db.models.job import Job
 from src.db.models.layer import Layer
 from src.schemas.job import JobStatusType, JobType
 from src.schemas.layer import (
+    ColumnStatisticsOperation,
     CQLQuery,
-    FeatureLayerType,
-    IFeatureLayerStandardCreateAdditionalAttributes,
-    ITableLayerCreateAdditionalAttributes,
+    FeatureType,
+    IFeatureStandardCreateAdditionalAttributes,
+    ITableCreateAdditionalAttributes,
     LayerType,
     SupportedOgrGeomType,
-    UserDataGeomType,
-    ColumnStatisticsOperation,
 )
 from src.schemas.style import base_styles
 from src.utils import build_where, get_user_table, search_value
@@ -96,21 +95,21 @@ class CRUDLayer(CRUDBase):
             geom_type = SupportedOgrGeomType[
                 layer_attributes["data_types"]["geometry"]["type"]
             ].value
-            additional_attributes["style"] = base_styles["feature_layer"]["standard"][
+            additional_attributes["style"] = base_styles["feature"]["standard"][
                 geom_type
             ]
-            additional_attributes["type"] = LayerType.feature_layer
-            additional_attributes["feature_layer_type"] = FeatureLayerType.standard
+            additional_attributes["type"] = LayerType.feature
+            additional_attributes["feature_layer_type"] = FeatureType.standard
             additional_attributes["feature_layer_geometry_type"] = geom_type
             additional_attributes["extent"] = layer_attributes["data_types"][
                 "geometry"
             ]["extent"]
-            additional_attributes = IFeatureLayerStandardCreateAdditionalAttributes(
+            additional_attributes = IFeatureStandardCreateAdditionalAttributes(
                 **additional_attributes
             ).dict()
         else:
             additional_attributes["type"] = LayerType.table
-            additional_attributes = ITableLayerCreateAdditionalAttributes(
+            additional_attributes = ITableCreateAdditionalAttributes(
                 **additional_attributes
             ).dict()
 
@@ -320,8 +319,8 @@ class CRUDLayer(CRUDBase):
                 status_code=status.HTTP_404_NOT_FOUND, detail="Layer not found"
             )
 
-        # Check if layer_type is feature_layer or table_layer
-        if layer.type not in [LayerType.feature_layer, LayerType.table]:
+        # Check if layer_type is feature or table
+        if layer.type not in [LayerType.feature, LayerType.table]:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Layer is not a feature layer or table layer. Unique values can only be requested for internal layers.",
@@ -410,17 +409,6 @@ class CRUDLayer(CRUDBase):
         )
 
         # Build query
-        sql_query = f"""
-        WITH cnt AS (
-            SELECT {column_mapped} AS {column_name}, COUNT(*) AS count
-            FROM {table_name}
-            WHERE layer_id = '{layer.id}'
-            {where}
-            AND {column_mapped} IS NOT NULL
-            GROUP BY {column_mapped}
-        )
-        SELECT {operation}(count) FROM cnt
-        """
 
 
 layer = CRUDLayer(Layer)

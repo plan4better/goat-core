@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
-from sqlalchemy import and_, or_, select, text
+from sqlalchemy import and_, or_, select
 
 # Local application imports
 from src.core.content import (
@@ -30,14 +30,14 @@ from src.core.content import (
 )
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import layer as crud_layer
-from src.db.models.layer import FeatureLayerType, Layer, LayerType
+from src.db.models.layer import FeatureType, Layer, LayerType
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_user_id
 from src.schemas.common import ContentIdList, OrderEnum
 from src.schemas.job import JobStatusType, JobType
 from src.schemas.layer import (
-    CQLQuery,
-    FeatureLayerUploadType,
+    ColumnStatisticsOperation,
+    FeatureUploadType,
     FileUploadType,
     IInternalLayerCreate,
     ILayerExternalCreate,
@@ -46,11 +46,9 @@ from src.schemas.layer import (
     IValidateJobId,
     MaxFileSizeType,
     TableUploadType,
-    ColumnStatisticsOperation,
 )
 from src.schemas.layer import request_examples as layer_request_examples
-from src.utils import build_where, check_file_size, get_user_table, search_value
-import json
+from src.utils import check_file_size
 
 router = APIRouter()
 
@@ -73,11 +71,11 @@ async def file_validate(
     """
 
     file_ending = os.path.splitext(file.filename)[-1][1:]
-    # Check if file is feature_layer or table_layer
+    # Check if file is feature or table
     if file_ending in TableUploadType.__members__:
         layer_type = LayerType.table.value
-    elif file_ending in FeatureLayerUploadType.__members__:
-        layer_type = LayerType.feature_layer.value
+    elif file_ending in FeatureUploadType.__members__:
+        layer_type = LayerType.feature.value
     else:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -283,10 +281,10 @@ async def read_layers(
         None,
         description="Layer type to filter by. Can be multiple. If not specified, all layer types will be returned.",
     ),
-    feature_layer_type: List[FeatureLayerType]
+    feature_layer_type: List[FeatureType]
     | None = Query(
         None,
-        description="Feature layer type. Can be multiple. If not specified, all feature layer types will be returned. Can only be used if 'layer_type' contains 'feature_layer'.",
+        description="Feature layer type. Can be multiple. If not specified, all feature layer types will be returned. Can only be used if 'layer_type' contains 'feature'.",
     ),
     search: str = Query(
         None,
@@ -307,10 +305,10 @@ async def read_layers(
     """This endpoints returns a list of layers based one the specified filters."""
 
     # Additional server side validation for feature_layer_type
-    if feature_layer_type is not None and LayerType.feature_layer not in layer_type:
+    if feature_layer_type is not None and LayerType.feature not in layer_type:
         raise HTTPException(
             status_code=400,
-            detail="Feature layer type can only be set when layer type is feature_layer",
+            detail="Feature layer type can only be set when layer type is feature",
         )
     # TODO: Put this in CRUD layer
     if folder_id is None:
@@ -397,7 +395,7 @@ async def delete_layer(
         )
 
     # Check if internal or external layer
-    if layer.type in [LayerType.table.value, LayerType.feature_layer.value]:
+    if layer.type in [LayerType.table.value, LayerType.feature.value]:
         # Delete layer data
         await crud_layer.delete_layer_data(async_session=async_session, layer=layer)
 
@@ -453,6 +451,7 @@ async def get_unique_values(
     # Return result
     return values
 
+
 # @router.get(
 #     "/{id}/class-breaks/{operation}/{column_name}",
 #     summary="Get statistics of a column",
@@ -489,7 +488,7 @@ async def get_unique_values(
 # ):
 #     """Get statistics of a column. Based on the saved layer filter in the project."""
 
-#     statistics = await crud_layer.get_statistics_column(
+#     statistics = await crud_layer.get_class_breaks(
 #         async_session=async_session,
 #         id=id,
 #         operation=operation,

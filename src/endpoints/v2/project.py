@@ -1,38 +1,35 @@
-from fastapi import APIRouter, Body, Depends, Path, Query, status, HTTPException
+from typing import List
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
 
+from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.crud.crud_project import project as crud_project
 from src.crud.crud_user_project import user_project as crud_user_project
-from src.crud.crud_layer_project import layer_project as crud_layer_project
+from src.db.models._link_model import UserProjectLink
 from src.db.models.project import Project
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_user_id
 from src.schemas.common import ContentIdList, OrderEnum
 from src.schemas.project import (
+    IExternalImageryProjectRead,
+    IExternalVectorTileProjectRead,
+    IFeatureIndicatorProjectRead,
+    IFeatureScenarioProjectRead,
+    IFeatureStandardProjectRead,
+    InitialViewState,
+    IProjectBaseUpdate,
     IProjectCreate,
     IProjectRead,
-    IProjectBaseUpdate,
-    InitialViewState,
-    request_examples as project_request_examples,
+    ITableProjectRead,
 )
-from src.db.models._link_model import UserProjectLink
-from typing import List
 from src.schemas.project import (
-    ITileLayerProjectRead,
-    IImageryLayerProjectRead,
-    ITableLayerProjectRead,
-    IFeatureLayerStandardProjectRead,
-    IFeatureLayerIndicatorProjectRead,
-    IFeatureLayerScenarioProjectRead,
-    layer_type_mapping_read,
+    request_examples as project_request_examples,
 )
 
 router = APIRouter()
-
-
-
 
 
 ### Project endpoints
@@ -93,7 +90,9 @@ async def read_project(
     # Get project
     project = await crud_project.get(async_session, id=id)
     if project is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
+        )
     return IProjectRead(**project.dict())
 
 
@@ -212,7 +211,9 @@ async def delete_project(
     # Get project
     project = await crud_project.get(async_session, id=id)
     if project is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
+        )
 
     # Delete project
     await crud_project.delete(db=async_session, id=id)
@@ -278,12 +279,12 @@ async def update_project_initial_view_state(
 @router.post(
     "/{id}/layer",
     response_model=List[
-        IFeatureLayerStandardProjectRead
-        | IFeatureLayerIndicatorProjectRead
-        | IFeatureLayerScenarioProjectRead
-        | ITableLayerProjectRead
-        | ITileLayerProjectRead
-        | IImageryLayerProjectRead
+        IFeatureStandardProjectRead
+        | IFeatureIndicatorProjectRead
+        | IFeatureScenarioProjectRead
+        | ITableProjectRead
+        | IExternalVectorTileProjectRead
+        | IExternalImageryProjectRead
     ],
     response_model_exclude_none=True,
     status_code=200,
@@ -316,12 +317,12 @@ async def add_layers_to_project(
 @router.get(
     "/{id}/layer",
     response_model=List[
-        IFeatureLayerStandardProjectRead
-        | IFeatureLayerIndicatorProjectRead
-        | IFeatureLayerScenarioProjectRead
-        | ITableLayerProjectRead
-        | ITileLayerProjectRead
-        | IImageryLayerProjectRead
+        IFeatureStandardProjectRead
+        | IFeatureIndicatorProjectRead
+        | IFeatureScenarioProjectRead
+        | ITableProjectRead
+        | IExternalVectorTileProjectRead
+        | IExternalImageryProjectRead
     ],
     response_model_exclude_none=True,
     status_code=200,
@@ -343,14 +344,15 @@ async def get_layers_from_project(
     )
     return layers_project
 
+
 @router.get(
     "/{id}/layer/{layer_id}",
-    response_model=IFeatureLayerStandardProjectRead
-    | IFeatureLayerIndicatorProjectRead
-    | IFeatureLayerScenarioProjectRead
-    | ITableLayerProjectRead
-    | ITileLayerProjectRead
-    | IImageryLayerProjectRead,
+    response_model=IFeatureStandardProjectRead
+    | IFeatureIndicatorProjectRead
+    | IFeatureScenarioProjectRead
+    | ITableProjectRead
+    | IExternalVectorTileProjectRead
+    | IExternalImageryProjectRead,
     response_model_exclude_none=True,
     status_code=200,
 )
@@ -375,15 +377,14 @@ async def get_layer_from_project(
     return layer_project[0]
 
 
-
 @router.put(
     "/{id}/layer",
-    response_model=IFeatureLayerStandardProjectRead
-    | IFeatureLayerIndicatorProjectRead
-    | IFeatureLayerScenarioProjectRead
-    | ITableLayerProjectRead
-    | ITileLayerProjectRead
-    | IImageryLayerProjectRead,
+    response_model=IFeatureStandardProjectRead
+    | IFeatureIndicatorProjectRead
+    | IFeatureScenarioProjectRead
+    | ITableProjectRead
+    | IExternalVectorTileProjectRead
+    | IExternalImageryProjectRead,
     response_model_exclude_none=True,
     status_code=200,
 )
@@ -407,7 +408,7 @@ async def update_layer_in_project(
 ):
     """Update layer in a project by its ID."""
 
-    #NOTE: Avoid getting layer_id from layer_in as the authorization is running against the query params.
+    # NOTE: Avoid getting layer_id from layer_in as the authorization is running against the query params.
 
     # Update layer in project
     layer_project = await crud_layer_project.update(
@@ -448,7 +449,8 @@ async def delete_layer_from_project(
     )
     if layer_project == []:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Layer project relation not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Layer project relation not found",
         )
 
     # Delete layer from project

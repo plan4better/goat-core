@@ -40,6 +40,7 @@ from shapely.geometry import GeometryCollection, MultiPolygon, Point, Polygon, b
 from shapely.ops import transform
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import SQLModel
 from starlette import status
 from starlette.responses import Response
 
@@ -47,7 +48,7 @@ from starlette.responses import Response
 from src.core.config import settings
 from src.resources.enums import MaxUploadFileSize, MimeTypes
 from src.schemas.layer import LayerType
-from sqlmodel import SQLModel
+
 
 def optional(*fields):
     def dec(_cls):
@@ -70,10 +71,7 @@ async def table_exists(db: AsyncSession, schema_name: str, table_name: str) -> b
         .where(text("table_name = :table_name AND table_schema = :schema_name"))
         .select_from(text("information_schema.tables"))
     )
-    params = {
-        "table_name": table_name,
-        "schema_name": schema_name
-    }
+    params = {"table_name": table_name, "schema_name": schema_name}
     table_exists = await db.execute(sql_check_table, params)
     return table_exists.scalar() > 0
 
@@ -208,7 +206,9 @@ def decode_r5_grid(grid_data_buffer: bytes) -> dict:
     if header_type != TIMES_GRID_TYPE:
         raise ValueError("Invalid grid type")
     ## - get header data
-    header_raw = np.frombuffer(grid_data_buffer, count=HEADER_ENTRIES, offset=8, dtype=np.int32)
+    header_raw = np.frombuffer(
+        grid_data_buffer, count=HEADER_ENTRIES, offset=8, dtype=np.int32
+    )
     version = header_raw[0]
     if version != CURRENT_VERSION:
         raise ValueError("Invalid grid version")
@@ -238,7 +238,8 @@ def decode_r5_grid(grid_data_buffer: bytes) -> dict:
     # - decode metadata
     raw_metadata = np.frombuffer(
         grid_data_buffer,
-        offset=(HEADER_LENGTH + header["width"] * header["height"] * header["depth"]) * 4,
+        offset=(HEADER_LENGTH + header["width"] * header["height"] * header["depth"])
+        * 4,
         dtype=np.int8,
     )
     metadata = json.loads(raw_metadata.tostring())
@@ -246,7 +247,9 @@ def decode_r5_grid(grid_data_buffer: bytes) -> dict:
     return header | metadata | {"data": data, "errors": [], "warnings": []}
 
 
-def filter_r5_grid(grid: dict, percentile: int = None, travel_time_limit: int = None) -> dict:
+def filter_r5_grid(
+    grid: dict, percentile: int = None, travel_time_limit: int = None
+) -> dict:
     """
     This function strips the grid to only include one percentile
     and removes empty rows/columns around the bounding box of the largest isochrone.
@@ -423,7 +426,9 @@ def buffer(starting_points_gdf, buffer_distance, increment):
         else:
             incremental_shapes.append(full_shapes[i].difference(full_shapes[i - 1]))
 
-    incremental_gdf = geopandas.GeoDataFrame({"geometry": incremental_shapes, "steps": steps})
+    incremental_gdf = geopandas.GeoDataFrame(
+        {"geometry": incremental_shapes, "steps": steps}
+    )
     incremental_gdf.set_crs(epsg=3857, inplace=True)
     incremental_gdf = incremental_gdf.to_crs(epsg=4326)
     results["incremental"] = incremental_gdf
@@ -431,7 +436,9 @@ def buffer(starting_points_gdf, buffer_distance, increment):
     return results
 
 
-def coordinate_to_pixel(input, zoom, return_dict=True, round_int=False, web_mercator=False):
+def coordinate_to_pixel(
+    input, zoom, return_dict=True, round_int=False, web_mercator=False
+):
     """
     Convert coordinate to pixel coordinate
     """
@@ -456,9 +463,9 @@ def longitude_to_pixel(longitude, zoom):
 
 def latitude_to_pixel(latitude, zoom):
     lat_rad = (latitude * math.pi) / 180
-    return ((1 - math.log(math.tan(lat_rad) + 1 / math.cos(lat_rad)) / math.pi) / 2) * z_scale(
-        zoom
-    )
+    return (
+        (1 - math.log(math.tan(lat_rad) + 1 / math.cos(lat_rad)) / math.pi) / 2
+    ) * z_scale(zoom)
 
 
 @njit(cache=True)
@@ -488,14 +495,18 @@ def geometry_to_pixel(geometry, zoom):
     pixel_coordinates = []
     if geometry["type"] == "Point":
         pixel_coordinates.append(
-            coordinate_to_pixel(geometry["coordinates"], zoom, return_dict=False, round_int=True)
+            coordinate_to_pixel(
+                geometry["coordinates"], zoom, return_dict=False, round_int=True
+            )
         )
     if geometry["type"] == "LineString":
         for coordinate in geometry["coordinates"]:
             pixel_coordinates.append(
                 np.unique(
                     np.array(
-                        coordinate_to_pixel(coordinate, zoom, return_dict=False, round_int=True)
+                        coordinate_to_pixel(
+                            coordinate, zoom, return_dict=False, round_int=True
+                        )
                     ),
                     axis=0,
                 )
@@ -505,7 +516,9 @@ def geometry_to_pixel(geometry, zoom):
             ring_pixels = np.unique(
                 np.array(
                     [
-                        coordinate_to_pixel(coord, zoom, return_dict=False, round_int=True)
+                        coordinate_to_pixel(
+                            coord, zoom, return_dict=False, round_int=True
+                        )
                         for coord in ring
                     ]
                 ),
@@ -692,7 +705,9 @@ def get_zip_directories(zip_file_dir):
     List directories of zip file
     """
     with zipfile.ZipFile(zip_file_dir) as zip_file:
-        return [directory for directory in zip_file.namelist() if directory.endswith("/")]
+        return [
+            directory for directory in zip_file.namelist() if directory.endswith("/")
+        ]
 
 
 def get_geopandas_uri(file_path):
@@ -706,7 +721,8 @@ def get_geopandas_uri(file_path):
             file_uri = file_uri + "!" + directory
         elif len(directories) > 1:
             raise HTTPException(
-                status_code=400, detail="Several directories inside zip file is not supported."
+                status_code=400,
+                detail="Several directories inside zip file is not supported.",
             )
         else:
             pass
@@ -759,7 +775,9 @@ def _cover_polygon_h3(polygon: Polygon, resolution: int, intersect_with_centroid
             result_set.update(h3.h3_line(vertex_hexes[i], vertex_hexes[i + 1]))
     # Hexes for internal area
     result_set.update(
-        list(h3.polyfill(geometry.mapping(polygon), resolution, geo_json_conformant=True))
+        list(
+            h3.polyfill(geometry.mapping(polygon), resolution, geo_json_conformant=True)
+        )
     )
     return result_set
 
@@ -789,7 +807,9 @@ def create_h3_grid(
         h3_indexes.extend(h3_index)
     elif geometry.geom_type == "MultiPolygon":
         for polygon in geometry.geoms:
-            h3_index = _cover_polygon_h3(polygon, h3_resolution, intersect_with_centroid)
+            h3_index = _cover_polygon_h3(
+                polygon, h3_resolution, intersect_with_centroid
+            )
             h3_indexes.extend(h3_index)
     h3_indexes = list(set(h3_indexes))
 
@@ -941,10 +961,17 @@ def downsample_array(arr, new_shape, method="sum"):
         raise ValueError("new_shape should be a tuple of two integers.")
 
     if arr.shape[0] % new_shape[0] != 0 or arr.shape[1] % new_shape[1] != 0:
-        raise ValueError("The shape of the input array should be divisible by the new_shape.")
+        raise ValueError(
+            "The shape of the input array should be divisible by the new_shape."
+        )
 
     reshaped_arr = arr.reshape(
-        (new_shape[0], arr.shape[0] // new_shape[0], new_shape[1], arr.shape[1] // new_shape[1])
+        (
+            new_shape[0],
+            arr.shape[0] // new_shape[0],
+            new_shape[1],
+            arr.shape[1] // new_shape[1],
+        )
     )
 
     if method == "mean":
@@ -960,7 +987,9 @@ def hexlify_file(file_path: str):
         return binascii.hexlify(f.read()).decode("utf-8")
 
 
-def zip_converted_files(temp_file_base_path: str, destination_name: str, file_extension: str):
+def zip_converted_files(
+    temp_file_base_path: str, destination_name: str, file_extension: str
+):
     file_extensions = [file_extension, "txt"]
     if file_extension == "shp":
         file_extensions.extend(["shx", "dbf", "prj"])
@@ -1119,7 +1148,9 @@ def read_results(results, return_type=None):
         return Response(
             data,
             media_type=MimeTypes.geobuf.value,
-            headers={"Content-Disposition": f"attachment; filename={results['data_source']}.pbf"},
+            headers={
+                "Content-Disposition": f"attachment; filename={results['data_source']}.pbf"
+            },
         )
 
     else:
@@ -1128,7 +1159,9 @@ def read_results(results, return_type=None):
             destination_layer_name=results["data_source"],
             output_format=return_type,
         )
-        file_name = f"{results['data_source']}-{return_type}.{converted_data['output_suffix']}"
+        file_name = (
+            f"{results['data_source']}-{return_type}.{converted_data['output_suffix']}"
+        )
         # TODO: define the media type based on the output_format
         return Response(
             converted_data["data"],
@@ -1142,7 +1175,7 @@ def get_user_table(layer: Union[dict, SQLModel, BaseModel]):
 
     # Check if layer is of type dict or SQLModel/BaseModel
     if isinstance(layer, dict):
-        if layer["type"] == LayerType.feature_layer.value:
+        if layer["type"] == LayerType.feature.value:
             feature_layer_geometry_type = layer["feature_layer_geometry_type"]
         elif layer["type"] == LayerType.table.value:
             feature_layer_geometry_type = "no_geometry"
@@ -1150,12 +1183,14 @@ def get_user_table(layer: Union[dict, SQLModel, BaseModel]):
             raise ValueError(f"The passed layer type {layer['type']} is not supported.")
         user_id = layer["user_id"]
     elif isinstance(layer, (SQLModel, BaseModel)):
-        if layer.type == LayerType.feature_layer.value:
+        if layer.type == LayerType.feature.value:
             feature_layer_geometry_type = layer.feature_layer_geometry_type
         elif layer.type == LayerType.table.value:
-            feature_layer_geometry_type = 'no_geometry'
+            feature_layer_geometry_type = "no_geometry"
         else:
-            raise ValueError(f"The passed layer type {layer.type} is not supported as internal layer.")
+            raise ValueError(
+                f"The passed layer type {layer.type} is not supported as internal layer."
+            )
         user_id = layer.user_id
     else:
         raise ValueError(f"The passed layer type {type(layer)} is not supported.")
@@ -1195,17 +1230,21 @@ async def async_delete_dir(path: str):
     except FileNotFoundError:
         pass
 
+
 async def async_scandir(directory):
     for entry in os.scandir(directory):
         yield entry
 
+
 def execute_cmd(cmd):
     subprocess.run(cmd, shell=True, check=True)
+
 
 async def async_run_command(cmd):
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(None, execute_cmd, cmd)
     return result
+
 
 async def check_file_size(file: UploadFile, max_size: int) -> bool:
     """
@@ -1223,11 +1262,13 @@ async def check_file_size(file: UploadFile, max_size: int) -> bool:
     await file.seek(0)  # Reset file position for further processing if needed
     return True
 
+
 def build_where(query: dict, attribute_mapping: dict):
     ast = cql2_json_parser(query)
     attribute_mapping = {value: key for key, value in attribute_mapping.items()}
     where = to_sql_where(ast, attribute_mapping)
     return where
+
 
 def search_value(d, target):
     for key, value in d.items():

@@ -1,18 +1,20 @@
 from enum import Enum
 from uuid import UUID
+
 from pydantic import BaseModel, Field, validator
-from src.db.models.layer import ContentBaseAttributes
+
 from src.db.models._base_class import DateTimeBase
-from src.utils import optional
+from src.db.models.layer import ContentBaseAttributes
 from src.schemas.layer import (
-    IFeatureLayerStandardRead,
-    IFeatureLayerIndicatorRead,
-    IFeatureLayerScenarioRead,
-    ITableLayerRead,
-    ITileLayerRead,
-    IImageryLayerRead,
     CQLQuery,
+    IExternalImageryRead,
+    IExternalVectorTileRead,
+    IFeatureIndicatorRead,
+    IFeatureScenarioRead,
+    IFeatureStandardRead,
+    ITableRead,
 )
+from src.utils import optional
 
 
 ################################################################################
@@ -76,7 +78,7 @@ class IProjectBaseUpdate(ContentBaseAttributes):
 # Define layers within project
 
 
-class IFeatureLayerBaseProject(CQLQuery):
+class IFeatureBaseProject(CQLQuery):
     name: str = Field(..., description="Layer name")
     group: str | None = Field(None, description="Layer group name")
     style: dict = Field(
@@ -85,88 +87,95 @@ class IFeatureLayerBaseProject(CQLQuery):
     )
 
 
-class IFeatureLayerBaseProjectRead(IFeatureLayerBaseProject):
+class IFeatureBaseProjectRead(IFeatureBaseProject):
     total_count: int = Field(..., description="Total count of features in the layer")
-    filtered_count: int | None = Field(None, description="Filtered count of features in the layer")
+    filtered_count: int | None = Field(
+        None, description="Filtered count of features in the layer"
+    )
 
 
-class IFeatureLayerStandardProjectRead(IFeatureLayerStandardRead, IFeatureLayerBaseProjectRead):
+class IFeatureStandardProjectRead(IFeatureStandardRead, IFeatureBaseProjectRead):
     pass
 
 
-class IFeatureLayerIndicatorProjectRead(IFeatureLayerIndicatorRead, IFeatureLayerBaseProjectRead):
+class IFeatureIndicatorProjectRead(IFeatureIndicatorRead, IFeatureBaseProjectRead):
     pass
 
 
-class IFeatureLayerScenarioProjectRead(IFeatureLayerScenarioRead, IFeatureLayerBaseProjectRead):
-    pass
-
-
-@optional
-class IFeatureLayerStandardProjectUpdate(IFeatureLayerBaseProject):
-    pass
-
-
-@optional
-class IFeatureLayerIndicatorProjectUpdate(IFeatureLayerBaseProject):
+class IFeatureScenarioProjectRead(IFeatureScenarioRead, IFeatureBaseProjectRead):
     pass
 
 
 @optional
-class IFeatureLayerScenarioProjectUpdate(IFeatureLayerBaseProject):
+class IFeatureStandardProjectUpdate(IFeatureBaseProject):
     pass
 
 
-class ITableLayerProjectRead(ITableLayerRead, CQLQuery):
+@optional
+class IFeatureIndicatorProjectUpdate(IFeatureBaseProject):
+    pass
+
+
+@optional
+class IFeatureScenarioProjectUpdate(IFeatureBaseProject):
+    pass
+
+
+class ITableProjectRead(ITableRead, CQLQuery):
     group: str = Field(None, description="Layer group name")
     total_count: int = Field(..., description="Total count of features in the layer")
-    filtered_count: int | None = Field(None, description="Filtered count of features in the layer")
+    filtered_count: int | None = Field(
+        None, description="Filtered count of features in the layer"
+    )
 
 
-class ITableLayerProjectUpdate(CQLQuery):
+class ITableProjectUpdate(CQLQuery):
     name: str | None = Field(None, description="Layer name")
     group: str | None = Field(None, description="Layer group name")
 
 
-class ITileLayerProjectRead(ITileLayerRead):
+class IExternalVectorTileProjectRead(IExternalVectorTileRead):
     group: str = Field(None, description="Layer group name")
 
 
-class ITileLayerProjectUpdate(BaseModel):
+class IExternalVectorTileProjectUpdate(BaseModel):
     name: str | None = Field(None, description="Layer name")
     group: str | None = Field(None, description="Layer group name")
 
 
-class IImageryLayerProjectRead(IImageryLayerRead):
+class IExternalImageryProjectRead(IExternalImageryRead):
     group: str = Field(None, description="Layer group name")
 
 
-class IImageryLayerProjectUpdate(BaseModel):
+class IExternalImageryProjectUpdate(BaseModel):
     name: str | None = Field(None, description="Layer name")
     group: str | None = Field(None, description="Layer group name")
 
 
 layer_type_mapping_read = {
-    "feature_layer_standard": IFeatureLayerStandardProjectRead,
-    "feature_layer_indicator": IFeatureLayerIndicatorProjectRead,
-    "feature_layer_scenario": IFeatureLayerScenarioProjectRead,
-    "table_layer": ITableLayerProjectRead,
-    "tile_layer": ITileLayerProjectRead,
-    "imagery_layer": IImageryLayerProjectRead,
+    "feature_standard": IFeatureStandardProjectRead,
+    "feature_indicator": IFeatureIndicatorProjectRead,
+    "feature_scenario": IFeatureScenarioProjectRead,
+    "table": ITableProjectRead,
+    "external_vector_tile": IExternalVectorTileProjectRead,
+    "external_imagery": IExternalImageryProjectRead,
 }
 
 layer_type_mapping_update = {
-    "feature_layer_standard": IFeatureLayerStandardProjectUpdate,
-    "feature_layer_indicator": IFeatureLayerIndicatorProjectUpdate,
-    "feature_layer_scenario": IFeatureLayerScenarioProjectUpdate,
-    "table_layer": ITableLayerProjectUpdate,
-    "tile_layer": ITileLayerProjectUpdate,
-    "imagery_layer": IImageryLayerProjectUpdate,
+    "feature_standard": IFeatureStandardProjectUpdate,
+    "feature_indicator": IFeatureIndicatorProjectUpdate,
+    "feature_scenario": IFeatureScenarioProjectUpdate,
+    "table": ITableProjectUpdate,
+    "external_vector_tile": IExternalVectorTileProjectUpdate,
+    "external_imagery": IExternalImageryProjectUpdate,
 }
 
 request_examples = {
     "get": {
-        "ids": ["39e16c27-2b03-498e-8ccc-68e798c64b8d", "e7dcaae4-1750-49b7-89a5-9510bf2761ad"],
+        "ids": [
+            "39e16c27-2b03-498e-8ccc-68e798c64b8d",
+            "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
+        ],
     },
     "create": {
         "folder_id": "39e16c27-2b03-498e-8ccc-68e798c64b8d",
@@ -185,7 +194,7 @@ request_examples = {
     },
     "initial_view_state": initial_view_state_example,
     "update_layer": {
-        "feature_layer_standard": {
+        "feature_standard": {
             "summary": "Feature Layer Standard",
             "value": {
                 "name": "Feature Layer Standard",
@@ -200,7 +209,7 @@ request_examples = {
                 },
             },
         },
-        "feature_layer_indicator": {
+        "feature_indicator": {
             "summary": "Feature Layer Indicator",
             "value": {
                 "name": "Feature Layer Indicator",
@@ -214,7 +223,7 @@ request_examples = {
                 },
             },
         },
-        "feature_layer_scenario": {
+        "feature_scenario": {
             "summary": "Feature Layer Scenario",
             "value": {
                 "name": "Feature Layer Scenario",
@@ -228,21 +237,21 @@ request_examples = {
                 },
             },
         },
-        "table_layer": {
+        "table": {
             "summary": "Table Layer",
             "value": {
                 "name": "Table Layer",
                 "group": "Group 1",
             },
         },
-        "tile_layer": {
-            "summary": "Tile Layer",
+        "external_vector_tile": {
+            "summary": "VectorVectorTile Layer",
             "value": {
-                "name": "Tile Layer",
+                "name": "VectorVectorTile Layer",
                 "group": "Group 1",
             },
         },
-        "imagery_layer": {
+        "external_imagery": {
             "summary": "Imagery Layer",
             "value": {
                 "name": "Imagery Layer",

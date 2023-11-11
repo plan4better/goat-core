@@ -42,9 +42,9 @@ from src.endpoints.legacy import deps
 from src.resources import tms as custom_tms
 from src.resources.enums import MimeTypes
 from src.schemas.layer import (
+    ExternalVectorTile,
     TileMatrixSetList,
     VectorTileFunction,
-    VectorTileLayer,
     VectorTileTable,
 )
 from src.schemas.layer import registry as FunctionRegistry
@@ -94,7 +94,7 @@ def TileMatrixSetParams(
 def LayerParams(
     request: Request,
     layer: str = Path(..., description="Layer Name"),
-) -> VectorTileLayer:
+) -> ExternalVectorTile:
     """Return Layer Object."""
 
     if layer == "building":
@@ -122,7 +122,7 @@ class VectorTilerFactory:
     tms_dependency: Callable[..., TileMatrixSet] = TileMatrixSetParams
 
     # Table/Function dependency
-    layer_dependency: Callable[..., VectorTileLayer] = LayerParams
+    layer_dependency: Callable[..., ExternalVectorTile] = LayerParams
 
     with_tables_metadata: bool = False
     with_functions_metadata: bool = False
@@ -162,7 +162,9 @@ class VectorTilerFactory:
         """Register /tiles endpoints."""
 
         @self.router.get(r"/{layer}/{z}/{x}/{y}.pbf", **TILE_RESPONSE_PARAMS)
-        @self.router.get(r"/{TileMatrixSetId}/{layer}/{z}/{x}/{y}.pbf", **TILE_RESPONSE_PARAMS)
+        @self.router.get(
+            r"/{TileMatrixSetId}/{layer}/{z}/{x}/{y}.pbf", **TILE_RESPONSE_PARAMS
+        )
         async def tile(
             *,
             db: AsyncSession = Depends(deps.get_db),
@@ -176,8 +178,8 @@ class VectorTilerFactory:
             qs_key_to_remove = ["tilematrixsetid"]
             kwargs = {
                 key: value
-                    for (key, value) in request.query_params._list
-                    if key.lower() not in qs_key_to_remove
+                for (key, value) in request.query_params._list
+                if key.lower() not in qs_key_to_remove
             }
 
             content = await crud_layer.tile_from_table(db, tile, tms, layer, **kwargs)
@@ -199,8 +201,12 @@ class VectorTilerFactory:
             request: Request,
             layer=Depends(self.layer_dependency),
             tms: TileMatrixSet = Depends(self.tms_dependency),
-            minzoom: Optional[int] = Query(None, description="Overwrite default minzoom."),
-            maxzoom: Optional[int] = Query(None, description="Overwrite default maxzoom."),
+            minzoom: Optional[int] = Query(
+                None, description="Overwrite default minzoom."
+            ),
+            maxzoom: Optional[int] = Query(
+                None, description="Overwrite default maxzoom."
+            ),
             current_user: models.User = Depends(deps.get_current_active_user),
         ):
             """Return TileJSON document."""
@@ -215,8 +221,8 @@ class VectorTilerFactory:
             qs_key_to_remove = ["tilematrixsetid", "minzoom", "maxzoom"]
             query_params = {
                 key: value
-                    for (key, value) in request.query_params._list
-                    if key.lower() not in qs_key_to_remove
+                for (key, value) in request.query_params._list
+                if key.lower() not in qs_key_to_remove
             }
 
             if query_params:
@@ -240,7 +246,8 @@ class VectorTilerFactory:
             response_model_exclude_none=True,
         )
         async def TileMatrixSet_list(
-            request: Request, current_user: models.User = Depends(deps.get_current_active_user)
+            request: Request,
+            current_user: models.User = Depends(deps.get_current_active_user),
         ):
             """
             Return list of supported TileMatrixSets.
@@ -289,13 +296,16 @@ class VectorTilerFactory:
             response_model_exclude_none=True,
         )
         async def tables_index(
-            request: Request, current_user: models.User = Depends(deps.get_current_active_user)
+            request: Request,
+            current_user: models.User = Depends(deps.get_current_active_user),
         ):
             """Index of tables."""
 
             def _get_tiles_url(id) -> str:
                 try:
-                    return self.url_for(request, "tile", layer=id, z="{z}", x="{x}", y="{y}")
+                    return self.url_for(
+                        request, "tile", layer=id, z="{z}", x="{x}", y="{y}"
+                    )
                 except NoMatchFound:
                     return None
 
@@ -319,7 +329,9 @@ class VectorTilerFactory:
 
             def _get_tiles_url(id) -> str:
                 try:
-                    return self.url_for(request, "tile", layer=id, z="{z}", x="{x}", y="{y}")
+                    return self.url_for(
+                        request, "tile", layer=id, z="{z}", x="{x}", y="{y}"
+                    )
                 except NoMatchFound:
                     return None
 
@@ -340,12 +352,16 @@ class VectorTilerFactory:
 
             def _get_tiles_url(id) -> str:
                 try:
-                    return self.url_for(request, "tile", layer=id, z="{z}", x="{x}", y="{y}")
+                    return self.url_for(
+                        request, "tile", layer=id, z="{z}", x="{x}", y="{y}"
+                    )
                 except NoMatchFound:
                     return None
 
             return [
-                VectorTileFunction(**func.dict(exclude_none=True), tileurl=_get_tiles_url(id))
+                VectorTileFunction(
+                    **func.dict(exclude_none=True), tileurl=_get_tiles_url(id)
+                )
                 for id, func in FunctionRegistry.funcs.items()
             ]
 
@@ -365,7 +381,9 @@ class VectorTilerFactory:
 
             def _get_tiles_url(id) -> str:
                 try:
-                    return self.url_for(request, "tile", layer=id, z="{z}", x="{x}", y="{y}")
+                    return self.url_for(
+                        request, "tile", layer=id, z="{z}", x="{x}", y="{y}"
+                    )
                 except NoMatchFound:
                     return None
 
@@ -380,7 +398,8 @@ class VectorTilerFactory:
             response_class=HTMLResponse,
         )
         async def list_layers(
-            request: Request, current_user: models.User = Depends(deps.get_current_active_user)
+            request: Request,
+            current_user: models.User = Depends(deps.get_current_active_user),
         ):
             """Display layer list."""
             return templates.TemplateResponse(
@@ -402,6 +421,10 @@ class VectorTilerFactory:
             tile_url = self.url_for(request, "tilejson", layer=layer.id)
             return templates.TemplateResponse(
                 name="viewer.html",
-                context={"endpoint": tile_url, "request": request, "bounds": layer.bounds},
+                context={
+                    "endpoint": tile_url,
+                    "request": request,
+                    "bounds": layer.bounds,
+                },
                 media_type="text/html",
             )

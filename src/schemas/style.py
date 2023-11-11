@@ -1,6 +1,6 @@
 # TODO: Fill with default styles
 base_styles = {
-    "feature_layer": {
+    "feature": {
         "standard": {
             "point": {
                 "type": "circle",

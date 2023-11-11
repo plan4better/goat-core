@@ -2,7 +2,12 @@ from enum import Enum
 from typing import TYPE_CHECKING, List, Optional, Union
 from uuid import UUID
 
-from geoalchemy2 import Geometry
+from geoalchemy2 import Geometry, WKBElement
+from geoalchemy2.shape import to_shape
+from pydantic import validator
+from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
     ARRAY,
     Column,
@@ -12,25 +17,20 @@ from sqlmodel import (
     Relationship,
     SQLModel,
     Text,
-    UniqueConstraint
+    UniqueConstraint,
 )
-from geoalchemy2 import WKBElement
-from geoalchemy2.shape import to_shape
-from pydantic import validator
-from sqlalchemy import text
-from sqlalchemy.dialects.postgresql import UUID as UUID_PG, JSONB
-from src.db.models._base_class import DateTimeBase, ContentBaseAttributes
+
+from src.db.models._base_class import ContentBaseAttributes, DateTimeBase
 from src.db.models.scenario_feature import ScenarioType
 
 if TYPE_CHECKING:
+    from ._link_model import LayerProjectLink
     from .data_store import DataStore
     from .scenario import Scenario
     from .scenario_feature import ScenarioFeature
-    from ._link_model import LayerProjectLink
-    from .job import Job
 
 
-class FeatureLayerType(str, Enum):
+class FeatureType(str, Enum):
     """Feature layer types."""
 
     standard = "standard"
@@ -39,7 +39,7 @@ class FeatureLayerType(str, Enum):
     street_network = "street_network"
 
 
-class FeatureLayerExportType(str, Enum):
+class FeatureExportType(str, Enum):
     """Feature layer data types."""
 
     geojson = "geojson"
@@ -51,13 +51,13 @@ class FeatureLayerExportType(str, Enum):
     kml = "kml"
 
 
-class FeatureLayerServeType(str, Enum):
+class FeatureServeType(str, Enum):
     mvt = "mvt"
     wfs = "wfs"
     binary = "binary"
 
 
-class ImageryLayerDataType(str, Enum):
+class ExternalImageryDataType(str, Enum):
     """Imagery layer data types."""
 
     wms = "wms"
@@ -78,23 +78,25 @@ class IndicatorType(str, Enum):
 class LayerType(str, Enum):
     """Layer types that are supported."""
 
-    feature_layer = "feature_layer"
-    imagery_layer = "imagery_layer"
-    tile_layer = "tile_layer"
+    feature = "feature"
+    external_imagery = "external_imagery"
+    external_vector_tile = "external_vector_tile"
     table = "table"
 
 
-class TileLayerDataType(str, Enum):
-    """Tile layer data types."""
+class ExternalVectorTileDataType(str, Enum):
+    """VectorTile layer data types."""
 
     mvt = "mvt"
 
-class FeatureLayerGeometryType(str, Enum):
+
+class FeatureGeometryType(str, Enum):
     """Feature layer geometry types."""
 
     point = "point"
     line = "line"
     polygon = "polygon"
+
 
 class GeospatialAttributes(SQLModel):
     """Some general geospatial attributes."""
@@ -113,6 +115,7 @@ class GeospatialAttributes(SQLModel):
             return to_shape(v).wkt
         else:
             return v
+
 
 class LayerBase(ContentBaseAttributes):
     """Base model for layers."""
@@ -165,7 +168,9 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         ),
         description="Layer folder ID",
     )
-    type: LayerType = Field(sa_column=Column(Text, nullable=False), description="Layer type")
+    type: LayerType = Field(
+        sa_column=Column(Text, nullable=False), description="Layer type"
+    )
     data_store_id: UUID | None = Field(
         sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.data_store.id")),
         description="Data store ID of the layer",
@@ -182,9 +187,12 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         description="Style of the layer",
     )
     url: str | None = Field(
-        sa_column=Column(Text, nullable=True), description="Layer URL for tile and imagery layers"
+        sa_column=Column(Text, nullable=True),
+        description="Layer URL for tile and imagery layers",
     )
-    data_type: Optional[Union["ImageryLayerDataType", "TileLayerDataType"]] = Field(
+    data_type: Optional[
+        Union["ExternalImageryDataType", "ExternalVectorTileDataType"]
+    ] = Field(
         sa_column=Column(Text, nullable=True),
         description="Data type for imagery layers and tile layers",
     )
@@ -197,21 +205,25 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         description="If it is an indicator layer, the indicator type",
     )
     scenario_id: UUID | None = Field(
-        sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.scenario.id"), nullable=True),
+        sa_column=Column(
+            UUID_PG(as_uuid=True), ForeignKey("customer.scenario.id"), nullable=True
+        ),
         description="Scenario ID if there is a scenario associated with this layer",
     )
     scenario_type: Optional["ScenarioType"] = Field(
         sa_column=Column(Text, nullable=True),
         description="Scenario type if the layer is a scenario layer",
     )
-    feature_layer_type: Optional["FeatureLayerType"] = Field(
+    feature_layer_type: Optional["FeatureType"] = Field(
         sa_column=Column(Text, nullable=True), description="Feature layer type"
     )
-    feature_layer_geometry_type: FeatureLayerGeometryType | None = Field(
-        sa_column=Column(Text, nullable=True), description="Geometry type for feature layers"
+    feature_layer_geometry_type: FeatureGeometryType | None = Field(
+        sa_column=Column(Text, nullable=True),
+        description="Geometry type for feature layers",
     )
     size: int | None = Field(
-        sa_column=Column(Integer, nullable=True), description="Size of the layer in bytes"
+        sa_column=Column(Integer, nullable=True),
+        description="Size of the layer in bytes",
     )
     attribute_mapping: dict | None = Field(
         sa_column=Column(JSONB, nullable=True),
@@ -221,7 +233,9 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     # Relationships
 
     scenario: "Scenario" = Relationship(back_populates="layers")
-    scenario_features: List["ScenarioFeature"] = Relationship(back_populates="original_layer")
+    scenario_features: List["ScenarioFeature"] = Relationship(
+        back_populates="original_layer"
+    )
     data_store: "DataStore" = Relationship(back_populates="layers")
     layer_projects: List["LayerProjectLink"] = Relationship(back_populates="layer")
 
@@ -231,6 +245,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
             return to_shape(v).wkt
         else:
             return v
+
 
 # Constraints
 UniqueConstraint(Layer.__table__.c.folder_id, Layer.__table__.c.name)
