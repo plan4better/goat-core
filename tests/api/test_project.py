@@ -99,10 +99,26 @@ async def test_create_layer_project(client: AsyncClient, fixture_create_layer_pr
 
 
 @pytest.mark.asyncio
+async def test_duplicate_layer_project(client: AsyncClient, fixture_create_layer_project):
+    layer_id = fixture_create_layer_project["layer_project"][0]["layer_id"]
+
+    # Duplicate layer
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{fixture_create_layer_project['project_id']}/layer?layer_ids={layer_id}",
+    )
+    assert response.status_code == 200
+    res = response.json()
+
+    # Check if layer is duplicated
+    for layer in res:
+        if layer["id"] == layer_id:
+            assert layer["name"] == "Copy from " + fixture_create_layer_project["layer_project"][0]["name"]
+
+@pytest.mark.asyncio
 async def test_get_layer_project(client: AsyncClient, fixture_create_layer_project):
-    layer_id = fixture_create_layer_project["layer_project"][0]["id"]
+    layer_project_id = fixture_create_layer_project["layer_project"][0]["id"]
     response = await client.get(
-        f"{settings.API_V2_STR}/project/{fixture_create_layer_project['project_id']}/layer/{layer_id}",
+        f"{settings.API_V2_STR}/project/{fixture_create_layer_project['project_id']}/layer/{layer_project_id}",
     )
     assert response.status_code == 200
 
@@ -121,7 +137,7 @@ async def test_update_layer_project(client: AsyncClient, fixture_create_layer_pr
     project_id = fixture_create_layer_project["project_id"]
     layer_id = fixture_create_layer_project["layer_project"][0]["id"]
     response = await client.put(
-        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_id={layer_id}",
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_project_id={layer_id}",
         json={
             "name": "test2",
             "query": {"op": "=", "args": [{"property": "category"}, "bus_stop"]},
@@ -140,9 +156,9 @@ async def test_update_layer_project_bad_format_query(
     client: AsyncClient, fixture_create_layer_project
 ):
     project_id = fixture_create_layer_project["project_id"]
-    layer_id = fixture_create_layer_project["layer_project"][0]["id"]
+    layer_project_id = fixture_create_layer_project["layer_project"][0]["id"]
     response = await client.put(
-        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_id={layer_id}",
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_project_id={layer_project_id}",
         json={
             "name": "test2",
             "query": {"op": "=", "args": "wrong"},
@@ -154,11 +170,11 @@ async def test_update_layer_project_bad_format_query(
 @pytest.mark.asyncio
 async def test_delete_layer_project(client: AsyncClient, fixture_create_layer_project):
     project_id = fixture_create_layer_project["project_id"]
-    layer_id = fixture_create_layer_project["layer_project"][0]["id"]
+    layer_project_id = fixture_create_layer_project["layer_project"][0]["id"]
 
     # Delete layer
     response = await client.delete(
-        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_id={layer_id}",
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_project_id={layer_project_id}",
     )
     assert response.status_code == 204
 

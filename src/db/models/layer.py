@@ -182,9 +182,9 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         ),
         description="Geographical Extent of the layer",
     )
-    style: dict | None = Field(
+    parameter: dict | None = Field(
         sa_column=Column(JSONB, nullable=True),
-        description="Style of the layer",
+        description="Parameter of the layer",
     )
     url: str | None = Field(
         sa_column=Column(Text, nullable=True),
@@ -195,10 +195,6 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     ] = Field(
         sa_column=Column(Text, nullable=True),
         description="Data type for imagery layers and tile layers",
-    )
-    legend_urls: List[str] | None = Field(
-        sa_column=Column(ARRAY(Text()), nullable=True),
-        description="Layer legend URLs for imagery layers.",
     )
     indicator_type: Optional[IndicatorType] = Field(
         sa_column=Column(Text, nullable=True),

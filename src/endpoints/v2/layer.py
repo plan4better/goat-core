@@ -475,12 +475,17 @@ async def get_unique_values(
 #         description="The column name to get the statistics from. It needs to be a number column.",
 #         example="name",
 #     ),
-#     query: str = Query(
-#         "",
+#     breaks: int = Query(
+#         ...,
+#         description="Number of class breaks to create",
+#         example=5,
+#     ),
+#     query: str | None = Query(
+#         None,
 #         description="CQL2-Filter in JSON format",
 #         example={"op": "=", "args": [{"property": "category"}, "bus_stop"]},
 #     ),
-#     stripe_zeros: bool = Query(
+#     stripe_zeros: bool | None = Query(
 #         True,
 #         description="Stripe zeros from the column before performing the operation",
 #         example=True,
@@ -488,11 +493,13 @@ async def get_unique_values(
 # ):
 #     """Get statistics of a column. Based on the saved layer filter in the project."""
 
+    
 #     statistics = await crud_layer.get_class_breaks(
 #         async_session=async_session,
 #         id=id,
 #         operation=operation,
 #         column_name=column_name,
+#         breaks=breaks,
 #         query=query,
 #         stripe_zeros=stripe_zeros,
 #     )

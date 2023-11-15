@@ -1,7 +1,5 @@
 from uuid import UUID
-
 from pydantic import Field
-
 from src.db.models.system_setting import SystemSetting, SystemSettingBase
 from src.utils import optional
 

@@ -37,9 +37,8 @@ class LayerProjectLink(DateTimeBase, table=True):
     name: str = Field(
         sa_column=Column(Text, nullable=False), description="Layer name within the project"
     )
-    style: dict | None = Field(
-        sa_column=Column(JSONB, nullable=True),
-        description="Style of the layer",
+    parameter: dict | None = Field(
+        sa_column=Column(JSONB, nullable=True), description="Layer parameter"
     )
     query: dict | None = Field(
         sa_column=Column(JSONB, nullable=True), description="CQL2-JSON filter to query the layer"
@@ -48,11 +47,6 @@ class LayerProjectLink(DateTimeBase, table=True):
     # Relationships
     project: "Project" = Relationship(back_populates="layer_projects")
     layer: "Layer" = Relationship(back_populates="layer_projects")
-
-
-UniqueConstraint(
-    LayerProjectLink.layer_id, LayerProjectLink.project_id, name="unique_layer_project"
-)
 
 
 class ScenarioScenarioFeatureLink(DateTimeBase, table=True):

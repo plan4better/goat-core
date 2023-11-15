@@ -27,7 +27,7 @@ from src.schemas.layer import (
     LayerType,
     SupportedOgrGeomType,
 )
-from src.schemas.style import base_styles
+from src.schemas.style import base_parameter
 from src.utils import build_where, get_user_table, search_value
 
 
@@ -95,9 +95,7 @@ class CRUDLayer(CRUDBase):
             geom_type = SupportedOgrGeomType[
                 layer_attributes["data_types"]["geometry"]["type"]
             ].value
-            additional_attributes["style"] = base_styles["feature"]["standard"][
-                geom_type
-            ]
+            additional_attributes["parameter"] = base_parameter["feature"]["standard"][geom_type]
             additional_attributes["type"] = LayerType.feature
             additional_attributes["feature_layer_type"] = FeatureType.standard
             additional_attributes["feature_layer_geometry_type"] = geom_type
@@ -284,25 +282,25 @@ class CRUDLayer(CRUDBase):
     async def get_feature_cnt(
         self,
         async_session: AsyncSession,
-        layer: dict,
+        layer_project: dict,
     ):
-        """Get feature count for a layer."""
+        """Get feature count for a layer project."""
 
         # Get table name
-        table_name = get_user_table(layer)
+        table_name = get_user_table(layer_project)
 
         # Get feature count total
         feature_cnt = {}
         sql_query = (
-            f"SELECT COUNT(*) FROM {table_name} WHERE layer_id = '{str(layer['id'])}'"
+            f"SELECT COUNT(*) FROM {table_name} WHERE layer_id = '{str(layer_project['layer_id'])}'"
         )
         result = await async_session.execute(text(sql_query))
         feature_cnt["total_count"] = result.scalar_one()
 
         # Get feature count filtered
-        if layer.get("query", None):
+        if layer_project.get("query", None):
             where = build_where(
-                query=layer["query"], attribute_mapping=layer["attribute_mapping"]
+                query=layer_project["query"], attribute_mapping=layer_project["attribute_mapping"]
             )
             sql_query += f" AND {where}"
             result = await async_session.execute(text(sql_query))
@@ -401,14 +399,40 @@ class CRUDLayer(CRUDBase):
         operation: ColumnStatisticsOperation,
         query: str,
         column_name: str,
-        stripe_zeros: bool,
+        stripe_zeros: bool = None,
+        breaks: int = None,
     ):
         # Check if layer is suitable for stats
         column_mapped, table_name, where = await self.check_layer_suitable_for_stats(
             async_session=async_session, id=id, column_name=column_name, query=query
         )
 
-        # Build query
+        # Extend where clause
+        if stripe_zeros:
+            where += f" AND {column_mapped} != 0"
+
+        # Define arguments
+        args = {"table_name": table_name, "column_name": column_mapped, "where": where}
+        if breaks:
+            args["breaks"] = breaks
+
+        if operation == ColumnStatisticsOperation.quantile:
+            sql_query = """SELECT * FROM basic.quantile_breaks(:table_name, :column_name, :where, :breaks)"""
+        elif operation == ColumnStatisticsOperation.equal_interval:
+            sql_query = """SELECT * FROM basic.equal_interval_breaks(:table_name, :column_name, :where, :breaks)"""
+        elif operation == ColumnStatisticsOperation.standard_deviation:
+            sql_query = """SELECT * FROM basic.std_deviation_breaks(:table_name, :column_name, :where)"""
+        elif operation == ColumnStatisticsOperation.heads_and_tails:
+            sql_query = """SELECT * FROM basic.heads_and_tails_breaks(:table_name, :column_name, :where, :breaks)"""
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Operation not supported",
+            )
+
+        res = await async_session.execute(sql_query, args)
+        res = res.fetchall()
+        return res[0][0]
 
 
 layer = CRUDLayer(Layer)

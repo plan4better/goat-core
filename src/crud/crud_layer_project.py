@@ -14,6 +14,9 @@ from src.schemas.layer import LayerType
 from src.schemas.project import (
     layer_type_mapping_read,
     layer_type_mapping_update,
+    FeatureLayerProjectParameter,
+    ExternalVectorTileProjectParameter,
+    ExternalImageryProjectParameter,
 )
 
 # Local application imports
@@ -41,9 +44,8 @@ class CRUDLayerProject(CRUDBase):
             # Convert to dicts and update layer
             layer = layer.dict()
             layer_project = layer_project.dict()
-
-            # Delete id from layer project
-            del layer_project["id"]
+            # Delete id from layer
+            del layer["id"]
 
             # Update layer
             layer.update(layer_project)
@@ -51,7 +53,7 @@ class CRUDLayerProject(CRUDBase):
             # Get feature cnt for all feature layers and tables
             if layer["type"] in [LayerType.feature.value, LayerType.table.value]:
                 feature_cnt = await crud_layer.get_feature_cnt(
-                    async_session=async_session, layer=layer
+                    async_session=async_session, layer_project=layer
                 )
             else:
                 feature_cnt = {}
@@ -86,17 +88,13 @@ class CRUDLayerProject(CRUDBase):
         )
         return layer_projects_to_schemas
 
-    async def get_by_ids(
-        self,
-        async_session: AsyncSession,
-        project_id: UUID,
-        layer_ids: [UUID],
-    ):
+    async def get_by_ids(self, async_session: AsyncSession, ids: [int]):
+        """Get all layer projects links by the ids"""
+
         # Get all layers from project by id
         query = select([Layer, LayerProjectLink]).where(
-            LayerProjectLink.project_id == project_id,
+            LayerProjectLink.id.in_(ids),
             Layer.id == LayerProjectLink.layer_id,
-            Layer.id.in_(layer_ids),
         )
 
         # Get all layers from project
@@ -132,6 +130,14 @@ class CRUDLayerProject(CRUDBase):
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Maximum number of layers in project reached",
                 )
+            z_index = max(
+                [
+                    layer_project[0].parameter["z_index"]
+                    for layer_project in layer_projects
+                ]
+            )
+        else:
+            z_index = 0
 
         # Get layer from catalog
         layers = await crud_layer.get_multi(
@@ -145,33 +151,71 @@ class CRUDLayerProject(CRUDBase):
                 detail="One or several Layers were not found",
             )
 
+        # Define array for layer project ids
+        layer_project_ids = []
+
         # Create link between project and layer
         for layer in layers:
             layer = layer[0]
+
+            # Check if layer with same name and ID already exists in project. Then the layer should be duplicated with a new name.
+            if layer_projects != []:
+                if layer.name in [
+                    layer_project[0].name for layer_project in layer_projects
+                ]:
+                    layer.name = "Copy from " + layer.name
+
             layer_project = LayerProjectLink(
                 project_id=project_id, layer_id=layer.id, name=layer.name
             )
-            # Add style if exists
-            if layer.style is not None:
-                layer_project.style = layer.style
+
+            # Validate against correct parameter schema depending on layer type
+            if layer.type == LayerType.feature.value:
+                params = FeatureLayerProjectParameter(
+                    **layer.parameter, z_index=z_index
+                )
+            elif layer.type == LayerType.external_imagery.value:
+                params = ExternalImageryProjectParameter(
+                    **layer.parameter, z_index=z_index
+                )
+            elif layer.type == LayerType.external_vector_tile.value:
+                params = ExternalVectorTileProjectParameter(
+                    **layer.parameter, z_index=z_index
+                )
+            else:
+                params = None
+
+            # Add parameter to layer project
+            if params is not None:
+                layer_project.parameter = params
 
             # Add to database
-            await CRUDBase(LayerProjectLink).create(
+            layer_project = await CRUDBase(LayerProjectLink).create(
                 async_session,
                 obj_in=layer_project,
             )
+            layer_project_ids.append(layer_project.id)
 
-        layers = await self.get_by_ids(async_session, project_id, layer_ids)
+            # Increase z-index
+            z_index += 1
+
+        layers = await self.get_by_ids(async_session, ids=layer_project_ids)
         return layers
 
     async def update(
         self,
         async_session: AsyncSession,
-        project_id: UUID,
-        layer_id: UUID,
+        id: int,
         layer_in: dict,
     ):
         """Update a link between a project and a layer"""
+
+        # Get layer project
+        layer_project_old = await self.get(
+            async_session,
+            id=id,
+        )
+        layer_id = layer_project_old.layer_id
 
         # Get base layer object
         layer = await crud_layer.get(async_session, id=layer_id)
@@ -198,12 +242,7 @@ class CRUDLayerProject(CRUDBase):
                 detail=str(e),
             )
 
-        # Get layer project
-        layer_project_old = await self.get_by_multi_keys(
-            async_session,
-            keys={"project_id": project_id, "layer_id": layer_id},
-        )
-        if layer_project_old == []:
+        if layer_project_old is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Layer project not found"
             )
@@ -211,7 +250,7 @@ class CRUDLayerProject(CRUDBase):
         # Update layer project
         layer_project = await CRUDBase(LayerProjectLink).update(
             async_session,
-            db_obj=layer_project_old[0],
+            db_obj=layer_project_old,
             obj_in=layer_in,
         )
         layer_project_dict = layer_project.dict()
@@ -220,7 +259,7 @@ class CRUDLayerProject(CRUDBase):
         layer_dict.update(layer_project_dict)
 
         # Get feature cnt
-        feature_cnt = await crud_layer.get_feature_cnt(async_session, layer=layer_dict)
+        feature_cnt = await crud_layer.get_feature_cnt(async_session, layer_project=layer_dict)
         return model_type_read(**layer_dict, **feature_cnt)
 
 

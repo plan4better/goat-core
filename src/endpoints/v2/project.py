@@ -346,7 +346,7 @@ async def get_layers_from_project(
 
 
 @router.get(
-    "/{id}/layer/{layer_id}",
+    "/{id}/layer/{layer_project_id}",
     response_model=IFeatureStandardProjectRead
     | IFeatureIndicatorProjectRead
     | IFeatureScenarioProjectRead
@@ -358,21 +358,14 @@ async def get_layers_from_project(
 )
 async def get_layer_from_project(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    layer_project_id: int = Path(
         ...,
-        description="The ID of the project to get",
-        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    ),
-    layer_id: UUID4 = Path(
-        ...,
-        description="Layer ID to get",
-        example="e7dcaae4-1750-49b7-89a5-9510bf2761ad",
+        description="Layer project ID to get",
+        example="1",
     ),
 ):
     layer_project = await crud_layer_project.get_by_ids(
-        async_session,
-        project_id=id,
-        layer_ids=[layer_id],
+        async_session, ids=[layer_project_id]
     )
     return layer_project[0]
 
@@ -395,10 +388,10 @@ async def update_layer_in_project(
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
-    layer_id: UUID4 = Query(
+    layer_project_id: int = Query(
         ...,
-        description="Layer ID to update",
-        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        description="Layer Project ID to update",
+        example="1",
     ),
     layer_in: dict = Body(
         ...,
@@ -413,8 +406,7 @@ async def update_layer_in_project(
     # Update layer in project
     layer_project = await crud_layer_project.update(
         async_session=async_session,
-        project_id=id,
-        layer_id=layer_id,
+        id=layer_project_id,
         layer_in=layer_in,
     )
 
@@ -434,20 +426,17 @@ async def delete_layer_from_project(
         description="The ID of the project",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
-    layer_id: UUID4 = Query(
+    layer_project_id: int = Query(
         ...,
         description="Layer ID to delete",
-        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        example="1",
     ),
 ):
     """Delete layer from a project by its ID."""
 
     # Get layer project
-    layer_project = await crud_layer_project.get_by_multi_keys(
-        async_session,
-        keys={"project_id": id, "layer_id": layer_id},
-    )
-    if layer_project == []:
+    layer_project = await crud_layer_project.get(async_session, id=layer_project_id)
+    if layer_project is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Layer project relation not found",
@@ -456,7 +445,7 @@ async def delete_layer_from_project(
     # Delete layer from project
     await crud_layer_project.delete(
         db=async_session,
-        id=layer_project[0].id,
+        id=layer_project.id,
     )
 
     return None
