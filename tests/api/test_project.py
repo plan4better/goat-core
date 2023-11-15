@@ -135,9 +135,9 @@ async def test_get_layers_project(client: AsyncClient, fixture_create_layer_proj
 @pytest.mark.asyncio
 async def test_update_layer_project(client: AsyncClient, fixture_create_layer_project):
     project_id = fixture_create_layer_project["project_id"]
-    layer_id = fixture_create_layer_project["layer_project"][0]["id"]
+    layer_project_id = fixture_create_layer_project["layer_project"][0]["id"]
     response = await client.put(
-        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_project_id={layer_id}",
+        f"{settings.API_V2_STR}/project/{project_id}/layer/{layer_project_id}",
         json={
             "name": "test2",
             "query": {"op": "=", "args": [{"property": "category"}, "bus_stop"]},

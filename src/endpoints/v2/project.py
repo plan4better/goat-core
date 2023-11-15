@@ -371,7 +371,7 @@ async def get_layer_from_project(
 
 
 @router.put(
-    "/{id}/layer",
+    "/{id}/layer/{layer_project_id}",
     response_model=IFeatureStandardProjectRead
     | IFeatureIndicatorProjectRead
     | IFeatureScenarioProjectRead
@@ -388,7 +388,7 @@ async def update_layer_in_project(
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
-    layer_project_id: int = Query(
+    layer_project_id: int = Path(
         ...,
         description="Layer Project ID to update",
         example="1",
