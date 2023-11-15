@@ -14,9 +14,6 @@ from src.schemas.layer import LayerType
 from src.schemas.project import (
     layer_type_mapping_read,
     layer_type_mapping_update,
-    FeatureLayerProjectParameter,
-    ExternalVectorTileProjectParameter,
-    ExternalImageryProjectParameter,
 )
 
 # Local application imports
@@ -132,7 +129,7 @@ class CRUDLayerProject(CRUDBase):
                 )
             z_index = max(
                 [
-                    layer_project[0].parameter["z_index"]
+                    layer_project[0].z_index
                     for layer_project in layer_projects
                 ]
             )
@@ -165,29 +162,15 @@ class CRUDLayerProject(CRUDBase):
                 ]:
                     layer.name = "Copy from " + layer.name
 
+            # Create layer project link
             layer_project = LayerProjectLink(
-                project_id=project_id, layer_id=layer.id, name=layer.name
+                project_id=project_id,
+                layer_id=layer.id,
+                name=layer.name,
+                properties=layer.properties,
+                other_properties=layer.other_properties,
+                z_index=z_index,
             )
-
-            # Validate against correct parameter schema depending on layer type
-            if layer.type == LayerType.feature.value:
-                params = FeatureLayerProjectParameter(
-                    **layer.parameter, z_index=z_index
-                )
-            elif layer.type == LayerType.external_imagery.value:
-                params = ExternalImageryProjectParameter(
-                    **layer.parameter, z_index=z_index
-                )
-            elif layer.type == LayerType.external_vector_tile.value:
-                params = ExternalVectorTileProjectParameter(
-                    **layer.parameter, z_index=z_index
-                )
-            else:
-                params = None
-
-            # Add parameter to layer project
-            if params is not None:
-                layer_project.parameter = params
 
             # Add to database
             layer_project = await CRUDBase(LayerProjectLink).create(
@@ -259,7 +242,9 @@ class CRUDLayerProject(CRUDBase):
         layer_dict.update(layer_project_dict)
 
         # Get feature cnt
-        feature_cnt = await crud_layer.get_feature_cnt(async_session, layer_project=layer_dict)
+        feature_cnt = await crud_layer.get_feature_cnt(
+            async_session, layer_project=layer_dict
+        )
         return model_type_read(**layer_dict, **feature_cnt)
 
 

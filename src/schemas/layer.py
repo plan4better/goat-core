@@ -6,6 +6,7 @@ from uuid import UUID
 # Third party imports
 from pydantic import BaseModel, Field, ValidationError, validator
 from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
+
 # Local application imports
 from src.db.models._base_class import DateTimeBase, content_base_example
 from src.db.models.layer import (
@@ -141,37 +142,22 @@ class ColumnStatisticsOperation(BaseModel):
     heads_and_tails = "heads_and_tails"
 
 
-class SupportedMapboxStyleType(str, Enum):
-    """Mapbox style types."""
-
-    fill = "fill"
-    line = "line"
-    symbol = "symbol"
-    circle = "circle"
-    raster = "raster"
-
 class LayerReadBaseAttributes(BaseModel):
     id: UUID = Field(..., description="Content ID of the layer", alias="id")
     user_id: UUID = Field(..., description="User ID of the owner")
     type: LayerType = Field(..., description="Layer type")
 
 
-class LayerParameterBase(BaseModel):
-    """Base model for layer parameters."""
+class LayerProperties(BaseModel):
+    """Base model for layer properties."""
 
-    pass
+    type: str = Field(..., description="Mapbox style type")
+    paint: dict = Field(..., description="Paint of the mapbox style of the layer")
 
 
 ################################################################################
 # Feature Layer DTOs
 ################################################################################
-
-
-class FeatureLayerParameter(LayerParameterBase):
-    """Model for feature layer parameters."""
-
-    type: SupportedMapboxStyleType = Field(..., description="Mapbox style type")
-    paint: dict = Field(..., description="Paint of the mapbox style of the layer")
 
 
 class FeatureReadBaseAttributes(
@@ -185,19 +171,17 @@ class FeatureReadBaseAttributes(
     )
     attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
     size: int = Field(..., description="Size of the layer in bytes")
-    parameter: FeatureLayerParameter = Field(..., description="Layer parameter.")
+    properties: LayerProperties = Field(..., description="Layer properties.")
 
 
 class FeatureUpdateBase(LayerBase, GeospatialAttributes):
     """Base model for feature layer updates."""
 
-    parameter: FeatureLayerParameter | None = Field(
-        None, description="Layer parameter."
-    )
+    properties: LayerProperties | None = Field(None, description="Layer properties.")
 
 
 feature_layer_update_base_example = {
-    "parameter": [
+    "properties": [
         "match",
         ["get", "category"],
         ["forest"],
@@ -226,13 +210,14 @@ class IFeatureStandardCreateAdditionalAttributes(BaseModel):
         ..., description="Feature layer geometry type"
     )
     size: int = Field(..., description="Size of the layer in bytes")
-    parameter: FeatureLayerParameter = Field(..., description="Layer parameter.")
+    properties: LayerProperties = Field(..., description="Layer properties.")
     extent: str = Field(..., description="Geographical Extent of the layer")
     attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
 
 
 class IFeatureStandardRead(FeatureReadBaseAttributes, DateTimeBase):
     pass
+
 
 class IFeatureStandardUpdate(FeatureUpdateBase):
     pass
@@ -262,6 +247,7 @@ class IFeatureIndicatorRead(
     """Model to read a feature layer indicator."""
 
     pass
+
 
 class IFeatureIndicatorUpdate(FeatureUpdateBase):
     """Model to update a feature layer indicator."""
@@ -296,6 +282,7 @@ class IFeatureScenarioRead(
 
     pass
 
+
 class IFeatureScenarioUpdate(FeatureUpdateBase):
     """Model to update a feature layer scenario."""
 
@@ -307,11 +294,9 @@ class IFeatureScenarioUpdate(FeatureUpdateBase):
 ################################################################################
 
 
-class ExternalImageryParameter(BaseModel):
-    """Model for external imagery layer parameters."""
+class LayerOtherProperties(BaseModel):
+    """Model for external imagery layer properties."""
 
-    type: SupportedMapboxStyleType = Field(..., description="Mapbox style type")
-    paint: dict = Field(..., description="Paint of the mapbox style of the layer")
     layers: List[str] = Field(..., description="List of layers to be displayed")
     width: int = Field(..., description="Width of the WMS image")
     height: int = Field(..., description="Height of the WMS image")
@@ -324,15 +309,20 @@ class ExternalImageryAttributesBase(BaseModel):
 
     url: str = Field(..., description="Layer URL")
     data_type: ExternalImageryDataType = Field(..., description="Content data type")
-    parameter: ExternalImageryParameter = Field(..., description="Layer parameter.")
+    properties: LayerProperties = Field(..., description="Layer properties.")
+    other_properties: LayerOtherProperties = Field(
+        ..., description="Additional layer properties."
+    )
 
 
 imagery_layer_attributes_example = {
     "url": "https://geodata.nationaalgeoregister.nl/luchtfoto/rgb/wms?request=GetCapabilities&service=WMS",
     "data_type": "wms",
-    "parameter": {
+    "properties": {
         "type": "raster",
         "paint": {"raster-opacity": 1},
+    },
+    "other_properties": {
         "layers": ["Actueel_ortho25"],
         "width": 256,
         "height": 256,
@@ -364,16 +354,20 @@ class IExternalImageryRead(
 
     pass
 
+
 class IExternalImageryUpdate(LayerBase, GeospatialAttributes):
     """Model to update a imagery layer."""
 
     url: str | None = Field(None, description="Layer URL")
-    parameter: ExternalImageryParameter | None = Field(None, description="Layer parameter.")
+    properties: LayerProperties | None = Field(..., description="Layer properties.")
+    other_properties: LayerOtherProperties | None = Field(
+        None, description="Additional layer properties."
+    )
 
 
 imagery_layer_update_base_example = {
     "url": "https://geodata.nationaalgeoregister.nl/luchtfoto/rgb/wms?request=GetCapabilities&service=WMS",
-    "parameter": {
+    "properties": {
         "type": "raster",
         "paint": {"raster-opacity": 0.5},
         "layers": ["Actueel_ortho25"],
@@ -392,31 +386,20 @@ imagery_layer_update_base_example = {
 ################################################################################
 
 
-class ExternalVectorTileLayerParameter(BaseModel):
-    """Model for external vector layer parameters."""
-
-    type: SupportedMapboxStyleType = Field(..., description="Mapbox style type")
-    paint: dict = Field(..., description="Paint of the mapbox style of the layer")
-    srs: str = Field(..., description="SRS of the WMS image")
-
-
 class ExternalVectorTileAttributesBase(BaseModel):
     """Base model for additional attributes tile layer."""
 
     url: str = Field(..., description="Layer URL")
     data_type: ExternalVectorTileDataType = Field(..., description="Content data type")
-    parameter: ExternalVectorTileLayerParameter | None = Field(
-        None, description="Layer parameter."
-    )
+    properties: LayerProperties | None = Field(None, description="Layer properties.")
 
 
 tile_layer_attributes_example = {
     "url": "https://goat.plan4better.de/api/v1/layers/tiles/accidents_pedestrians/12/2179/1420.pbf",
     "data_type": "mvt",
-    "parameter": {
+    "properties": {
         "type": "fill",
         "paint": {"fill-color": "#00ffff"},
-        "srs": "EPSG:3857",
     },
 }
 
@@ -449,10 +432,9 @@ class IExternalVectorTileUpdate(LayerBase, GeospatialAttributes):
 
 tile_layer_update_example = {
     "url": "https://goat.plan4better.de/api/v1/layers/tiles/accidents_pedestrians/12/2179/1420.pbf",
-    "parameter": {
+    "properties": {
         "type": "fill",
         "paint": {"fill-color": "#ff0000"},
-        "srs": "EPSG:3857",
     },
 }
 

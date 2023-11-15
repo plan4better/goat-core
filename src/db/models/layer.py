@@ -182,9 +182,13 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         ),
         description="Geographical Extent of the layer",
     )
-    parameter: dict | None = Field(
+    properties: dict | None = Field(
         sa_column=Column(JSONB, nullable=True),
-        description="Parameter of the layer",
+        description="Properties of the layer",
+    )
+    other_properties: dict | None = Field(
+        sa_column=Column(JSONB, nullable=True),
+        description="Other properties of the layer",
     )
     url: str | None = Field(
         sa_column=Column(Text, nullable=True),

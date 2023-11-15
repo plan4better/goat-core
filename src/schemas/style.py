@@ -1,5 +1,5 @@
 # TODO: Fill with default styles
-base_parameter = {
+base_properties = {
     "feature": {
         "standard": {
             "point": {

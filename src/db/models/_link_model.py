@@ -1,20 +1,24 @@
+from typing import TYPE_CHECKING
 from uuid import UUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
     Column,
     Field,
     ForeignKey,
     Integer,
-    Text,
     Relationship,
+    Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID as UUID_PG, JSONB
+
 from src.db.models._base_class import DateTimeBase
-from typing import TYPE_CHECKING
+from src.schemas.layer import LayerOtherProperties
+from src.schemas.project import LayerProjectProperties
 
 if TYPE_CHECKING:
-    from .project import Project
     from .layer import Layer
+    from .project import Project
 
 
 # TODO: Add relations
@@ -22,7 +26,9 @@ class LayerProjectLink(DateTimeBase, table=True):
     __tablename__ = "layer_project"
     __table_args__ = {"schema": "customer"}
 
-    id: int | None = Field(sa_column=Column(Integer, primary_key=True, autoincrement=True))
+    id: int | None = Field(
+        sa_column=Column(Integer, primary_key=True, autoincrement=True)
+    )
     group: str | None = Field(
         sa_column=Column(Text, nullable=True), description="Layer group name"
     )
@@ -35,13 +41,21 @@ class LayerProjectLink(DateTimeBase, table=True):
         description="Project ID",
     )
     name: str = Field(
-        sa_column=Column(Text, nullable=False), description="Layer name within the project"
+        sa_column=Column(Text, nullable=False),
+        description="Layer name within the project",
     )
-    parameter: dict | None = Field(
-        sa_column=Column(JSONB, nullable=True), description="Layer parameter"
+    properties: dict | None = Field(
+        sa_column=Column(JSONB, nullable=True), description="Layer properties"
+    )
+    other_properties: dict | None = Field(
+        sa_column=Column(JSONB, nullable=True), description="Layer other properties"
+    )
+    z_index: int = Field(
+        sa_column=Column(Integer, nullable=False), description="Layer z-index"
     )
     query: dict | None = Field(
-        sa_column=Column(JSONB, nullable=True), description="CQL2-JSON filter to query the layer"
+        sa_column=Column(JSONB, nullable=True),
+        description="CQL2-JSON filter to query the layer",
     )
 
     # Relationships
@@ -53,13 +67,17 @@ class ScenarioScenarioFeatureLink(DateTimeBase, table=True):
     __tablename__ = "scenario_scenario_feature"
     __table_args__ = {"schema": "customer"}
 
-    id: int | None = Field(sa_column=Column(Integer, primary_key=True, autoincrement=True))
+    id: int | None = Field(
+        sa_column=Column(Integer, primary_key=True, autoincrement=True)
+    )
     scenario_id: UUID = Field(
         sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.scenario.id")),
         description="Scenario ID",
     )
     scenario_feature_id: UUID = Field(
-        sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.scenario_feature.id")),
+        sa_column=Column(
+            UUID_PG(as_uuid=True), ForeignKey("customer.scenario_feature.id")
+        ),
         description="Scenario Feature ID",
     )
 
@@ -68,7 +86,9 @@ class UserProjectLink(DateTimeBase, table=True):
     __tablename__ = "user_project"
     __table_args__ = {"schema": "customer"}
 
-    id: int | None = Field(sa_column=Column(Integer, primary_key=True, autoincrement=True))
+    id: int | None = Field(
+        sa_column=Column(Integer, primary_key=True, autoincrement=True)
+    )
     user_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True), ForeignKey("customer.user.id", ondelete="CASCADE")
@@ -82,11 +102,14 @@ class UserProjectLink(DateTimeBase, table=True):
         description="Project ID",
     )
     initial_view_state: dict = Field(
-        sa_column=Column(JSONB, nullable=False), description="Initial view state of the project"
+        sa_column=Column(JSONB, nullable=False),
+        description="Initial view state of the project",
     )
 
     # Relationships
     project: "Project" = Relationship(back_populates="user_projects")
 
 
-UniqueConstraint(UserProjectLink.project_id, UserProjectLink.user_id, name="unique_user_project")
+UniqueConstraint(
+    UserProjectLink.project_id, UserProjectLink.user_id, name="unique_user_project"
+)

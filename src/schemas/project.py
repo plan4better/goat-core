@@ -13,8 +13,8 @@ from src.schemas.layer import (
     IFeatureScenarioRead,
     IFeatureStandardRead,
     ITableRead,
-    FeatureLayerParameter,
-    ExternalImageryParameter,
+    LayerOtherProperties,
+    LayerProperties,
 )
 from src.utils import optional
 
@@ -83,42 +83,27 @@ class Visibility(str, Enum):
     none = "none"
 
 
-class ProjectBaseParameter(BaseModel):
-    z_index: int = Field(..., description="Z index of the layer")
+class LayerProjectProperties(LayerProperties):
+    layout: dict = Field(
+        {"visibility": "visible"},
+        description="Layout properties",
+    )
     minzoom: int = Field(2, description="Minimum zoom level", ge=0, le=22)
     maxzoom: int = Field(20, description="Maximum zoom level", ge=0, le=22)
 
-    @validator("maxzoom")
-    def check_max_zoom(cls, max_zoom, values):
-        min_zoom = values.get("minzoom")
-        if min_zoom is not None and max_zoom < min_zoom:
-            raise ValueError("max_zoom should be greater than or equal to min_zoom")
-        return max_zoom
-
-    @validator("minzoom")
-    def check_min_zoom(cls, min_zoom, values):
-        max_zoom = values.get("maxzoom")
-        if max_zoom is not None and min_zoom > max_zoom:
-            raise ValueError("min_zoom should be less than or equal to max_zoom")
-        return min_zoom
 
 class LayerProjectIds(BaseModel):
     id: int = Field(..., description="Layer Project ID")
     layer_id: UUID = Field(..., description="Layer ID")
-
-
-class FeatureLayerProjectParameter(FeatureLayerParameter, ProjectBaseParameter):
-    """Model for external imagery layer parameters."""
-
-    pass
+    z_index: int = Field(..., description="Layer z-index")
 
 
 class IFeatureBaseProject(CQLQuery):
     name: str = Field(..., description="Layer name")
     group: str | None = Field(None, description="Layer group name")
-    parameter: FeatureLayerProjectParameter = Field(
+    properties: LayerProjectProperties = Field(
         ...,
-        description="Layer parameter",
+        description="Layer properties",
     )
 
 
@@ -129,15 +114,21 @@ class IFeatureBaseProjectRead(IFeatureBaseProject):
     )
 
 
-class IFeatureStandardProjectRead(LayerProjectIds, IFeatureStandardRead, IFeatureBaseProjectRead):
+class IFeatureStandardProjectRead(
+    LayerProjectIds, IFeatureStandardRead, IFeatureBaseProjectRead
+):
     pass
 
 
-class IFeatureIndicatorProjectRead(LayerProjectIds, IFeatureIndicatorRead, IFeatureBaseProjectRead):
+class IFeatureIndicatorProjectRead(
+    LayerProjectIds, IFeatureIndicatorRead, IFeatureBaseProjectRead
+):
     pass
 
 
-class IFeatureScenarioProjectRead(LayerProjectIds, IFeatureScenarioRead, IFeatureBaseProjectRead):
+class IFeatureScenarioProjectRead(
+    LayerProjectIds, IFeatureScenarioRead, IFeatureBaseProjectRead
+):
     pass
 
 
@@ -157,12 +148,12 @@ class IFeatureScenarioProjectUpdate(IFeatureBaseProject):
 
 
 class ITableProjectRead(LayerProjectIds, ITableRead, CQLQuery):
-
     group: str = Field(None, description="Layer group name")
     total_count: int = Field(..., description="Total count of features in the layer")
     filtered_count: int | None = Field(
         None, description="Filtered count of features in the layer"
     )
+
 
 @optional
 class ITableProjectUpdate(CQLQuery):
@@ -170,51 +161,47 @@ class ITableProjectUpdate(CQLQuery):
     group: str | None = Field(None, description="Layer group name")
 
 
-class ExternalVectorTileProjectParameter(
-    FeatureLayerProjectParameter, ProjectBaseParameter
-):
-    """Model for external vector tile layer parameters."""
-
-    pass
-
-
 class IExternalVectorTileProjectRead(LayerProjectIds, IExternalVectorTileRead):
     group: str = Field(None, description="Layer group name")
-    parameter: ExternalVectorTileProjectParameter = Field(
+    properties: LayerProjectProperties = Field(
         ...,
-        description="Layer parameter",
+        description="Layer properties",
     )
+
 
 @optional
 class IExternalVectorTileProjectUpdate(BaseModel):
     name: str | None = Field(None, description="Layer name")
     group: str | None = Field(None, description="Layer group name")
-    parameter: ExternalVectorTileProjectParameter | None = Field(
+    properties: LayerProjectProperties | None = Field(
         None,
-        description="Layer parameter",
+        description="Layer properties",
     )
-
-
-class ExternalImageryProjectParameter(ExternalImageryParameter, ProjectBaseParameter):
-    """Model for external imagery layer parameters."""
-
-    pass
 
 
 class IExternalImageryProjectRead(LayerProjectIds, IExternalImageryRead):
     group: str = Field(None, description="Layer group name")
-    parameter: ExternalImageryProjectParameter = Field(
+    properties: LayerProjectProperties = Field(
         ...,
-        description="Layer parameter",
+        description="Layer properties",
     )
+    other_properties: LayerOtherProperties = Field(
+        ...,
+        description="Other properties of the layer",
+    )
+
 
 @optional
 class IExternalImageryProjectUpdate(BaseModel):
     name: str | None = Field(None, description="Layer name")
     group: str | None = Field(None, description="Layer group name")
-    parameter: ExternalImageryProjectParameter | None = Field(
+    properties: LayerProjectProperties | None = Field(
         None,
-        description="Layer parameter",
+        description="Layer properties",
+    )
+    other_properties: LayerOtherProperties | None = Field(
+        None,
+        description="Other properties of the layer",
     )
 
 
@@ -264,16 +251,16 @@ request_examples = {
             "summary": "Feature Layer Standard",
             "value": {
                 "name": "Feature Layer Standard",
+                "z_index": 0,
                 "group": "Group 1",
                 "query": {"op": "=", "args": [{"property": "category"}, "bus_stop"]},
-                "parameter": {
+                "properties": {
                     "type": "circle",
                     "paint": {
                         "circle-radius": 5,
                         "circle-color": "#ff0000",
                     },
-                    "z_index": 0,
-                    "visibility": "visible",
+                    "layout": {"visibility": "visible"},
                     "minzoom": 0,
                     "maxzoom": 22,
                 },
@@ -284,14 +271,14 @@ request_examples = {
             "value": {
                 "name": "Feature Layer Indicator",
                 "group": "Group 1",
-                "parameter": {
+                "properties": {
                     "type": "circle",
                     "paint": {
                         "circle-radius": 5,
                         "circle-color": "#ff0000",
                     },
                     "z_index": 0,
-                    "visibility": "visible",
+                    "layout": {"visibility": "visible"},
                     "minzoom": 0,
                     "maxzoom": 22,
                 },
@@ -302,14 +289,14 @@ request_examples = {
             "value": {
                 "name": "Feature Layer Scenario",
                 "group": "Group 1",
-                "style": {
+                "z_index": 0,
+                "properties": {
                     "type": "circle",
                     "paint": {
                         "circle-radius": 5,
                         "circle-color": "#ff0000",
                     },
-                    "z_index": 0,
-                    "visibility": "visible",
+                    "layout": {"visibility": "visible"},
                     "minzoom": 0,
                     "maxzoom": 22,
                 },

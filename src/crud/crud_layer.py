@@ -27,7 +27,7 @@ from src.schemas.layer import (
     LayerType,
     SupportedOgrGeomType,
 )
-from src.schemas.style import base_parameter
+from src.schemas.style import base_properties
 from src.utils import build_where, get_user_table, search_value
 
 
@@ -95,7 +95,9 @@ class CRUDLayer(CRUDBase):
             geom_type = SupportedOgrGeomType[
                 layer_attributes["data_types"]["geometry"]["type"]
             ].value
-            additional_attributes["parameter"] = base_parameter["feature"]["standard"][geom_type]
+            additional_attributes["properties"] = base_properties["feature"]["standard"][
+                geom_type
+            ]
             additional_attributes["type"] = LayerType.feature
             additional_attributes["feature_layer_type"] = FeatureType.standard
             additional_attributes["feature_layer_geometry_type"] = geom_type
@@ -291,16 +293,15 @@ class CRUDLayer(CRUDBase):
 
         # Get feature count total
         feature_cnt = {}
-        sql_query = (
-            f"SELECT COUNT(*) FROM {table_name} WHERE layer_id = '{str(layer_project['layer_id'])}'"
-        )
+        sql_query = f"SELECT COUNT(*) FROM {table_name} WHERE layer_id = '{str(layer_project['layer_id'])}'"
         result = await async_session.execute(text(sql_query))
         feature_cnt["total_count"] = result.scalar_one()
 
         # Get feature count filtered
         if layer_project.get("query", None):
             where = build_where(
-                query=layer_project["query"], attribute_mapping=layer_project["attribute_mapping"]
+                query=layer_project["query"],
+                attribute_mapping=layer_project["attribute_mapping"],
             )
             sql_query += f" AND {where}"
             result = await async_session.execute(text(sql_query))

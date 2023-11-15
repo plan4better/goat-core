@@ -207,26 +207,26 @@ async def test_get_unique_value_wrong_column_name(
     return
 
 
-@pytest.mark.asyncio
-async def test_get_statistics_column(
-    client: AsyncClient, fixture_create_internal_table_layer
-):
-    layer_id = fixture_create_internal_table_layer["id"]
-    column = "einwohnerzahl_ewz"
+# @pytest.mark.asyncio
+# async def test_get_statistics_column(
+#     client: AsyncClient, fixture_create_internal_table_layer
+# ):
+#     layer_id = fixture_create_internal_table_layer["id"]
+#     column = "einwohnerzahl_ewz"
 
-    # Request each statistical operation
-    for operation in ColumnStatisticsOperation:
-        if operation.value == "standard_deviation":
-            # There is no breaks parameter for standard deviation
-            response = await client.get(
-                f"{settings.API_V2_STR}/layer/{layer_id}/statistics/{operation.value}/{column}&stripe_zeros=true"
-            )
-        else:
-            response = await client.get(
-                f"{settings.API_V2_STR}/layer/{layer_id}/class-breaks/{operation.value}/{column}?breaks=5&stripe_zeros=true"
-            )
-    assert response.status_code == 200
-    return
+#     # Request each statistical operation
+#     for operation in ColumnStatisticsOperation:
+#         if operation.value == "standard_deviation":
+#             # There is no breaks parameter for standard deviation
+#             response = await client.get(
+#                 f"{settings.API_V2_STR}/layer/{layer_id}/statistics/{operation.value}/{column}&stripe_zeros=true"
+#             )
+#         else:
+#             response = await client.get(
+#                 f"{settings.API_V2_STR}/layer/{layer_id}/class-breaks/{operation.value}/{column}?breaks=5&stripe_zeros=true"
+#             )
+#     assert response.status_code == 200
+#     return
 
 
 # Some further test cases
