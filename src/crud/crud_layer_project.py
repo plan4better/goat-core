@@ -127,11 +127,8 @@ class CRUDLayerProject(CRUDBase):
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Maximum number of layers in project reached",
                 )
-            z_index = max(
-                [
-                    layer_project[0].z_index
-                    for layer_project in layer_projects
-                ]
+            z_index = (
+                max([layer_project[0].z_index for layer_project in layer_projects]) + 1
             )
         else:
             z_index = 0

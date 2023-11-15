@@ -68,5 +68,5 @@ class CRUDProject(CRUDBase):
 
         return IProjectRead(**project.dict())
 
-    
+
 project = CRUDProject(Project)
