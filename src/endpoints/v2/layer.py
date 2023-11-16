@@ -2,6 +2,7 @@
 import os
 from typing import List
 from uuid import uuid4
+import json
 
 # Third-party Libraries
 from fastapi import (
@@ -46,22 +47,23 @@ from src.schemas.layer import (
     IValidateJobId,
     MaxFileSizeType,
     TableUploadType,
+    IFileUploadMetadata,
 )
 from src.schemas.layer import request_examples as layer_request_examples
 from src.utils import check_file_size
+from src.core.config import settings
 
 router = APIRouter()
 
 
 @router.post(
-    "/file-validate",
+    "/file-upload",
     summary="Upload file to server and validate",
-    response_class=JSONResponse,
+    response_model=IFileUploadMetadata,
     status_code=201,
 )
-async def file_validate(
+async def file_upload(
     *,
-    background_tasks: BackgroundTasks,
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
     file: UploadFile | None = File(None, description="File to upload. "),
@@ -91,95 +93,24 @@ async def file_validate(
             detail=f"File size too large. Max file size is {round(MaxFileSizeType[file_ending].value / 1048576, 2)} MB",
         )
 
-    # Create job and check if user can create a new job
-    job = await crud_job.check_and_create(
-        async_session=async_session,
-        user_id=user_id,
-        job_type=JobType.file_validate,
-    )
-
     # Run the validation
-    await crud_layer.validate_file(
-        background_tasks=background_tasks,
+    metadata = await crud_layer.upload_file(
         async_session=async_session,
-        user_id=user_id,
-        job_id=job.id,
         layer_type=layer_type,
+        user_id=user_id,
         file=file,
     )
-    return {"job_id": job.id}
+    return metadata
 
-
-@router.post(
-    "/file-import",
-    summary="Import previously uploaded file using Ogr2ogr",
-    response_class=JSONResponse,
-    status_code=201,
-)
-async def file_import(
-    *,
-    background_tasks: BackgroundTasks,
-    async_session: AsyncSession = Depends(get_db),
-    user_id: UUID4 = Depends(get_user_id),
-    validate_job_id: IValidateJobId = Body(
-        ...,
-        example=layer_request_examples["validate_job_id"],
-        description="Upload job ID",
-    ),
-):
-    """
-    Import file using ogr2ogr.
-    """
-
-    # Check if file upload job exists, is finished and owned by the user
-    validate_job = await crud_job.get_by_multi_keys(
-        db=async_session,
-        keys={
-            "id": validate_job_id.validate_job_id,
-            "user_id": user_id,
-            "type": JobType.file_validate.value,
-            "status_simple": JobStatusType.finished.value,
-        },
-    )
-    if validate_job == []:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File upload job not found or not finished.",
-        )
-    validate_job = validate_job[0]
-    # Create job and check if user can create a new job
-    job = await crud_job.check_and_create(
-        async_session=async_session,
-        user_id=user_id,
-        job_type=JobType.file_import,
-    )
-
-    # Create layer_id
-    layer_id = str(uuid4())
-
-    # Run the import
-    await crud_layer.import_file(
-        background_tasks=background_tasks,
-        async_session=async_session,
-        user_id=user_id,
-        job_id=job.id,
-        layer_id=layer_id,
-        validate_job=validate_job,
-        file_path=validate_job.response["file_path"],
-    )
-
-    return {"job_id": job.id}
-
-
-## Layer endpoints
 @router.post(
     "/internal",
     summary="Create a new internal layer",
-    response_model=ILayerRead,
+    response_class=JSONResponse,
     status_code=201,
     description="Generate a new layer from a file that was previously uploaded using the file-upload endpoint.",
 )
 async def create_layer_internal(
+    background_tasks: BackgroundTasks,
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
     layer_in: IInternalLayerCreate = Body(
@@ -188,11 +119,36 @@ async def create_layer_internal(
         description="Layer to create",
     ),
 ):
-    """Create a new internal layer."""
-    layer = await crud_layer.create_internal(
-        async_session=async_session, user_id=user_id, layer_in=layer_in
+
+    # Check if user owns folder by checking if it exists
+    folder_path = os.path.join(settings.DATA_DIR, user_id, str(layer_in.dataset_id))
+    if os.path.exists(folder_path) is False:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Dataset not found or not owned by user.",
+        )
+
+    # Get metadata from file in folder
+    with open(os.path.join(folder_path, "metadata.json"), "r") as f:
+        file_metadata = json.loads(json.load(f))
+
+    # Create job and check if user can create a new job
+    job = await crud_job.check_and_create(
+        async_session=async_session,
+        user_id=user_id,
+        job_type=JobType.file_import,
     )
-    return layer
+
+    # Run the import
+    await crud_layer.import_file(
+        background_tasks=background_tasks,
+        async_session=async_session,
+        user_id=user_id,
+        layer_in=layer_in,
+        job_id=job.id,
+        file_metadata=file_metadata,
+    )
+    return {"job_id": job.id}
 
 
 @router.post(

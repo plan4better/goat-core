@@ -35,17 +35,24 @@ from src.utils import (
 
 
 class FileUpload:
-    def __init__(self, async_session: AsyncSession, user_id: UUID, job_id: UUID, file: UploadFile):
+    def __init__(
+        self,
+        async_session: AsyncSession,
+        user_id: UUID,
+        dataset_id: UUID,
+        file: UploadFile,
+    ):
         self.async_session = async_session
         self.user_id = user_id
         self.file = file
-        self.folder_path = os.path.join(settings.DATA_DIR, str(job_id))
+        self.folder_path = os.path.join(
+            settings.DATA_DIR, str(self.user_id), str(dataset_id)
+        )
         self.file_ending = os.path.splitext(file.filename)[-1][1:]
         self.file_name = file.filename
         self.file_path = os.path.join(self.folder_path, "file." + self.file_ending)
 
-    @job_log(job_step_name="upload")
-    async def save_file(self, file: UploadFile, job_id: UUID):
+    async def save_file(self, file: UploadFile):
         """Save file to disk for later operations."""
 
         # Clean all old folders that are older then two hours
@@ -56,6 +63,8 @@ class FileUpload:
 
         # Create folder if exist delete it
         await async_delete_dir(self.folder_path)
+        if not os.path.exists(os.path.join(settings.DATA_DIR, str(self.user_id))):
+            await aos.mkdir(os.path.join(settings.DATA_DIR, str(self.user_id)))
         await aos.mkdir(self.folder_path)
 
         # Save file in chunks
@@ -65,19 +74,15 @@ class FileUpload:
                 if not chunk:
                     break
                 await buffer.write(chunk)
+        return self.file_path
 
-        return {
-            "msg": Msg(type=MsgType.info, text="File uploaded."),
-            "status": JobStatusType.finished.value,
-        }
-
-    async def fail_save_file(folder_path: str):
+    async def save_file_fail(self):
         """Delete folder if file upload fails."""
-        await async_delete_dir(folder_path)
+        await async_delete_dir(self.folder_path)
 
 
 class OGRFileHandling:
-    def __init__(self, async_session: AsyncSession, user_id: UUID, job_id: UUID, file_path: str):
+    def __init__(self, async_session: AsyncSession, user_id: UUID, file_path: str):
         self.async_session = async_session
         self.user_id = user_id
         self.file_path = file_path
@@ -132,15 +137,12 @@ class OGRFileHandling:
                     "status": JobStatusType.failed.value,
                 }
 
-        data_types = self.check_field_types(layer)
+        field_type_res = self.check_field_types(layer)
 
         # Close the datasource
         data_source = None
 
-        return {
-            "file_path": file_path,
-            "data_types": data_types,
-        }
+        return {"file_path": file_path, **field_type_res}
 
     def get_layer_extent(self, layer) -> str:
         """Get layer extent in EPSG:4326."""
@@ -182,7 +184,9 @@ class OGRFileHandling:
 
         if layer_def.GetGeomFieldCount() == 1:
             # Get geometry type of layer to upload to specify target table
-            geometry_type = ogr.GeometryTypeToName(layer_def.GetGeomType()).replace(" ", "_")
+            geometry_type = ogr.GeometryTypeToName(layer_def.GetGeomType()).replace(
+                " ", "_"
+            )
             if geometry_type not in SupportedOgrGeomType.__members__:
                 return {
                     "msg": "Geometry type not supported.",
@@ -193,7 +197,9 @@ class OGRFileHandling:
             if layer_def.GetGeomFieldDefn(0).GetName() == "":
                 field_types["geometry"]["column_name"] = "wkb_geometry"
             else:
-                field_types["geometry"]["column_name"] = layer_def.GetGeomFieldDefn(0).GetName()
+                field_types["geometry"]["column_name"] = layer_def.GetGeomFieldDefn(
+                    0
+                ).GetName()
             field_types["geometry"]["type"] = geometry_type
             field_types["geometry"]["extent"] = self.get_layer_extent(layer)
 
@@ -228,12 +234,13 @@ class OGRFileHandling:
 
             # Place fields that are exceeding the maximum number of columns or if the column name was already specified.
             elif (
-                NumberColumnsPerType[field_type_pg] <= len(field_types["valid"][field_type_pg])
+                NumberColumnsPerType[field_type_pg]
+                <= len(field_types["valid"][field_type_pg])
                 or field_name in field_types["valid"][field_type_pg]
             ):
                 field_types["overflow"][field_type_pg] = field_name
 
-        return field_types
+        return {"data_types": field_types}
 
     def validate_csv(self):
         """Validate if CSV."""
@@ -244,7 +251,7 @@ class OGRFileHandling:
             sample_bytes = 1024
             sample = f.read(sample_bytes)
 
-            if not sniffer.has_header(sample.decode('utf-8')):
+            if not sniffer.has_header(sample.decode("utf-8")):
                 return {
                     "msg": "CSV is not well-formed: Missing header.",
                     "status": JobStatusType.failed.value,
@@ -321,7 +328,8 @@ class OGRFileHandling:
 
         # Unzip file in temporary directory
         zip_dir = os.path.join(
-            os.path.dirname(self.file_path), os.path.basename(self.file_path).split(".")[0]
+            os.path.dirname(self.file_path),
+            os.path.basename(self.file_path).split(".")[0],
         )
 
         # Extra zip file to zip_dir
@@ -342,8 +350,7 @@ class OGRFileHandling:
         """Validate kml."""
         return self.validate_ogr(self.file_path)
 
-    @job_log(job_step_name="validation")
-    async def validate(self, job_id: UUID):
+    async def validate(self):
         """Validate file before uploading."""
 
         # Run validation
@@ -354,7 +361,10 @@ class OGRFileHandling:
 
         # Build object for job step status
         msg_text = ""
-        if result["data_types"]["unvalid"] == {} and result["data_types"]["overflow"] == {}:
+        if (
+            result["data_types"]["unvalid"] == {}
+            and result["data_types"]["overflow"] == {}
+        ):
             msg_type = MsgType.info.value
             msg_text = "File is valid."
         else:
@@ -368,7 +378,6 @@ class OGRFileHandling:
                 )
 
         result["msg"] = Msg(type=msg_type, text=msg_text)
-        result["status"] = JobStatusType.finished.value
         return result
 
     async def validate_fail(self, folder_path: str):
@@ -389,11 +398,13 @@ class OGRFileHandling:
         layer_def = layer.GetLayerDefn()
 
         # Get geometry type of layer to force multipolygon if any polygon type
-        geometry_type = ogr.GeometryTypeToName(layer_def.GetGeomType()).replace(" ", "_")
-        if 'polygon' in geometry_type.lower():
-            geometry_type = '-nlt MULTIPOLYGON'
+        geometry_type = ogr.GeometryTypeToName(layer_def.GetGeomType()).replace(
+            " ", "_"
+        )
+        if "polygon" in geometry_type.lower():
+            geometry_type = "-nlt MULTIPOLYGON"
         else:
-            geometry_type = ''
+            geometry_type = ""
 
         # Prepare the ogr2ogr command
         if self.file_ending == FileUploadType.gpkg.value:
@@ -423,10 +434,12 @@ class OGRFileHandling:
     async def upload_ogr2ogr_fail(self, temp_table_name: str):
         """Delete folder if ogr2ogr upload fails."""
         await self.validate_fail(self.folder_path)
-        await self.async_session.execute(text(f"DROP TABLE IF EXISTS {temp_table_name}"))
+        await self.async_session.execute(
+            text(f"DROP TABLE IF EXISTS {temp_table_name}")
+        )
         await self.async_session.commit()
 
-    #@timeout(120)
+    # @timeout(120)
     @job_log(job_step_name="migration")
     async def migrate_target_table(
         self,
@@ -470,7 +483,9 @@ class OGRFileHandling:
         await self.async_session.commit()
 
         # Delete temporary table
-        await self.async_session.execute(text(f"DROP TABLE IF EXISTS {temp_table_name}"))
+        await self.async_session.execute(
+            text(f"DROP TABLE IF EXISTS {temp_table_name}")
+        )
         await self.async_session.commit()
 
         return {

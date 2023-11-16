@@ -7,7 +7,9 @@ from sqlmodel import (
     Field,
     ForeignKey,
     Relationship,
-    UniqueConstraint
+    UniqueConstraint,
+    ARRAY,
+    Integer,
 )
 
 from src.db.models._base_class import DateTimeBase
@@ -49,7 +51,13 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         ),
         description="Project folder ID",
     )
-
+    layer_order: List[int] | None = Field(
+        sa_column=Column(
+            ARRAY(Integer),
+            nullable=True,
+        ),
+        description="Layer order in project",
+    )
     # Relationships
     reports: List["Report"] = Relationship(
         back_populates="project", sa_relationship_kwargs={"cascade": "all, delete-orphan"}

@@ -50,9 +50,6 @@ class LayerProjectLink(DateTimeBase, table=True):
     other_properties: dict | None = Field(
         sa_column=Column(JSONB, nullable=True), description="Layer other properties"
     )
-    z_index: int = Field(
-        sa_column=Column(Integer, nullable=False), description="Layer z-index"
-    )
     query: dict | None = Field(
         sa_column=Column(JSONB, nullable=True),
         description="CQL2-JSON filter to query the layer",

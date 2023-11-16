@@ -40,11 +40,6 @@ class JobStep(BaseModel):
     timestamp_end: datetime | None
     msg: Msg | None
 
-class JobStatusFileValidate(BaseModel):
-    """Job layer upload attribute types."""
-
-    upload: JobStep = {}
-    validation: JobStep = {}
 
 class JobStatusFileImport(BaseModel):
     """Job layer upload attribute types."""
@@ -53,6 +48,5 @@ class JobStatusFileImport(BaseModel):
     migration: JobStep = {}
 
 job_mapping = {
-    JobType.file_validate: JobStatusFileValidate,
     JobType.file_import: JobStatusFileImport
 }

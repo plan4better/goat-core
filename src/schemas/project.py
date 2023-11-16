@@ -67,20 +67,14 @@ class IProjectCreate(ContentBaseAttributes):
         ..., description="Initial view state of the project"
     )
 
-
 class IProjectRead(ContentBaseAttributes, DateTimeBase):
     id: UUID = Field(..., description="Project ID")
+    layer_order: list[int] | None = Field(None, description="Layer order in project")
 
 
 @optional
 class IProjectBaseUpdate(ContentBaseAttributes):
-    pass
-
-
-# Define layers within project
-class Visibility(str, Enum):
-    visible = "visible"
-    none = "none"
+    layer_order: list[int] | None = Field(None, description="Layer order in project")
 
 
 class LayerProjectProperties(LayerProperties):
@@ -95,7 +89,6 @@ class LayerProjectProperties(LayerProperties):
 class LayerProjectIds(BaseModel):
     id: int = Field(..., description="Layer Project ID")
     layer_id: UUID = Field(..., description="Layer ID")
-    z_index: int = Field(..., description="Layer z-index")
 
 
 class IFeatureBaseProject(CQLQuery):
@@ -251,7 +244,6 @@ request_examples = {
             "summary": "Feature Layer Standard",
             "value": {
                 "name": "Feature Layer Standard",
-                "z_index": 0,
                 "group": "Group 1",
                 "query": {"op": "=", "args": [{"property": "category"}, "bus_stop"]},
                 "properties": {
@@ -277,7 +269,6 @@ request_examples = {
                         "circle-radius": 5,
                         "circle-color": "#ff0000",
                     },
-                    "z_index": 0,
                     "layout": {"visibility": "visible"},
                     "minzoom": 0,
                     "maxzoom": 22,
@@ -289,7 +280,6 @@ request_examples = {
             "value": {
                 "name": "Feature Layer Scenario",
                 "group": "Group 1",
-                "z_index": 0,
                 "properties": {
                     "type": "circle",
                     "paint": {

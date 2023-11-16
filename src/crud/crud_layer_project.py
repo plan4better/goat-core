@@ -18,6 +18,7 @@ from src.schemas.project import (
 
 # Local application imports
 from .base import CRUDBase
+from .crud_project import project as crud_project
 
 
 class CRUDLayerProject(CRUDBase):
@@ -112,6 +113,9 @@ class CRUDLayerProject(CRUDBase):
     ):
         """Create a link between a project and a layer"""
 
+        # Remove duplicate layer_ids
+        layer_ids = list(set(layer_ids))
+
         # Get number of layers in project
         layer_projects = await self.get_multi(
             async_session,
@@ -127,11 +131,6 @@ class CRUDLayerProject(CRUDBase):
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Maximum number of layers in project reached",
                 )
-            z_index = (
-                max([layer_project[0].z_index for layer_project in layer_projects]) + 1
-            )
-        else:
-            z_index = 0
 
         # Get layer from catalog
         layers = await crud_layer.get_multi(
@@ -166,7 +165,6 @@ class CRUDLayerProject(CRUDBase):
                 name=layer.name,
                 properties=layer.properties,
                 other_properties=layer.other_properties,
-                z_index=z_index,
             )
 
             # Add to database
@@ -176,9 +174,21 @@ class CRUDLayerProject(CRUDBase):
             )
             layer_project_ids.append(layer_project.id)
 
-            # Increase z-index
-            z_index += 1
+        # Get project to update layer order
+        project = await crud_project.get(async_session, id=project_id)
+        layer_order = project.layer_order
+        # Add layer ids to the beginning of the list
+        if layer_order is None:
+            layer_order = layer_project_ids
+        else:
+            layer_order = layer_project_ids + layer_order
 
+        # Update project layer order
+        project = await crud_project.update(
+            async_session,
+            db_obj=project,
+            obj_in={"layer_order": layer_order},
+        )
         layers = await self.get_by_ids(async_session, ids=layer_project_ids)
         return layers
 

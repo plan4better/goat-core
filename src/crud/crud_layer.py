@@ -26,82 +26,52 @@ from src.schemas.layer import (
     ITableCreateAdditionalAttributes,
     LayerType,
     SupportedOgrGeomType,
+    IFileUploadMetadata,
+    IInternalLayerCreate,
 )
 from src.schemas.style import base_properties
 from src.utils import build_where, get_user_table, search_value
+from uuid import uuid4
+import asyncio
 
 
 class CRUDLayer(CRUDBase):
     """CRUD class for Layer."""
 
     async def create_internal(
-        self, async_session: AsyncSession, user_id: UUID, layer_in
+        self,
+        async_session: AsyncSession,
+        user_id: UUID,
+        layer_in: IInternalLayerCreate,
+        file_metadata: dict,
     ):
-        # Get import job
-        import_job = await crud_job.get_by_multi_keys(
-            db=async_session,
-            keys={
-                "id": layer_in.import_job_id,
-                "user_id": user_id,
-                "type": JobType.file_import.value,
-                "status_simple": JobStatusType.finished.value,
-            },
-        )
-        # Check if import job exists, is finished and owned by the user
-        if import_job == []:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Import job not found or not finished.",
-            )
-        import_job = import_job[0]
-
-        # Get validate job
-        validate_job = await crud_job.get_by_multi_keys(
-            db=async_session,
-            keys={
-                "id": import_job.response["validate_job_id"],
-                "user_id": user_id,
-                "type": JobType.file_validate.value,
-                "status_simple": JobStatusType.finished.value,
-            },
-        )
-        # Check if validate job exists, is finished and owned by the user
-        if validate_job == []:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Validate job not found or not finished.",
-            )
-        validate_job = validate_job[0]
-        layer_attributes = validate_job.response
-
         additional_attributes = {}
         # Get layer_id and size from import job
-        additional_attributes["id"] = import_job.layer_ids[0]
         additional_attributes["user_id"] = user_id
-        additional_attributes["size"] = layer_attributes["file_size"]
+        additional_attributes["size"] = file_metadata["file_size"]
 
         # Create attribute mapping
         attribute_mapping = {}
-        for data_type in layer_attributes["data_types"]["valid"]:
+        for data_type in file_metadata["data_types"]["valid"]:
             cnt = 0
-            for column in layer_attributes["data_types"]["valid"][data_type]:
+            for column in file_metadata["data_types"]["valid"][data_type]:
                 cnt += 1
                 attribute_mapping[data_type + "_attr" + str(cnt)] = column
 
         additional_attributes["attribute_mapping"] = attribute_mapping
 
         # Get default style if feature layer
-        if layer_attributes["data_types"].get("geometry"):
+        if file_metadata["data_types"].get("geometry"):
             geom_type = SupportedOgrGeomType[
-                layer_attributes["data_types"]["geometry"]["type"]
+                file_metadata["data_types"]["geometry"]["type"]
             ].value
-            additional_attributes["properties"] = base_properties["feature"]["standard"][
-                geom_type
-            ]
+            additional_attributes["properties"] = base_properties["feature"][
+                "standard"
+            ][geom_type]
             additional_attributes["type"] = LayerType.feature
             additional_attributes["feature_layer_type"] = FeatureType.standard
             additional_attributes["feature_layer_geometry_type"] = geom_type
-            additional_attributes["extent"] = layer_attributes["data_types"][
+            additional_attributes["extent"] = file_metadata["data_types"][
                 "geometry"
             ]["extent"]
             additional_attributes = IFeatureStandardCreateAdditionalAttributes(
@@ -124,53 +94,79 @@ class CRUDLayer(CRUDBase):
         )
         return layer
 
-    @run_background_or_immediately(settings)
-    @job_init()
-    async def validate_file(
+    async def upload_file(
         self,
-        background_tasks: BackgroundTasks,
         async_session: AsyncSession,
         user_id: UUID,
-        job_id: UUID,
         layer_type: LayerType,
         file: UploadFile,
     ):
+        """Validate file using ogr2ogr."""
+
+        dataset_id = uuid4()
         # Initialize OGRFileUpload
         file_upload = FileUpload(
-            async_session=async_session, user_id=user_id, job_id=job_id, file=file
+            async_session=async_session,
+            user_id=user_id,
+            dataset_id=dataset_id,
+            file=file,
         )
 
         # Save file
-        result = await file_upload.save_file(file=file, job_id=job_id)
-        if result["status"] in [
-            JobStatusType.failed.value,
-            JobStatusType.timeout.value,
-            JobStatusType.killed.value,
-        ]:
-            return result
-
-        # Build folder path
-        file_path = os.path.join(
-            settings.DATA_DIR,
-            str(job_id),
-            "file." + os.path.splitext(file.filename)[-1][1:],
-        )
+        timeout = 120
+        try:
+            file_path = await asyncio.wait_for(
+                file_upload.save_file(file=file),
+                timeout,
+            )
+        except asyncio.TimeoutError:
+            # Handle the timeout here. For example, you can raise a custom exception or log it.
+            await file_upload.save_file_fail()
+            raise HTTPException(
+                status_code=status.HTTP_408_REQUEST_TIMEOUT,
+                detail=f"File upload timed out after {timeout} seconds.",
+            )
+        except Exception as e:
+            # Run failure function if exists
+            await file_upload.save_file_fail()
+            # Update job status simple to failed
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(e),
+            )
 
         # Initialize OGRFileHandling
         ogr_file_handling = OGRFileHandling(
             async_session=async_session,
             user_id=user_id,
-            job_id=job_id,
             file_path=file_path,
         )
+
         # Validate file before uploading
-        validation_result = await ogr_file_handling.validate(job_id=job_id)
-        if validation_result["status"] in [
-            JobStatusType.failed.value,
-            JobStatusType.timeout.value,
-            JobStatusType.killed.value,
-        ]:
-            return validation_result
+        try:
+            validation_result = await asyncio.wait_for(
+                ogr_file_handling.validate(),
+                timeout,
+            )
+        except asyncio.TimeoutError:
+            raise HTTPException(
+                status_code=status.HTTP_408_REQUEST_TIMEOUT,
+                detail=f"File validation timed out after {timeout} seconds.",
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(e),
+            )
+
+        if validation_result.get("status") == "failed":
+            # Run failure function if exists
+            await file_upload.save_file_fail()
+            # Update job status simple to failed
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=validation_result["msg"],
+            )
 
         # Get file size in bytes
         original_position = file.file.tell()
@@ -178,21 +174,25 @@ class CRUDLayer(CRUDBase):
         file_size = file.file.tell()
         file.file.seek(original_position)
 
-        # Add layer_type and file_size to validation_result
-        response = {}
-        response["data_types"] = validation_result["data_types"]
-        response["layer_type"] = layer_type
-        response["file_ending"] = os.path.splitext(file.filename)[-1][1:]
-        response["file_size"] = file_size
-        response["file_path"] = validation_result["file_path"]
-
-        # Update job with validation result
-        job = await crud_job.get(db=async_session, id=job_id)
-        await crud_job.update(
-            db=async_session, db_obj=job, obj_in={"response": response}
+        # Define metadata object
+        metadata = IFileUploadMetadata(
+            **validation_result,
+            dataset_id=dataset_id,
+            file_ending=os.path.splitext(file.filename)[-1][1:],
+            file_size=file_size,
+            layer_type=layer_type,
         )
 
-        return validation_result
+        # Save metadata into user folder as json
+        metadata_path = os.path.join(
+            os.path.dirname(metadata.file_path), "metadata.json"
+        )
+        with open(metadata_path, "w") as f:
+            # Convert dict to json
+            json.dump(metadata.json(), f)
+
+        # Add layer_type and file_size to validation_result
+        return metadata
 
     @run_background_or_immediately(settings)
     @job_init()
@@ -201,10 +201,9 @@ class CRUDLayer(CRUDBase):
         background_tasks: BackgroundTasks,
         async_session: AsyncSession,
         job_id: UUID,
-        validate_job: Job,
+        file_metadata: dict,
         user_id: UUID,
-        layer_id: UUID,
-        file_path: str,
+        layer_in: IInternalLayerCreate,
     ):
         """Import file using ogr2ogr."""
 
@@ -212,15 +211,12 @@ class CRUDLayer(CRUDBase):
         ogr_file_upload = OGRFileHandling(
             async_session=async_session,
             user_id=user_id,
-            job_id=job_id,
-            file_path=file_path,
+            file_path=file_metadata["file_path"],
         )
 
         # Create attribute mapping out of valid attributes
         attribute_mapping = {}
-        for field_type, field_names in validate_job.response["data_types"][
-            "valid"
-        ].items():
+        for field_type, field_names in file_metadata["data_types"]["valid"].items():
             cnt = 1
             for field_name in field_names:
                 if field_name == "id":
@@ -245,10 +241,10 @@ class CRUDLayer(CRUDBase):
 
         # Migrate temporary table to target table
         result = await ogr_file_upload.migrate_target_table(
-            validation_result=validate_job.response,
+            validation_result=file_metadata,
             attribute_mapping=attribute_mapping,
             temp_table_name=temp_table_name,
-            layer_id=layer_id,
+            layer_id=layer_in.id,
             job_id=job_id,
         )
         if result["status"] in [
@@ -265,9 +261,13 @@ class CRUDLayer(CRUDBase):
             db=async_session,
             db_obj=job,
             obj_in={
-                "layer_ids": [str(layer_id)],
-                "response": {"validate_job_id": str(validate_job.id)},
+                "layer_ids": [str(layer_in.id)],
             },
+        )
+
+        # Create layer
+        await self.create_internal(
+            async_session=async_session, user_id=user_id, layer_in=layer_in, file_metadata=file_metadata
         )
         return result
 

@@ -448,4 +448,15 @@ async def delete_layer_from_project(
         id=layer_project.id,
     )
 
+    # Delete layer from project layer order
+    project = await crud_project.get(async_session, id=id)
+    layer_order = project.layer_order.copy()
+    layer_order.remove(layer_project.id)
+
+    await crud_project.update(
+        async_session,
+        db_obj=project,
+        obj_in={"layer_order": layer_order},
+    )
+
     return None

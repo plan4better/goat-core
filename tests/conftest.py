@@ -29,11 +29,11 @@ from src.schemas.tool import (
 )
 from src.utils import get_user_table
 from tests.utils import (
+    check_if_job_finished,
     generate_random_string,
-    upload_file,
-    validate_invalid_file,
-    validate_valid_file,
-    validate_valid_files,
+    upload_invalid_file,
+    upload_valid_file,
+    upload_valid_files,
 )
 
 settings.RUN_AS_BACKGROUND_TASK = True
@@ -228,7 +228,23 @@ async def fixture_create_layer_project(
         f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={internal_layer_id}&layer_ids={external_layer_id}"
     )
     assert response.status_code == 200
-    return {"layer_project": response.json(), "project_id": project_id}
+    layer_project = response.json()
+
+    # Get layer project ids
+    layer_project_ids = []
+    for layer in response.json():
+        layer_project_ids.append(layer["id"])
+
+    # Get Project
+    response = await client.get(f"{settings.API_V2_STR}/project/{project_id}")
+    assert response.status_code == 200
+
+    # Check if layers are in layer order at right position
+    layer_order = response.json()["layer_order"]
+    assert layer_order[0] == layer_project_ids[0]
+    assert layer_order[1] == layer_project_ids[1]
+
+    return {"layer_project": layer_project, "project_id": project_id}
 
 
 @pytest.fixture(autouse=True)
@@ -239,21 +255,21 @@ def set_testing_config():
 
 
 @pytest.fixture()
-async def fixture_validate_file_point(client: AsyncClient, fixture_create_user):
-    return await validate_valid_file(client, "point")
+async def fixture_upload_file_point(client: AsyncClient, fixture_create_user):
+    return await upload_valid_file(client, "point")
 
 
 @pytest.fixture()
-async def fixture_validate_file_table(client: AsyncClient, fixture_create_user):
-    return await validate_valid_file(client, "table")
+async def fixture_upload_file_table(client: AsyncClient, fixture_create_user):
+    return await upload_valid_file(client, "table")
 
 
 file_types = ["point", "line", "polygon", "no_geometry"]
 
 
 @pytest.fixture(params=file_types)
-async def fixture_validate_files(client: AsyncClient, fixture_create_user, request):
-    return await validate_valid_files(client, request.param)
+async def fixture_upload_files(client: AsyncClient, fixture_create_user, request):
+    return await upload_valid_files(client, request.param)
 
 
 files = [
@@ -265,28 +281,37 @@ files = [
 
 
 @pytest.fixture(params=files)
-async def fixture_validate_file_invalid(
+async def fixture_upload_file_invalid(
     client: AsyncClient, fixture_create_user, request
 ):
-    return await validate_invalid_file(client, request.param)
+    return await upload_invalid_file(client, request.param)
 
 
 async def create_internal_layer(
-    client: AsyncClient, validate_job_id, fixture_get_home_folder, layer_type
+    client: AsyncClient, dataset_id, fixture_get_home_folder, layer_type
 ):
-    # Hit endpoint to upload file
-    job_id = await upload_file(client, validate_job_id)
-
     # Get feature layer dict and add layer ID
     feature_layer_dict = layer_request_examples["create_internal"][layer_type]["value"]
-    feature_layer_dict["import_job_id"] = job_id
+    feature_layer_dict["dataset_id"] = dataset_id
     feature_layer_dict["folder_id"] = fixture_get_home_folder["id"]
     # Hit endpoint to create internal layer
     response = await client.post(
         f"{settings.API_V2_STR}/layer/internal", json=feature_layer_dict
     )
     assert response.status_code == 201
-    return response.json()
+
+    # Get job id
+    job_id = response.json()["job_id"]
+
+    # Check if job is finished
+    job = await check_if_job_finished(client, job_id)
+    assert job["status_simple"] == "finished"
+
+    # Get layer
+    response = await client.get(f"{settings.API_V2_STR}/layer/{job['layer_ids'][0]}")
+    assert response.status_code == 200
+
+    return {**response.json(), "job_id": job_id}
 
 
 internal_layers = ["feature_layer_standard", "table"]
@@ -297,14 +322,14 @@ async def fixture_create_internal_layers(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder, request
 ):
     if request.param == "feature_layer_standard":
-        validate_job_id = await validate_valid_file(client, "point")
+        metadata = await upload_valid_file(client, "point")
         layer = await create_internal_layer(
-            client, validate_job_id, fixture_get_home_folder, request.param
+            client, metadata["dataset_id"], fixture_get_home_folder, request.param
         )
     elif request.param == "table":
-        validate_job_id = await validate_valid_file(client, "no_geometry")
+        metadata = await upload_valid_file(client, "no_geometry")
         layer = await create_internal_layer(
-            client, validate_job_id, fixture_get_home_folder, request.param
+            client, metadata["dataset_id"], fixture_get_home_folder, request.param
         )
     return layer
 
@@ -347,9 +372,12 @@ async def fixture_create_external_layer(
 async def fixture_create_internal_feature_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
-    validate_job_id = await validate_valid_file(client, "point")
+    metadata = await upload_valid_file(client, "point")
     return await create_internal_layer(
-        client, validate_job_id, fixture_get_home_folder, "feature_layer_standard"
+        client,
+        metadata["dataset_id"],
+        fixture_get_home_folder,
+        "feature_layer_standard",
     )
 
 
@@ -357,9 +385,12 @@ async def fixture_create_internal_feature_layer(
 async def fixture_create_internal_and_external_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
-    validate_job_id = await validate_valid_file(client, "point")
+    metadata = await upload_valid_file(client, "point")
     internal_layer = await create_internal_layer(
-        client, validate_job_id, fixture_get_home_folder, "feature_layer_standard"
+        client,
+        metadata["dataset_id"],
+        fixture_get_home_folder,
+        "feature_layer_standard",
     )
     external_layer = await create_external_layer(
         client, fixture_get_home_folder, "external_vector_tile"
@@ -371,9 +402,9 @@ async def fixture_create_internal_and_external_layer(
 async def fixture_create_internal_table_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
-    validate_job_id = await validate_valid_file(client, "no_geometry")
+    metadata = await upload_valid_file(client, "no_geometry")
     return await create_internal_layer(
-        client, validate_job_id, fixture_get_home_folder, "table"
+        client, metadata["dataset_id"], fixture_get_home_folder, "table"
     )
 
 

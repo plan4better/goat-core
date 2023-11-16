@@ -2,6 +2,8 @@
 from enum import Enum
 from typing import List
 from uuid import UUID
+from uuid import uuid4
+import json
 
 # Third party imports
 from pydantic import BaseModel, Field, ValidationError, validator
@@ -21,7 +23,7 @@ from src.db.models.layer import (
     ScenarioType,
     layer_base_example,
 )
-
+from src.schemas.job import Msg
 
 class AnalysisType(str, Enum):
     """Analysis types."""
@@ -116,6 +118,16 @@ class NumberColumnsPerType(int, Enum):
     boolean = 3
 
 
+class IFileUploadMetadata(BaseModel):
+    data_types: dict = Field(..., description="Data types of the columns")
+    layer_type: LayerType = Field(..., description="Layer type")
+    file_ending: str = Field(..., description="File ending")
+    file_size: int = Field(..., description="File size")
+    file_path: str = Field(..., description="File path")
+    dataset_id: UUID = Field(..., description="Dataset ID")
+    msg: Msg = Field(..., description="Response Message")
+
+
 class CQLQuery(BaseModel):
     """Model for CQL query."""
 
@@ -196,13 +208,13 @@ feature_layer_update_base_example = {
 
 # Feature Layer Standard
 class IInternalLayerCreate(LayerBase):
-    import_job_id: UUID = Field(..., description="Job ID of the import job")
+    id: UUID = Field(uuid4(), description="Content ID of the layer", alias="id")
+    dataset_id: UUID = Field(..., description="Dataset ID")
 
 
 class IFeatureStandardCreateAdditionalAttributes(BaseModel):
     """Model for second internal validation with extended attributes."""
 
-    id: UUID = Field(..., description="Content ID of the layer", alias="id")
     user_id: UUID = Field(..., description="User ID of the owner")
     type: LayerType = Field(..., description="Layer type")
     feature_layer_type: FeatureType = Field(..., description="Feature layer type")
@@ -446,7 +458,6 @@ tile_layer_update_example = {
 class ITableCreateAdditionalAttributes(BaseModel):
     """Model for second internal validation with extended attributes."""
 
-    id: UUID = Field(..., description="Content ID of the layer", alias="id")
     user_id: UUID = Field(..., description="User ID of the owner")
     type: LayerType = Field(..., description="Layer type")
     size: int = Field(..., description="Size of the layer in bytes")
@@ -544,9 +555,6 @@ class IValidateJobId(BaseModel):
 
 
 request_examples = {
-    "validate_job_id": {
-        "validate_job_id": "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
-    },
     "get": {
         "ids": [
             "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
@@ -557,7 +565,7 @@ request_examples = {
         "table": {
             "summary": "Table Layer",
             "value": {
-                "import_job_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
+                "dataset_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
                 **content_base_example,
                 **layer_base_example,
             },
@@ -565,7 +573,7 @@ request_examples = {
         "feature_layer_standard": {
             "summary": "Layer Standard",
             "value": {
-                "import_job_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
+                "dataset_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
                 **content_base_example,
                 **layer_base_example,
             },
