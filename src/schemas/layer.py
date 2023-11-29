@@ -145,7 +145,7 @@ class CQLQuery(BaseModel):
         return v
 
 
-class ColumnStatisticsOperation(BaseModel):
+class ColumnStatisticsOperation(Enum):
     """Allowed operations on numeric columsn."""
 
     quantile = "quantile"
@@ -153,6 +153,13 @@ class ColumnStatisticsOperation(BaseModel):
     equal_interval = "equal_interval"
     heads_and_tails = "heads_and_tails"
 
+class AreaStatisticsOperation(Enum):
+    """Allowed operations on polygon geometries."""
+
+    sum = "sum"
+    mean = "mean"
+    min = "min"
+    max = "max"
 
 class LayerReadBaseAttributes(BaseModel):
     id: UUID = Field(..., description="Content ID of the layer", alias="id")

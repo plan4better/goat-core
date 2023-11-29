@@ -382,6 +382,18 @@ async def fixture_create_internal_feature_layer(
 
 
 @pytest.fixture
+async def fixture_create_internal_feature_polygon_layer(
+    client: AsyncClient, fixture_create_user, fixture_get_home_folder
+):
+    metadata = await upload_valid_file(client, "polygon")
+    return await create_internal_layer(
+        client,
+        metadata["dataset_id"],
+        fixture_get_home_folder,
+        "feature_layer_standard",
+    )
+
+@pytest.fixture
 async def fixture_create_internal_and_external_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):

@@ -5,7 +5,8 @@ import pytest
 from httpx import AsyncClient
 
 from src.core.config import settings
-from tests.utils import get_with_wrong_id, upload_file
+from tests.utils import get_with_wrong_id
+from src.schemas.layer import ColumnStatisticsOperation, AreaStatisticsOperation
 
 
 @pytest.mark.asyncio
@@ -92,6 +93,66 @@ async def test_delete_external_layers(
 ):
     return
 
+
+@pytest.mark.asyncio
+async def test_get_feature_cnt(
+    client: AsyncClient, fixture_create_internal_feature_layer
+):
+    layer_id = fixture_create_internal_feature_layer["id"]
+    query = '{"op": "=", "args": [{"property": "category"}, "bus_stop"]}'
+    response = await client.get(
+        f"{settings.API_V2_STR}/layer/{layer_id}/feature-count?query={str(query)}"
+    )
+    assert response.status_code == 200
+    assert response.json()["filtered_count"] == 2
+    assert response.json()["total_count"] == 26
+
+
+@pytest.mark.asyncio
+async def test_get_area_statistics(
+    client: AsyncClient, fixture_create_internal_feature_polygon_layer
+):
+    layer_id = fixture_create_internal_feature_polygon_layer["id"]
+    expected_result = {
+        "sum": 5813696342.208582,
+        "mean": 2906848171.10429092,
+        "min": 83206235.43294483,
+        "max": 5730490106.775637
+    }
+
+    query = '{"op": ">", "args": [{"property": "id"}, "3"]}'
+    # Request each statistical operation
+    for operation in AreaStatisticsOperation:
+        response = await client.get(
+            f"{settings.API_V2_STR}/layer/{layer_id}/area/{operation.value}?query={str(query)}"
+        )
+        assert response.status_code == 200
+        # Check if results are same as expected results
+        assert response.json()[operation.value] == expected_result[operation.value]
+
+
+@pytest.mark.asyncio
+async def test_get_area_statistics_no_query(
+    client: AsyncClient, fixture_create_internal_feature_polygon_layer
+):
+    layer_id = fixture_create_internal_feature_polygon_layer["id"]
+
+    response = await client.get(
+        f"{settings.API_V2_STR}/layer/{layer_id}/area/sum"
+    )
+    assert response.status_code == 200
+    return
+
+@pytest.mark.asyncio
+async def test_get_wrong_area_statistics_wrong_geom_type(
+    client: AsyncClient, fixture_create_internal_feature_layer
+):
+    layer_id = fixture_create_internal_feature_layer["id"]
+    response = await client.get(
+        f"{settings.API_V2_STR}/layer/{layer_id}/area/sum"
+    )
+    assert response.status_code == 422
+    return
 
 @pytest.mark.asyncio
 async def test_get_unique_values_layer_pagination(
@@ -197,26 +258,93 @@ async def test_get_unique_value_wrong_column_name(
     return
 
 
-# @pytest.mark.asyncio
-# async def test_get_statistics_column(
-#     client: AsyncClient, fixture_create_internal_table_layer
-# ):
-#     layer_id = fixture_create_internal_table_layer["id"]
-#     column = "einwohnerzahl_ewz"
+@pytest.mark.asyncio
+async def test_get_statistics_column(
+    client: AsyncClient, fixture_create_internal_table_layer
+):
+    layer_id = fixture_create_internal_table_layer["id"]
+    column = "einwohnerzahl_ewz"
 
-#     # Request each statistical operation
-#     for operation in ColumnStatisticsOperation:
-#         if operation.value == "standard_deviation":
-#             # There is no breaks parameter for standard deviation
-#             response = await client.get(
-#                 f"{settings.API_V2_STR}/layer/{layer_id}/statistics/{operation.value}/{column}&stripe_zeros=true"
-#             )
-#         else:
-#             response = await client.get(
-#                 f"{settings.API_V2_STR}/layer/{layer_id}/class-breaks/{operation.value}/{column}?breaks=5&stripe_zeros=true"
-#             )
-#     assert response.status_code == 200
-#     return
+    base_results = {
+        "max": 3677472,
+        "min": 34091,
+        "mean": 208092.81,
+    }
+    results = {
+        "quantile": {
+            **base_results,
+            "breaks": [88430, 122724, 155900, 203831, 288097],
+        },
+        "standard_deviation": {
+            **base_results,
+            "breaks": [
+                85339.48205224,
+                330846.13794776,
+                576352.7938432801,
+                821859.4497388001,
+            ],
+        },
+        "equal_interval": {
+            **base_results,
+            "breaks": [641321, 1248551, 1855781, 2463011, 3070241],
+        },
+        "heads_and_tails": {
+            **base_results,
+            "breaks": [
+                208092.81,
+                383477.3106060606,
+                720935.3636363636,
+                1668162.6666666667,
+                2765703.5,
+            ],
+        },
+    }
+
+    # Request each statistical operation
+    for operation in ColumnStatisticsOperation:
+        if operation.value == ColumnStatisticsOperation.standard_deviation.value:
+            # There is no breaks parameter for standard deviation
+            response = await client.get(
+                f"{settings.API_V2_STR}/layer/{layer_id}/class-breaks/{operation.value}/{column}?stripe_zeros=true"
+            )
+        else:
+            response = await client.get(
+                f"{settings.API_V2_STR}/layer/{layer_id}/class-breaks/{operation.value}/{column}?breaks=5&stripe_zeros=true"
+            )
+        assert response.status_code == 200
+        # Check that the results are the same as the expected results. Avoid checking the breaks for standard deviation as they can slighly differ.
+        if operation.value != ColumnStatisticsOperation.standard_deviation.value:
+            assert response.json() == results[operation.value]
+    return
+
+
+@pytest.mark.asyncio
+async def test_get_statistics_column_wrong_layer_id(
+    client: AsyncClient, fixture_create_internal_table_layer
+):
+    layer_id = uuid4()
+    column = "einwohnerzahl_ewz"
+
+    response = await client.get(
+        f"{settings.API_V2_STR}/layer/{layer_id}/class-breaks/quantile/{column}?breaks=5&stripe_zeros=true"
+    )
+    assert response.status_code == 404
+    return
+
+
+# Get not existing column name
+@pytest.mark.asyncio
+async def test_get_statistics_column_wrong_column_name(
+    client: AsyncClient, fixture_create_internal_table_layer
+):
+    layer_id = fixture_create_internal_table_layer["id"]
+    column = "wrong_column"
+
+    response = await client.get(
+        f"{settings.API_V2_STR}/layer/{layer_id}/class-breaks/quantile/{column}?breaks=5&stripe_zeros=true"
+    )
+    assert response.status_code == 404
+    return
 
 
 # Some further test cases

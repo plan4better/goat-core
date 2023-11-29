@@ -32,8 +32,6 @@ from geojson import loads as geojsonloads
 from jose import jwt
 from numba import njit
 from pydantic import BaseModel
-from pygeofilter.backends.sql import to_sql_where
-from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
 from rich import print as print
 from shapely import geometry
 from shapely.geometry import GeometryCollection, MultiPolygon, Point, Polygon, box
@@ -48,7 +46,7 @@ from starlette.responses import Response
 from src.core.config import settings
 from src.resources.enums import MaxUploadFileSize, MimeTypes
 from src.schemas.layer import LayerType
-
+from uuid import UUID
 
 def optional(*fields):
     def dec(_cls):
@@ -1261,14 +1259,6 @@ async def check_file_size(file: UploadFile, max_size: int) -> bool:
 
     await file.seek(0)  # Reset file position for further processing if needed
     return True
-
-
-def build_where(query: dict, attribute_mapping: dict):
-    ast = cql2_json_parser(query)
-    attribute_mapping = {value: key for key, value in attribute_mapping.items()}
-    where = to_sql_where(ast, attribute_mapping)
-    return where
-
 
 def search_value(d, target):
     for key, value in d.items():

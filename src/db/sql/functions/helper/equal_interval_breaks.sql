@@ -13,14 +13,14 @@ BEGIN
     -- Compute the min, max, and interval size directly
     EXECUTE format(
         'SELECT avg(%I), min(%I), max(%I), (max(%I) - min(%I)) / %L FROM %s WHERE %s',
-        column_name, column_name, column_name, column_name, column_name, breaks, table_name, where_filter
+        column_name, column_name, column_name, column_name, column_name, breaks + 1, table_name, where_filter
     ) INTO mean_val, min_val, max_val, interval_size;
 
     -- Build the JSONB object with the computed breaks
-    SELECT JSONB_BUILD_OBJECT('mean', mean_val, 'min', min_val, 'max', max_val, 'breaks', array_agg(computed_breaks))
+    SELECT JSONB_BUILD_OBJECT('mean', mean_val, 'min', min_val, 'max', max_val, 'breaks', (array_agg(computed_breaks))[1:array_length(array_agg(computed_breaks), 1) - 1])
     INTO result
     FROM (
-        SELECT min_val + generate_series(1, breaks) * interval_size AS computed_breaks
+        SELECT min_val + generate_series(1, breaks + 1) * interval_size AS computed_breaks
     ) b;
 
     RETURN result;

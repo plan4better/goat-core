@@ -22,6 +22,11 @@ class ColumnStatistic(BaseModel):
     operation: ColumStatisticsOperation
     field: str
 
+class MaxFeatureCnt(int, Enum):
+    """Max feature count schema."""
+
+    area_statistics = 100000
+
 
 class ResultTarget(BaseModel):
     """Define the target location of the produced layer."""

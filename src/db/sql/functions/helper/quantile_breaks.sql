@@ -16,11 +16,11 @@ BEGIN
 		WITHIN GROUP (ORDER BY %I ASC) AS borders
 		FROM %s
 		WHERE %s',
-        column_name, column_name, column_name, breaks, breaks, column_name, table_name, where_filter
+        column_name, column_name, column_name, breaks + 1, breaks + 1, column_name, table_name, where_filter
     ) INTO mean_val, min_val, max_val, computed_breaks;
 	
-   	-- Build the JSONB object with the computed breaks
-   	res = jsonb_build_object('mean', mean_val, 'min', min_val, 'max', max_val, 'breaks', computed_breaks);
+   	-- Build the JSONB object with the computed breaks. Remove the last element as it is the same as max_val.
+   	res = jsonb_build_object('mean', mean_val, 'min', min_val, 'max', max_val, 'breaks', computed_breaks[1:array_length(computed_breaks, 1) - 1]);
     RETURN res;
 END;
 $function$;

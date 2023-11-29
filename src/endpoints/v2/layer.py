@@ -1,7 +1,6 @@
 # Standard Libraries
 import os
 from typing import List
-from uuid import uuid4
 import json
 
 # Third-party Libraries
@@ -35,7 +34,7 @@ from src.db.models.layer import FeatureType, Layer, LayerType
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_user_id
 from src.schemas.common import ContentIdList, OrderEnum
-from src.schemas.job import JobStatusType, JobType
+from src.schemas.job import JobType
 from src.schemas.layer import (
     ColumnStatisticsOperation,
     FeatureUploadType,
@@ -44,10 +43,10 @@ from src.schemas.layer import (
     ILayerExternalCreate,
     ILayerRead,
     ILayerUpdate,
-    IValidateJobId,
     MaxFileSizeType,
     TableUploadType,
     IFileUploadMetadata,
+    AreaStatisticsOperation,
 )
 from src.schemas.layer import request_examples as layer_request_examples
 from src.utils import check_file_size
@@ -102,6 +101,7 @@ async def file_upload(
     )
     return metadata
 
+
 @router.post(
     "/internal",
     summary="Create a new internal layer",
@@ -119,7 +119,6 @@ async def create_layer_internal(
         description="Layer to create",
     ),
 ):
-
     # Check if user owns folder by checking if it exists
     folder_path = os.path.join(settings.DATA_DIR, user_id, str(layer_in.dataset_id))
     if os.path.exists(folder_path) is False:
@@ -364,6 +363,93 @@ async def delete_layer(
 
 
 @router.get(
+    "/{id}/feature-count",
+    summary="Get feature count",
+    response_class=JSONResponse,
+    status_code=200,
+)
+async def get_feature_count(
+    async_session: AsyncSession = Depends(get_db),
+    id: UUID4 = Path(
+        ...,
+        description="The ID of the layer to get",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    query: str = Query(
+        None,
+        description="CQL2-Filter in JSON format",
+        example='{"op": "=", "args": [{"property": "category"}, "bus_stop"]}',
+    ),
+):
+    """Get feature count. Based on the passed CQL-filter."""
+
+    # Get layer
+    layer = await crud_layer.get(
+        db=async_session,
+        id=id,
+    )
+
+    # Raise error if not feature layer
+    if layer.type != LayerType.feature.value:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="You can only compute the feature count for feature layers.",
+        )
+    layer_dict = layer.dict()
+
+    # Add query to layer dict
+    layer_dict["query"] = query
+
+    # Rename id to layer_id. This is because the function is also user for layer project.
+    layer_dict["layer_id"] = layer_dict.pop("id")
+
+    count = await crud_layer.get_feature_cnt(
+        async_session=async_session,
+        layer_project=layer_dict,
+    )
+
+    # Return result
+    return count
+
+
+@router.get(
+    "/{id}/area/{operation}",
+    summary="Get area statistics of a layer",
+    response_class=JSONResponse,
+    status_code=200,
+)
+async def get_area_statistics(
+    async_session: AsyncSession = Depends(get_db),
+    id: UUID4 = Path(
+        ...,
+        description="The ID of the layer to get",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    operation: AreaStatisticsOperation = Path(
+        ...,
+        description="The operation to perform",
+        example="sum",
+    ),
+    query: str = Query(
+        None,
+        description="CQL2-Filter in JSON format",
+        example='{"op": ">", "args": [{"property": "id"}, "10"]}',
+    ),
+):
+    """Get statistics on the area size of a polygon layer. The area is computed using geography datatype and the unit is m²."""
+
+    statistics = await crud_layer.get_area_statistics(
+        async_session=async_session,
+        id=id,
+        operation=operation,
+        query=query,
+    )
+
+    # Return result
+    return statistics
+
+
+@router.get(
     "/{id}/unique-values/{column_name}",
     summary="Get unique values of a column",
     response_class=JSONResponse,
@@ -383,7 +469,7 @@ async def get_unique_values(
         example="name",
     ),
     query: str = Query(
-        "",
+        None,
         description="CQL2-Filter in JSON format",
         example={"op": "=", "args": [{"property": "category"}, "bus_stop"]},
     ),
@@ -408,57 +494,59 @@ async def get_unique_values(
     return values
 
 
-# @router.get(
-#     "/{id}/class-breaks/{operation}/{column_name}",
-#     summary="Get statistics of a column",
-#     response_class=JSONResponse,
-#     status_code=200,
-# )
-# async def class_breaks(
-#     async_session: AsyncSession = Depends(get_db),
-#     id: UUID4 = Path(
-#         ...,
-#         description="The ID of the layer to get",
-#         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
-#     ),
-#     operation: ColumnStatisticsOperation = Path(
-#         ...,
-#         description="The operation to perform",
-#         example="quantile",
-#     ),
-#     column_name: str = Path(
-#         ...,
-#         description="The column name to get the statistics from. It needs to be a number column.",
-#         example="name",
-#     ),
-#     breaks: int = Query(
-#         ...,
-#         description="Number of class breaks to create",
-#         example=5,
-#     ),
-#     query: str | None = Query(
-#         None,
-#         description="CQL2-Filter in JSON format",
-#         example={"op": "=", "args": [{"property": "category"}, "bus_stop"]},
-#     ),
-#     stripe_zeros: bool | None = Query(
-#         True,
-#         description="Stripe zeros from the column before performing the operation",
-#         example=True,
-#     ),
-# ):
-#     """Get statistics of a column. Based on the saved layer filter in the project."""
+@router.get(
+    "/{id}/class-breaks/{operation}/{column_name}",
+    summary="Get statistics of a column",
+    response_class=JSONResponse,
+    status_code=200,
+)
+async def class_breaks(
+    async_session: AsyncSession = Depends(get_db),
+    id: UUID4 = Path(
+        ...,
+        description="The ID of the layer to get",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    operation: ColumnStatisticsOperation = Path(
+        ...,
+        description="The operation to perform",
+        example="quantile",
+    ),
+    column_name: str = Path(
+        ...,
+        description="The column name to get the statistics from. It needs to be a number column.",
+        example="name",
+    ),
+    breaks: int
+    | None = Query(
+        None,
+        description="Number of class breaks to create",
+        example=5,
+    ),
+    query: str
+    | None = Query(
+        None,
+        description="CQL2-Filter in JSON format",
+        example={"op": "=", "args": [{"property": "category"}, "bus_stop"]},
+    ),
+    stripe_zeros: bool
+    | None = Query(
+        True,
+        description="Stripe zeros from the column before performing the operation",
+        example=True,
+    ),
+):
+    """Get statistics of a column. Based on the saved layer filter in the project."""
 
-    
-#     statistics = await crud_layer.get_class_breaks(
-#         async_session=async_session,
-#         id=id,
-#         operation=operation,
-#         column_name=column_name,
-#         breaks=breaks,
-#         query=query,
-#         stripe_zeros=stripe_zeros,
-#     )
+    statistics = await crud_layer.get_class_breaks(
+        async_session=async_session,
+        id=id,
+        operation=operation,
+        column_name=column_name,
+        breaks=breaks,
+        query=query,
+        stripe_zeros=stripe_zeros,
+    )
 
-#     # Return result
-#     return statistics
+    # Return result
+    return statistics

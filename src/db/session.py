@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import (
 
 from src.core.config import settings
 
-engine = create_async_engine(settings.ASYNC_SQLALCHEMY_DATABASE_URI, pool_pre_ping=True)
+engine = create_async_engine(settings.ASYNC_SQLALCHEMY_DATABASE_URI, pool_pre_ping=True, echo=True)
 legacy_engine = create_engine(settings.SQLALCHEMY_DATABASE_URI, future=False)
 r5_mongo_db_client = AsyncIOMotorClient(str(settings.R5_MONGO_DB_URL))
 

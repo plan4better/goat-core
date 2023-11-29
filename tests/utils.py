@@ -102,6 +102,10 @@ async def upload_valid_file(client: AsyncClient, file_type: str):
 
     if file_type == "point":
         response = await upload_file(client, "point", "valid.geojson")
+    elif file_type == "polygon":
+        response = await upload_file(client, "polygon", "valid.geojson")
+    elif file_type == "line":
+        response = await upload_file(client, "line", "valid.geojson")
     elif file_type == "no_geometry":
         response = await upload_file(client, "no_geometry", "valid.csv")
     else:

@@ -18,7 +18,7 @@ BEGIN
 
     -- Build the JSONB object with the computed breaks
     SELECT JSONB_BUILD_OBJECT('mean', mean_val, 'min', min_val, 'max', max_val, 'breaks', 
-   		ARRAY[mean_val + stddev_val * 2.5, mean_val + stddev_val * 1.5, mean_val + stddev_val * 0.5, mean_val - stddev_val * 0.5]
+   		ARRAY[mean_val - stddev_val * 0.5, mean_val + stddev_val * 0.5, mean_val + stddev_val * 1.5, mean_val + stddev_val * 2.5]
    	)
    	INTO res;
     RETURN res;
