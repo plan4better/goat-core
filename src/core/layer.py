@@ -370,11 +370,11 @@ class OGRFileHandling:
         else:
             msg_type = MsgType.warning.value
             if result["data_types"]["unvalid"]:
-                msg_text = f"The following attributes are not saved as they could not be mapped to a valid data type: {', '.join(result['data_types']['unvalid'].keys())}"
+                msg_text = f"The following attributes are not saved as they could not be mapped to a valid data type: {', '.join(result['data_types']['unvalid'].values())}"
             if result["data_types"]["overflow"]:
                 msg_text = (
                     msg_text
-                    + f"The following attributes are not saved as they exceed the maximum number of columns per data type: {', '.join(result['data_types']['overflow'].keys())}"
+                    + f"The following attributes are not saved as they exceed the maximum number of columns per data type: {', '.join(result['data_types']['overflow'].values())}"
                 )
 
         result["msg"] = Msg(type=msg_type, text=msg_text)

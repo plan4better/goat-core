@@ -17,18 +17,13 @@ from src.db.models.layer import (
     FeatureGeometryType,
     FeatureType,
     GeospatialAttributes,
-    IndicatorType,
     LayerBase,
     LayerType,
     ScenarioType,
     layer_base_example,
+    ToolType,
 )
 from src.schemas.job import Msg
-
-class AnalysisType(str, Enum):
-    """Analysis types."""
-
-    intersects = "intersects"
 
 
 class MaxFileSizeType(int, Enum):
@@ -153,6 +148,7 @@ class ColumnStatisticsOperation(Enum):
     equal_interval = "equal_interval"
     heads_and_tails = "heads_and_tails"
 
+
 class AreaStatisticsOperation(Enum):
     """Allowed operations on polygon geometries."""
 
@@ -160,6 +156,7 @@ class AreaStatisticsOperation(Enum):
     mean = "mean"
     min = "min"
     max = "max"
+
 
 class LayerReadBaseAttributes(BaseModel):
     id: UUID = Field(..., description="Content ID of the layer", alias="id")
@@ -215,8 +212,22 @@ feature_layer_update_base_example = {
 
 # Feature Layer Standard
 class IInternalLayerCreate(LayerBase):
-    id: UUID = Field(uuid4(), description="Content ID of the layer", alias="id")
+    id: UUID = Field(
+        default_factory=uuid4, description="Content ID of the layer", alias="id"
+    )
     dataset_id: UUID = Field(..., description="Dataset ID")
+
+
+class IFeatureLayerIndicatorCreate(BaseModel):
+    id: UUID = Field(
+        default_factory=uuid4, description="Content ID of the layer", alias="id"
+    )
+    name: str = Field(..., description="Layer name", max_length=255)
+    feature_layer_geometry_type: FeatureGeometryType = Field(
+        ..., description="Feature layer geometry type"
+    )
+    attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
+    tool_type: ToolType = Field(..., description="Tool type")
 
 
 class IFeatureStandardCreateAdditionalAttributes(BaseModel):
@@ -227,8 +238,7 @@ class IFeatureStandardCreateAdditionalAttributes(BaseModel):
     feature_layer_type: FeatureType = Field(..., description="Feature layer type")
     feature_layer_geometry_type: FeatureGeometryType = Field(
         ..., description="Feature layer geometry type"
-    )
-    size: int = Field(..., description="Size of the layer in bytes")
+    )    
     properties: LayerProperties = Field(..., description="Layer properties.")
     extent: str = Field(..., description="Geographical Extent of the layer")
     attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
@@ -242,34 +252,34 @@ class IFeatureStandardUpdate(FeatureUpdateBase):
     pass
 
 
-# Feature Layer Indicator
-class FeatureIndicatorAttributesBase(BaseModel):
-    """Base model for additional attributes feature layer indicator."""
+# Feature Layer Tool
+class FeatureToolAttributesBase(BaseModel):
+    """Base model for additional attributes feature layer tool."""
 
-    indicator_type: IndicatorType = Field(..., description="Indicator type")
+    tool_type: ToolType = Field(..., description="Tool type")
 
 
-feature_layer_indicator_attributes_example = {
-    "indicator_type": "isochrone",
+feature_layer_tool_attributes_example = {
+    "tool_type": "isochrone",
 }
 
 
-class IFeatureIndicatorCreate(LayerBase, FeatureIndicatorAttributesBase):
-    """Model to create feature layer indicator."""
+class IFeatureToolCreate(LayerBase, FeatureToolAttributesBase):
+    """Model to create feature layer tool."""
 
     pass
 
 
-class IFeatureIndicatorRead(
-    FeatureReadBaseAttributes, FeatureIndicatorAttributesBase, DateTimeBase
+class IFeatureToolRead(
+    FeatureReadBaseAttributes, FeatureToolAttributesBase, DateTimeBase
 ):
-    """Model to read a feature layer indicator."""
+    """Model to read a feature layer tool."""
 
     pass
 
 
-class IFeatureIndicatorUpdate(FeatureUpdateBase):
-    """Model to update a feature layer indicator."""
+class IFeatureToolUpdate(FeatureUpdateBase):
+    """Model to update a feature layer tool."""
 
     pass
 
@@ -467,14 +477,13 @@ class ITableCreateAdditionalAttributes(BaseModel):
 
     user_id: UUID = Field(..., description="User ID of the owner")
     type: LayerType = Field(..., description="Layer type")
-    size: int = Field(..., description="Size of the layer in bytes")
     attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
 
 
 class ITableRead(LayerBase, LayerReadBaseAttributes, DateTimeBase):
     """Model to read a table layer."""
 
-    pass
+    attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
 
 
 class ITableUpdate(LayerBase):
@@ -516,7 +525,7 @@ layer_creator_class = {
         "table": ITableRead,
         "feature": {
             "standard": IFeatureStandardRead,
-            "indicator": IFeatureIndicatorRead,
+            "tool": IFeatureToolRead,
             "scenario": IFeatureScenarioRead,
         },
     },

@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from tempfile import NamedTemporaryFile
 from typing import IO, Any, List, Optional, Union
+from uuid import UUID
 
 # Third party imports
 import geopandas
@@ -32,6 +33,8 @@ from geojson import loads as geojsonloads
 from jose import jwt
 from numba import njit
 from pydantic import BaseModel
+from pygeofilter.backends.sql import to_sql_where
+from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
 from rich import print as print
 from shapely import geometry
 from shapely.geometry import GeometryCollection, MultiPolygon, Point, Polygon, box
@@ -45,8 +48,9 @@ from starlette.responses import Response
 # Local application imports
 from src.core.config import settings
 from src.resources.enums import MaxUploadFileSize, MimeTypes
-from src.schemas.layer import LayerType
-from uuid import UUID
+from src.schemas.layer import CQLQuery, LayerType
+from src.schemas.toolbox_base import ColumnStatisticsOperation
+
 
 def optional(*fields):
     def dec(_cls):
@@ -1182,7 +1186,7 @@ def get_user_table(layer: Union[dict, SQLModel, BaseModel]):
         user_id = layer["user_id"]
     elif isinstance(layer, (SQLModel, BaseModel)):
         if layer.type == LayerType.feature.value:
-            feature_layer_geometry_type = layer.feature_layer_geometry_type
+            feature_layer_geometry_type = layer.feature_layer_geometry_type.value
         elif layer.type == LayerType.table.value:
             feature_layer_geometry_type = "no_geometry"
         else:
@@ -1260,8 +1264,100 @@ async def check_file_size(file: UploadFile, max_size: int) -> bool:
     await file.seek(0)  # Reset file position for further processing if needed
     return True
 
+
 def search_value(d, target):
     for key, value in d.items():
         if value == target:
             return key
-    return None
+    raise ValueError(f"{target} is not in the dictionary")
+
+
+def next_column_name(attribute_mapping: dict, data_type: str):
+    attributes = attribute_mapping.keys()
+    # Regular expression to find attributes with the given data type and a number
+    pattern = re.compile(rf"^{data_type}_attr(\d+)$")
+
+    # Find all numbers for the given data type attributes
+    numbers = [
+        int(match.group(1)) for attr in attributes if (match := pattern.match(attr))
+    ]
+
+    # Determine the next number (increment the highest found number)
+    next_number = max(numbers) + 1 if numbers else 1
+
+    # Construct the new attribute name
+    return f"{data_type}_attr{next_number}"
+
+def get_result_column(
+    attribute_mapping: dict, base_column_name: str, datatype: str
+) -> dict:
+    # Initialize the highest number found for the column name
+    highest_num = 0
+    base_name_exists = False
+
+    # Regular expression pattern to find numbered columns
+    pattern = re.compile(rf"^{base_column_name}_(\d+)$")
+
+    # Check all existing column names
+    for column_name in attribute_mapping.values():
+        if column_name == base_column_name:
+            # Base name exists without any number
+            base_name_exists = True
+        else:
+            # Match the pattern to find numbered columns
+            match = pattern.match(column_name)
+            if match:
+                # Extract the number and update highest_num if this number is larger
+                num = int(match.group(1))
+                if num > highest_num:
+                    highest_num = num
+    mapped_column = next_column_name(attribute_mapping, datatype)
+    # Construct the new column name based on the findings
+    if base_name_exists or highest_num > 0:
+        return {mapped_column: f"{base_column_name}_{highest_num + 1}"}
+    else:
+        # If the base name and no numbered variants were found, return the base name
+        return {mapped_column: base_column_name}
+
+
+def get_statistics_sql(field, operation):
+    if operation == ColumnStatisticsOperation.count:
+        query = f"COUNT({field})"
+    elif operation == ColumnStatisticsOperation.sum:
+        query = f"SUM({field})"
+    elif operation == ColumnStatisticsOperation.mean:
+        query = f"AVG({field})"
+    elif operation == ColumnStatisticsOperation.median:
+        query = f"PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {field})"
+    elif operation == ColumnStatisticsOperation.min:
+        query = f"MIN({field})"
+    elif operation == ColumnStatisticsOperation.max:
+        query = f"MAX({field})"
+
+    return query
+
+def build_where(id: UUID, table_name: str, query: str | dict, attribute_mapping: dict):
+    if query is None:
+        return f"{table_name}.layer_id = '{str(id)}'"
+    else:
+        if isinstance(query, str):
+            query = json.loads(query)
+        query_obj = CQLQuery(query=query)
+        ast = cql2_json_parser(query_obj.query)
+        attribute_mapping = {value: key for key, value in attribute_mapping.items()}
+        # Add id to attribute mapping
+        attribute_mapping["id"] = "id"
+        where = f"{table_name}.layer_id = '{str(id)}' AND "
+        converted_cql = re.sub(r'(?<=\(|\s|,)"', f'{table_name}."', to_sql_where(ast, attribute_mapping))
+        where = where + converted_cql
+        return where
+
+def build_where_clause(queries: [str]):
+    # Remove none values from queries
+    queries = [query for query in queries if query is not None]
+    if len(queries) == 0:
+        return ""
+    elif len(queries) == 1:
+        return "WHERE " + queries[0]
+    else:
+        return "WHERE " + " AND ".join(queries)

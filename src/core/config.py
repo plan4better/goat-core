@@ -15,6 +15,7 @@ class SyncPostgresDsn(PostgresDsn):
 class Settings(BaseSettings):
     API_V2_STR: str = "/api/v2"
     DATA_DIR: str = "/app/data"
+    TEST_DATA_DIR: str = "/app/tests/data"
     PROJECT_NAME: Optional[str] = "GOAT Core API"
     USER_DATA_SCHEMA: Optional[str] = "user_data"
 

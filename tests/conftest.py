@@ -1,6 +1,6 @@
 # Standard library imports
 import asyncio
-
+import os
 # Third party imports
 import pytest
 import pytest_asyncio
@@ -14,7 +14,7 @@ from src.main import app
 from src.schemas.active_mobility import (
     request_examples as active_mobility_request_examples,
 )
-from src.schemas.layer import request_examples as layer_request_examples
+from src.schemas.layer import request_examples as layer_request_examples, LayerType
 from src.schemas.motorized_mobility import (
     request_example_oev_gueteklasse,
     request_examples_isochrone_car,
@@ -34,6 +34,7 @@ from tests.utils import (
     upload_invalid_file,
     upload_valid_file,
     upload_valid_files,
+    upload_file
 )
 
 settings.RUN_AS_BACKGROUND_TASK = True
@@ -292,6 +293,7 @@ async def create_internal_layer(
 ):
     # Get feature layer dict and add layer ID
     feature_layer_dict = layer_request_examples["create_internal"][layer_type]["value"]
+    feature_layer_dict["name"] = generate_random_string(10)
     feature_layer_dict["dataset_id"] = dataset_id
     feature_layer_dict["folder_id"] = fixture_get_home_folder["id"]
     # Hit endpoint to create internal layer
@@ -333,6 +335,44 @@ async def fixture_create_internal_layers(
         )
     return layer
 
+@pytest.fixture
+async def fixture_create_join_layers(
+    client: AsyncClient, fixture_get_home_folder
+):
+    # Upload files
+    dir_csv = os.path.join(settings.TEST_DATA_DIR, "layers", "tool", "events.csv")
+    dir_gpkg = os.path.join(settings.TEST_DATA_DIR, "layers", "tool", "zipcode.gpkg")
+    dataset_csv = await upload_file(client, dir_csv)
+    dataset_gpkg = await upload_file(client, dir_gpkg)
+    # Create layers
+    layer_csv = await create_internal_layer(
+        client, dataset_csv["dataset_id"], fixture_get_home_folder, "table"
+    )
+    layer_gpkg = await create_internal_layer(
+        client, dataset_gpkg["dataset_id"], fixture_get_home_folder, "feature_layer_standard"
+    )
+    return {"home_folder": fixture_get_home_folder, "layer_csv": layer_csv, "layer_gpkg": layer_gpkg}
+
+@pytest.fixture
+async def fixture_add_join_layers_to_project(
+    client: AsyncClient, fixture_create_project, fixture_create_join_layers
+):
+    layer_csv = fixture_create_join_layers["layer_csv"]
+    layer_gpkg = fixture_create_join_layers["layer_gpkg"]
+    project_id = fixture_create_project["id"]
+    # Add layers to project
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_csv['id']}&layer_ids={layer_gpkg['id']}"
+    )
+    assert response.status_code == 200
+    layers_project = response.json()
+    for layer in layers_project:
+        if layer["type"] == LayerType.table.value:
+            layer_id_table = layer["id"]
+        elif layer["type"] == LayerType.feature.value:
+            layer_id_gpkg = layer["id"]
+
+    return {"layer_id_table": layer_id_table, "layer_id_gpkg": layer_id_gpkg, "project_id": project_id}
 
 async def create_external_layer(client: AsyncClient, home_folder, layer_type):
     # Get table layer dict and add layer ID

@@ -4,7 +4,7 @@ from uuid import UUID
 
 from geoalchemy2 import Geometry, WKBElement
 from geoalchemy2.shape import to_shape
-from pydantic import validator
+from pydantic import validator, root_validator
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
@@ -22,6 +22,8 @@ from sqlmodel import (
 
 from src.db.models._base_class import ContentBaseAttributes, DateTimeBase
 from src.db.models.scenario_feature import ScenarioType
+from src.core.config import settings
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from ._link_model import LayerProjectLink
@@ -29,12 +31,22 @@ if TYPE_CHECKING:
     from .scenario import Scenario
     from .scenario_feature import ScenarioFeature
 
+class ToolType(str, Enum):
+    """Indicator types."""
+
+    single_isochrone = "isochrone"
+    multi_isochrone = "multi_isochrone"
+    heatmap = "heatmap"
+    oev_gueteklasse = "oev_gueteklasse"
+    public_transport_frequency = "public_transport_frequency"
+    join = "join"
+
 
 class FeatureType(str, Enum):
     """Feature layer types."""
 
     standard = "standard"
-    indicator = "indicator"
+    tool = "tool"
     scenario = "scenario"
     street_network = "street_network"
 
@@ -63,16 +75,6 @@ class ExternalImageryDataType(str, Enum):
     wms = "wms"
     xyz = "xyz"
     wmts = "wmts"
-
-
-class IndicatorType(str, Enum):
-    """Indicator types."""
-
-    single_isochrone = "isochrone"
-    multi_isochrone = "multi_isochrone"
-    heatmap = "heatmap"
-    oev_gueteklasse = "oev_gueteklasse"
-    public_transport_frequency = "public_transport_frequency"
 
 
 class LayerType(str, Enum):
@@ -134,6 +136,23 @@ layer_base_example = {
     "data_source": "data_source plan4better example",
     "data_reference_year": 2020,
 }
+
+def internal_layer_table_name(values: SQLModel | BaseModel):
+    """Get the table name for the internal layer."""
+
+    # Get table name
+    if values.type == LayerType.feature.value:
+        # If of type enum return value
+        if isinstance(values.feature_layer_geometry_type, Enum):
+            feature_layer_geometry_type = values.feature_layer_geometry_type.value
+        else:
+            feature_layer_geometry_type = values.feature_layer_geometry_type
+    elif values.type == LayerType.table.value:
+        feature_layer_geometry_type = "no_geometry"
+    else:
+        raise ValueError(f"The passed layer type {values.type} is not supported.")
+
+    return f"{settings.USER_DATA_SCHEMA}.{feature_layer_geometry_type}_{str(values.user_id).replace('-', '')}"
 
 
 # TODO: Relation to check if opportunities_uuids exist in layers
@@ -200,9 +219,9 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         sa_column=Column(Text, nullable=True),
         description="Data type for imagery layers and tile layers",
     )
-    indicator_type: Optional[IndicatorType] = Field(
+    tool_type: Optional[ToolType] = Field(
         sa_column=Column(Text, nullable=True),
-        description="If it is an indicator layer, the indicator type",
+        description="If it is an tool layer, the tool type",
     )
     scenario_id: UUID | None = Field(
         sa_column=Column(
@@ -246,6 +265,12 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         else:
             return v
 
+    @property
+    def table_name(self):
+        return internal_layer_table_name(self)
+    @property
+    def layer_id(self):
+        return self.id
 
 # Constraints
 UniqueConstraint(Layer.__table__.c.folder_id, Layer.__table__.c.name)

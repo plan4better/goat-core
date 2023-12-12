@@ -1,4 +1,5 @@
 # Standard library imports
+import re
 from uuid import UUID
 
 # Third party imports
@@ -39,27 +40,23 @@ class CRUDLayerProject(CRUDBase):
             else:
                 layer_type = layer.type
 
-            # Convert to dicts and update layer
-            layer = layer.dict()
-            layer_project = layer_project.dict()
+            layer_dict = layer.dict()
             # Delete id from layer
-            del layer["id"]
-
-            # Update layer
-            layer.update(layer_project)
+            del layer_dict["id"]
+            # Update layer with layer project
+            layer_dict.update(layer_project.dict())
+            layer_project = layer_type_mapping_read[layer_type](**layer_dict)
 
             # Get feature cnt for all feature layers and tables
-            if layer["type"] in [LayerType.feature.value, LayerType.table.value]:
+            if layer_project.type in [LayerType.feature.value, LayerType.table.value]:
                 feature_cnt = await crud_layer.get_feature_cnt(
-                    async_session=async_session, layer_project=layer
+                    async_session=async_session, layer_project=layer_project
                 )
-            else:
-                feature_cnt = {}
+                layer_project.total_count = feature_cnt["total_count"]
+                layer_project.filtered_count = feature_cnt.get("filtered_count")
 
             # Write into correct schema
-            layer_projects_schemas.append(
-                layer_type_mapping_read[layer_type](**layer, **feature_cnt)
-            )
+            layer_projects_schemas.append(layer_project)
 
         return layer_projects_schemas
 
@@ -104,6 +101,76 @@ class CRUDLayerProject(CRUDBase):
             async_session, layer_projects
         )
         return layer_projects
+
+    async def get_internal(
+        self, async_session: AsyncSession, id: int, project_id: UUID
+    ):
+        """Get internal layer from layer project"""
+
+        # Get layer project
+        query = select([Layer, LayerProjectLink]).where(
+            LayerProjectLink.id == id,
+            Layer.id == LayerProjectLink.layer_id,
+            LayerProjectLink.project_id == project_id,
+        )
+        layer_project = await self.get_multi(
+            db=async_session,
+            query=query,
+        )
+        layer_project = await self.layer_projects_to_schemas(
+            async_session, layer_project
+        )
+
+        # Make sure layer project exists
+        if layer_project == []:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Layer project not found",
+            )
+
+        layer_project = layer_project[0]
+        # Check if internal layer
+        if layer_project.type not in [
+            LayerType.table.value,
+            LayerType.feature.value,
+        ]:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Layer is not an internal layer",
+            )
+
+        return layer_project
+
+    async def check_and_alter_layer_name(self, async_session: AsyncSession, project_id: UUID, layer_name):
+        """Check if layer name already exists in project and alter it like layer (n+1) if necessary"""
+
+        # Regular expression to find layer names with a number
+        pattern = re.compile(rf"^{re.escape(layer_name)} \((\d+)\)$")
+
+        # Modify the query to select only the name attribute of layers that start with the given layer_name
+        query = select(LayerProjectLink.name).where(
+            LayerProjectLink.project_id == project_id,
+            LayerProjectLink.name.like(f"{layer_name}%")
+        )
+
+        # Execute the query
+        result = await async_session.execute(query)
+        layer_names = [row[0] for row in result.fetchall()]
+
+        # Find the highest number (n) among the layer names using list comprehension
+        numbers = [int(match.group(1)) for name in layer_names if (match := pattern.match(name))]
+        highest_num = max(numbers, default=0)
+
+        # Check if the base layer name exists
+        base_name_exists = layer_name in layer_names
+
+        # Construct the new layer name
+        if base_name_exists or highest_num > 0:
+            new_layer_name = f"{layer_name} ({highest_num + 1})"
+        else:
+            new_layer_name = layer_name
+
+        return new_layer_name
 
     async def create(
         self,
@@ -247,12 +314,16 @@ class CRUDLayerProject(CRUDBase):
         del layer_project_dict["id"]
         # Update layer
         layer_dict.update(layer_project_dict)
+        layer_project = model_type_read(**layer_dict)
+
 
         # Get feature cnt
         feature_cnt = await crud_layer.get_feature_cnt(
-            async_session, layer_project=layer_dict
+            async_session, layer_project=layer_project
         )
-        return model_type_read(**layer_dict, **feature_cnt)
+        layer_project.total_count = feature_cnt.get("total_count")
+        layer_project.filtered_count = feature_cnt.get("filtered_count")
+        return layer_project
 
 
 layer_project = CRUDLayerProject(LayerProjectLink)

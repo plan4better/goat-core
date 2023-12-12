@@ -1,7 +1,7 @@
 # Standard Libraries
+import json
 import os
 from typing import List
-import json
 
 # Third-party Libraries
 from fastapi import (
@@ -22,6 +22,8 @@ from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
 from sqlalchemy import and_, or_, select
 
+from src.core.config import settings
+
 # Local application imports
 from src.core.content import (
     read_content_by_id,
@@ -36,21 +38,20 @@ from src.endpoints.deps import get_db, get_user_id
 from src.schemas.common import ContentIdList, OrderEnum
 from src.schemas.job import JobType
 from src.schemas.layer import (
+    AreaStatisticsOperation,
     ColumnStatisticsOperation,
     FeatureUploadType,
     FileUploadType,
+    IFileUploadMetadata,
     IInternalLayerCreate,
     ILayerExternalCreate,
     ILayerRead,
     ILayerUpdate,
     MaxFileSizeType,
     TableUploadType,
-    IFileUploadMetadata,
-    AreaStatisticsOperation,
 )
 from src.schemas.layer import request_examples as layer_request_examples
-from src.utils import check_file_size
-from src.core.config import settings
+from src.utils import build_where, check_file_size
 
 router = APIRouter()
 
@@ -384,28 +385,15 @@ async def get_feature_count(
     """Get feature count. Based on the passed CQL-filter."""
 
     # Get layer
-    layer = await crud_layer.get(
-        db=async_session,
+    layer = await crud_layer.get_internal(
+        async_session=async_session,
         id=id,
     )
-
-    # Raise error if not feature layer
-    if layer.type != LayerType.feature.value:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="You can only compute the feature count for feature layers.",
-        )
-    layer_dict = layer.dict()
-
-    # Add query to layer dict
-    layer_dict["query"] = query
-
-    # Rename id to layer_id. This is because the function is also user for layer project.
-    layer_dict["layer_id"] = layer_dict.pop("id")
-
+    where_query = build_where(layer.id, layer.table_name, query, layer.attribute_mapping)
     count = await crud_layer.get_feature_cnt(
         async_session=async_session,
-        layer_project=layer_dict,
+        layer_project=layer,
+        where_query=where_query,
     )
 
     # Return result

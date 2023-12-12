@@ -6,8 +6,7 @@ from uuid import UUID
 # Third-party Libraries
 from pydantic import BaseModel, Field, root_validator
 
-
-class ColumStatisticsOperation(str, Enum):
+class ColumnStatisticsOperation(str, Enum):
     count = "count"
     sum = "sum"
     mean = "mean"
@@ -19,13 +18,15 @@ class ColumStatisticsOperation(str, Enum):
 class ColumnStatistic(BaseModel):
     """Column statistic schema."""
 
-    operation: ColumStatisticsOperation
+    operation: ColumnStatisticsOperation
     field: str
+
 
 class MaxFeatureCnt(int, Enum):
     """Max feature count schema."""
 
     area_statistics = 100000
+    join = 1000000
 
 
 class ResultTarget(BaseModel):
@@ -36,17 +37,11 @@ class ResultTarget(BaseModel):
         title="Layer Name",
         description="The name of the layer.",
     )
-    folder_id: UUID = Field(
-        ...,
+    folder_id: UUID | None = Field(
+        None,
         title="Folder ID",
         description="The ID of the folder where the layer will be created.",
     )
-    project_id: UUID | None = Field(
-        None,
-        title="Project ID",
-        description="The ID of the project where the layer will be created.",
-    )
-
 
 class IToolResponse(BaseModel):
     """Tool response schema."""

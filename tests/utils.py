@@ -86,10 +86,9 @@ async def get_files_to_test(file_type: str) -> List[str]:
     return os.listdir(data_dir)
 
 
-async def upload_file(client: AsyncClient, file_type: str, filename: str) -> int:
+async def upload_file(client: AsyncClient, file_dir: str) -> int:
     """Upload a single file and get its job ID."""
-    data_dir = f"tests/data/layers/valid/{file_type}"
-    with open(os.path.join(data_dir, filename), "rb") as f:
+    with open(os.path.join(file_dir), "rb") as f:
         response = await client.post(
             f"{settings.API_V2_STR}/layer/file-upload", files={"file": f}
         )
@@ -101,13 +100,13 @@ async def upload_valid_file(client: AsyncClient, file_type: str):
     """Validate valid file."""
 
     if file_type == "point":
-        response = await upload_file(client, "point", "valid.geojson")
+        response = await upload_file(client, os.path.join(settings.TEST_DATA_DIR, "layers", "valid", "point", "valid.geojson"))
     elif file_type == "polygon":
-        response = await upload_file(client, "polygon", "valid.geojson")
+        response = await upload_file(client, os.path.join(settings.TEST_DATA_DIR, "layers", "valid", "polygon", "valid.geojson"))
     elif file_type == "line":
-        response = await upload_file(client, "line", "valid.geojson")
+        response = await upload_file(client, os.path.join(settings.TEST_DATA_DIR, "layers", "valid", "line", "valid.geojson"))
     elif file_type == "no_geometry":
-        response = await upload_file(client, "no_geometry", "valid.csv")
+        response = await upload_file(client, os.path.join(settings.TEST_DATA_DIR, "layers", "valid", "no_geometry", "valid.csv"))
     else:
         raise ValueError("file_type must be either point or table")
     return response
@@ -119,7 +118,8 @@ async def upload_valid_files(client: AsyncClient, file_type: str):
 
     dataset_ids = []
     for filename in files:
-        metadata = await upload_file(client, file_type, filename)
+        file_dir = os.path.join(settings.TEST_DATA_DIR, "layers", "valid", file_type, filename)
+        metadata = await upload_file(client, file_dir)
         dataset_ids.append(metadata["dataset_id"])
 
     return dataset_ids

@@ -4,9 +4,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import text
 
 from src.core.config import settings
-from src.db.models.layer import Layer
+from src.db.models.layer import Layer, ToolType
 from src.db.session import AsyncSession
-from src.schemas.layer import IndicatorType
 from src.schemas.motorized_mobility import AreaLimitPerTool, CountLimitPerTool
 
 
@@ -14,7 +13,7 @@ async def check_reference_area(
     async_session: AsyncSession,
     user_id: UUID,
     reference_area: Layer,
-    operation_type: IndicatorType,
+    operation_type: ToolType,
     filter: dict = None,
 ) -> str:
     """Check if reference area is too large for specific indicator."""

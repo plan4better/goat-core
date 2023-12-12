@@ -1,15 +1,16 @@
 # Standard library imports
+import asyncio
 import json
 import os
-from uuid import UUID
+from uuid import UUID, uuid4
 
 # Third party imports
 from fastapi import BackgroundTasks, HTTPException, UploadFile, status
 from fastapi_pagination import Params as PaginationParams
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from pygeofilter.backends.sql import to_sql_where
-from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
+from sqlmodel import SQLModel
 
 # Local application imports
 from src.core.config import settings
@@ -21,26 +22,22 @@ from src.db.models.layer import Layer
 from src.schemas.job import JobStatusType
 from src.schemas.layer import (
     ColumnStatisticsOperation,
-    CQLQuery,
     FeatureType,
     IFeatureStandardCreateAdditionalAttributes,
+    IFileUploadMetadata,
+    IInternalLayerCreate,
     ITableCreateAdditionalAttributes,
     LayerType,
     SupportedOgrGeomType,
-    IFileUploadMetadata,
-    IInternalLayerCreate,
     UserDataGeomType,
 )
-from src.schemas.toolbox_base import MaxFeatureCnt
 from src.schemas.style import base_properties
-from src.utils import get_user_table
-from uuid import uuid4
-import asyncio
+from src.schemas.toolbox_base import MaxFeatureCnt
+from src.utils import build_where, build_where_clause
 
 
 class CRUDLayer(CRUDBase):
     """CRUD class for Layer."""
-
     async def create_internal(
         self,
         async_session: AsyncSession,
@@ -52,8 +49,6 @@ class CRUDLayer(CRUDBase):
         additional_attributes = {}
         # Get layer_id and size from import job
         additional_attributes["user_id"] = user_id
-        additional_attributes["size"] = file_metadata["file_size"]
-
         # Create attribute mapping
         additional_attributes["attribute_mapping"] = attribute_mapping
 
@@ -85,10 +80,28 @@ class CRUDLayer(CRUDBase):
             **layer_in.dict(exclude_none=True),
             **additional_attributes,
         )
+        # Update size
+        layer_in.size = await self.get_feature_layer_size(async_session=async_session, layer=layer_in)
         layer = await self.create(
             db=async_session,
             obj_in=layer_in,
         )
+        return layer
+
+
+    async def get_internal(self, async_session: AsyncSession, id: UUID):
+        """Gets a layer and make sure it is a internal layer."""
+
+        layer = await self.get(async_session, id=id)
+        if layer is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Layer not found"
+            )
+        if layer.type not in [LayerType.feature, LayerType.table]:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Layer is not a feature layer or table layer. The requested operation cannot be performed on this layer.",
+            )
         return layer
 
     async def upload_file(
@@ -277,70 +290,59 @@ class CRUDLayer(CRUDBase):
         """Delete layer data which is in the user data tables."""
 
         # Delete layer data
-        table_name = get_user_table(layer)
         await async_session.execute(
-            text(f"DELETE FROM {table_name} WHERE layer_id = '{layer.id}'")
+            text(f"DELETE FROM {layer.table_name} WHERE layer_id = '{layer.id}'")
         )
         await async_session.commit()
 
-    async def build_where(self, id: UUID, query: str | dict, attribute_mapping: dict):
-        if query is None:
-            return f"layer_id = '{str(id)}'"
-        else:
-            if isinstance(query, str):
-                query = json.loads(query)
-            query_obj = CQLQuery(query=query)
-            ast = cql2_json_parser(query_obj.query)
-            attribute_mapping = {value: key for key, value in attribute_mapping.items()}
-            # Add id to attribute mapping
-            attribute_mapping["id"] = "id"
-            where = f"layer_id = '{str(id)}' AND " + to_sql_where(
-                ast, attribute_mapping
-            )
-            return where
+    async def get_feature_layer_size(self, async_session: AsyncSession, layer: BaseModel | SQLModel):
+        """Get size of feature layer."""
 
-    async def check_if_internal_layer(self, async_session: AsyncSession, id: UUID):
-        """Check if layer is internal layer."""
+        # Get size
+        sql_query = f"""
+            SELECT SUM(pg_column_size(p.*))
+            FROM {layer.table_name} AS p
+            WHERE layer_id = '{str(layer.id)}'
+        """
+        result = await async_session.execute(text(sql_query))
+        result = result.fetchall()
+        return result[0][0]
 
-        # Get layer
-        layer = await self.get(async_session, id=id)
-        if layer is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Layer not found"
-            )
+    async def get_feature_layer_extent(self, async_session: AsyncSession, layer: BaseModel | SQLModel):
+        """Get extent of feature layer."""
 
-        # Check if layer_type is feature or table
-        if layer.type not in [LayerType.feature, LayerType.table]:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Layer is not a feature layer or table layer. Unique values can only be requested for internal layers.",
-            )
-        return layer
+        # Get extent
+        sql_query = f"""
+            SELECT ST_ASTEXT(ST_MULTI(ST_ENVELOPE(ST_Extent(geom))))
+            FROM {layer.table_name}
+            WHERE layer_id = '{str(layer.id)}'
+        """
+        result = await async_session.execute(text(sql_query))
+        result = result.fetchall()
+        return result[0][0]
 
     async def get_feature_cnt(
         self,
         async_session: AsyncSession,
-        layer_project: dict,
+        layer_project: SQLModel | BaseModel,
+        where_query: str = None,
     ):
-        """Get feature count for a layer project."""
-
-        # Get table name
-        table_name = get_user_table(layer_project)
+        """Get feature count for a layer or a layer project."""
 
         # Get feature count total
         feature_cnt = {}
-        sql_query = f"SELECT COUNT(*) FROM {table_name} WHERE layer_id = '{str(layer_project['layer_id'])}'"
+        table_name = layer_project.table_name
+        sql_query = f"SELECT COUNT(*) FROM {table_name} WHERE layer_id = '{str(layer_project.layer_id)}'"
         result = await async_session.execute(text(sql_query))
         feature_cnt["total_count"] = result.scalar_one()
 
         # Get feature count filtered
-        if layer_project.get("query", None):
-            where = await self.build_where(
-                id=layer_project["layer_id"],
-                query=layer_project["query"],
-                attribute_mapping=layer_project["attribute_mapping"],
-            )
-            sql_query = f"SELECT COUNT(*) FROM {table_name} WHERE {where}"
+        if not where_query:
+            where_query = build_where_clause([layer_project.where_query])
+        else:
+            where_query = build_where_clause([where_query])
+        if where_query:
+            sql_query = f"SELECT COUNT(*) FROM {table_name} {where_query}"
             result = await async_session.execute(text(sql_query))
             feature_cnt["filtered_count"] = result.scalar_one()
         return feature_cnt
@@ -350,17 +352,11 @@ class CRUDLayer(CRUDBase):
         async_session: AsyncSession,
         max_feature_cnt: int,
         layer,
-        where: str,
+        where_query: str,
     ):
-        layer_dict = layer.dict()
-        layer_dict["where"] = where
-
-        # Rename id to layer_id
-        layer_dict["layer_id"] = layer_dict["id"]
-        del layer_dict["id"]
-
+        """Check if feature count is exceeding the defined limit."""
         feature_cnt = await self.get_feature_cnt(
-            async_session=async_session, layer_project=layer_dict
+            async_session=async_session, layer_project=layer, where_query=where_query
         )
 
         if feature_cnt.get("filtered_count") is not None:
@@ -379,7 +375,7 @@ class CRUDLayer(CRUDBase):
         self, async_session: AsyncSession, id: UUID, column_name: str, query: str
     ):
         # Check if layer is internal layer
-        layer = await self.check_if_internal_layer(async_session, id=id)
+        layer = await self.get_internal(async_session, id=id)
         column_mapped = next(
             (
                 key
@@ -394,19 +390,10 @@ class CRUDLayer(CRUDBase):
                 status_code=status.HTTP_404_NOT_FOUND, detail="Column not found"
             )
 
-        # Get user table name for layer
-        table_name = get_user_table(layer)
-
-        # Build query
-        where = await self.build_where(
-            id=id, query=query, attribute_mapping=layer.attribute_mapping
-        )
-
         return {
             "layer": layer,
             "column_mapped": column_mapped,
-            "table_name": table_name,
-            "where": where,
+            "where_query": build_where(id=layer.id, table_name=layer.table_name, query=query, attribute_mapping=layer.attribute_mapping)
         }
 
     async def get_unique_values(
@@ -422,18 +409,17 @@ class CRUDLayer(CRUDBase):
         res_check = await self.check_if_column_suitable_for_stats(
             async_session=async_session, id=id, column_name=column_name, query=query
         )
-        res_check["layer"]
+        layer = res_check["layer"]
         column_mapped = res_check["column_mapped"]
-        table_name = res_check["table_name"]
-        where = res_check["where"]
+        where_query = res_check["where_query"]
         # Map order
         order_mapped = {"descendent": "DESC", "ascendent": "ASC"}[order]
         # Build query
         sql_query = f"""
         WITH cnt AS (
             SELECT {column_mapped} AS {column_name}, COUNT(*) AS count
-            FROM {table_name}
-            WHERE {where}
+            FROM {layer.table_name}
+            WHERE {where_query}
             AND {column_mapped} IS NOT NULL
             GROUP BY {column_mapped}
             ORDER BY COUNT(*)
@@ -457,7 +443,10 @@ class CRUDLayer(CRUDBase):
         query: str,
     ):
         # Check if layer is internal layer
-        layer = await self.check_if_internal_layer(async_session, id=id)
+        layer = await self.get_internal(async_session, id=id)
+
+        # Where query
+        where_query = build_where(id=layer.id, table_name=layer.table_name, query=query, attribute_mapping=layer.attribute_mapping)
 
         # Check if layer has polygon geoms
         if layer.feature_layer_geometry_type != UserDataGeomType.polygon.value:
@@ -466,30 +455,23 @@ class CRUDLayer(CRUDBase):
                 detail="Operation not supported. The layer does not contain polygon geometries. Pick a layer with polygon geometries.",
             )
 
-        # Get user table name for layer
-        table_name = get_user_table(layer)
-
-        # Get where condition
-        where = await self.build_where(
-            id=id, query=query, attribute_mapping=layer.attribute_mapping
-        )
         # Check if feature count is exceeding the defined limit
         await self.check_exceed_feature_cnt(
             async_session=async_session,
             max_feature_cnt=MaxFeatureCnt.area_statistics.value,
             layer=layer,
-            where=where,
+            where_query=where_query,
         )
         # Call SQL function
         sql_query = """
-            SELECT * FROM basic.area_statistics(:operation, :table_name, :where)
+            SELECT * FROM basic.area_statistics(:operation, :table_name, :where_query)
         """
         res = await async_session.execute(
             sql_query,
             {
                 "operation": operation.value,
-                "table_name": table_name,
-                "where": where,
+                "table_name": layer.table_name,
+                "where_query": where_query,
             },
         )
         res = res.fetchall()
@@ -511,13 +493,14 @@ class CRUDLayer(CRUDBase):
         )
 
         args = res
+        where_clause = res["where_query"]
+        args["table_name"] = args["layer"].table_name
         # del layer from args
         del args["layer"]
 
         # Extend where clause
         column_mapped = res["column_mapped"]
         if stripe_zeros:
-            where_clause = args.get("where", "")
             where_extension = (
                 f" AND {column_mapped} != 0"
                 if where_clause

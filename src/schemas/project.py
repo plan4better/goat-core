@@ -1,22 +1,24 @@
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator
-
+from pydantic import BaseModel, Field, root_validator, validator
+from sqlmodel import SQLModel
+from src.core.config import settings
 from src.db.models._base_class import DateTimeBase
-from src.db.models.layer import ContentBaseAttributes
+from src.db.models.layer import ContentBaseAttributes, internal_layer_table_name
 from src.schemas.layer import (
     CQLQuery,
     IExternalImageryRead,
     IExternalVectorTileRead,
-    IFeatureIndicatorRead,
     IFeatureScenarioRead,
     IFeatureStandardRead,
+    IFeatureToolRead,
     ITableRead,
     LayerOtherProperties,
     LayerProperties,
+    LayerType,
 )
-from src.utils import optional
+from src.utils import build_where, optional
 
 
 ################################################################################
@@ -99,13 +101,24 @@ class IFeatureBaseProject(CQLQuery):
         description="Layer properties",
     )
 
-
 class IFeatureBaseProjectRead(IFeatureBaseProject):
-    total_count: int = Field(..., description="Total count of features in the layer")
+    total_count: int | None = Field(None, description="Total count of features in the layer")
     filtered_count: int | None = Field(
         None, description="Filtered count of features in the layer"
     )
+    @property
+    def table_name(self):
+        return internal_layer_table_name(self)
+    @property
+    def where_query(self):
+        return where_query(self)
 
+def where_query(values: SQLModel | BaseModel):
+    table_name = internal_layer_table_name(values)
+    # Check if query exists then build where query
+    if values.query:
+        return build_where(id=values.layer_id, table_name=table_name, query=values.query, attribute_mapping=values.attribute_mapping)
+    return None
 
 class IFeatureStandardProjectRead(
     LayerProjectIds, IFeatureStandardRead, IFeatureBaseProjectRead
@@ -113,8 +126,8 @@ class IFeatureStandardProjectRead(
     pass
 
 
-class IFeatureIndicatorProjectRead(
-    LayerProjectIds, IFeatureIndicatorRead, IFeatureBaseProjectRead
+class IFeatureToolProjectRead(
+    LayerProjectIds, IFeatureToolRead, IFeatureBaseProjectRead
 ):
     pass
 
@@ -131,7 +144,7 @@ class IFeatureStandardProjectUpdate(IFeatureBaseProject):
 
 
 @optional
-class IFeatureIndicatorProjectUpdate(IFeatureBaseProject):
+class IFeatureToolProjectUpdate(IFeatureBaseProject):
     pass
 
 
@@ -142,10 +155,20 @@ class IFeatureScenarioProjectUpdate(IFeatureBaseProject):
 
 class ITableProjectRead(LayerProjectIds, ITableRead, CQLQuery):
     group: str = Field(None, description="Layer group name")
-    total_count: int = Field(..., description="Total count of features in the layer")
+    total_count: int | None = Field(None, description="Total count of features in the layer")
     filtered_count: int | None = Field(
         None, description="Filtered count of features in the layer"
     )
+    table_name: str | None = Field(None, description="Table name")
+    where_query: str | None = Field(None, description="Where query")
+    # Compute table_name and where_query
+    @property
+    def table_name(self):
+        return internal_layer_table_name(self)
+    @property
+    def where_query(self):
+        return where_query(self)
+
 
 
 @optional
@@ -200,7 +223,7 @@ class IExternalImageryProjectUpdate(BaseModel):
 
 layer_type_mapping_read = {
     "feature_standard": IFeatureStandardProjectRead,
-    "feature_indicator": IFeatureIndicatorProjectRead,
+    "feature_tool": IFeatureToolProjectRead,
     "feature_scenario": IFeatureScenarioProjectRead,
     "table": ITableProjectRead,
     "external_vector_tile": IExternalVectorTileProjectRead,
@@ -209,7 +232,7 @@ layer_type_mapping_read = {
 
 layer_type_mapping_update = {
     "feature_standard": IFeatureStandardProjectUpdate,
-    "feature_indicator": IFeatureIndicatorProjectUpdate,
+    "feature_tool": IFeatureToolProjectUpdate,
     "feature_scenario": IFeatureScenarioProjectUpdate,
     "table": ITableProjectUpdate,
     "external_vector_tile": IExternalVectorTileProjectUpdate,
@@ -258,10 +281,10 @@ request_examples = {
                 },
             },
         },
-        "feature_indicator": {
-            "summary": "Feature Layer Indicator",
+        "feature_tool": {
+            "summary": "Feature Layer Tool",
             "value": {
-                "name": "Feature Layer Indicator",
+                "name": "Feature Layer Tool",
                 "group": "Group 1",
                 "properties": {
                     "type": "circle",
