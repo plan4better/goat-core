@@ -1,19 +1,15 @@
 import json
 from datetime import datetime, timedelta
 from uuid import UUID
-
-from geojson import FeatureCollection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
-
 from src.crud.crud_layer import layer as crud_layer
 from src.db.models import Layer
 from src.schemas.motorized_mobility import (
-    StationConfig,
+    IOevGueteklasse,
     oev_gueteklasse_station_config_layer_base,
-    IOevGueteklasse
 )
-from src.utils import get_user_table, get_layer_columns
+from src.utils import get_layer_columns, get_user_table
 
 
 class CRUDOevGueteklasse:
@@ -47,15 +43,15 @@ class CRUDOevGueteklasse:
             INSERT INTO {user_table}({table_columns})
             WITH stations AS (
                 SELECT stop_id, stop_name, trip_cnt::jsonb, trip_ids,
-                (oev_gueteklasse ->> 'frequency')::float AS frequency, 
-                (oev_gueteklasse ->> '_class')::integer AS _class, geom AS geom, 
+                (oev_gueteklasse ->> 'frequency')::float AS frequency,
+                (oev_gueteklasse ->> '_class')::integer AS _class, geom AS geom,
                 '{str(layer.id)}'::uuid AS layer_id
                 FROM basic.count_public_transport_services_station(
                     '{str(timedelta(seconds=params.start_time))}',
                     '{str(timedelta(seconds=params.end_time))}',
                     {params.weekday},
                     '{reference_table_name}'
-                ) s, LATERAL basic.oev_guetklasse_station_category(trip_cnt, '{json.dumps(params.station_config.dict())}'::jsonb, 
+                ) s, LATERAL basic.oev_guetklasse_station_category(trip_cnt, '{json.dumps(params.station_config.dict())}'::jsonb,
                 {params.start_time}, {params.end_time}) oev_gueteklasse
             )
             SELECT {original_columns}

@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from fastapi_pagination import Params as PaginationParams
-from sqlalchemy import and_, select, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -12,7 +12,7 @@ from src.core.config import settings
 from src.crud.base import CRUDBase
 from src.db.models.job import Job
 from src.schemas.common import OrderEnum
-from src.schemas.job import JobType, job_mapping, JobStatusType, MsgType
+from src.schemas.job import JobStatusType, JobType, MsgType, job_mapping
 from src.utils import sanitize_error_message
 
 
@@ -43,12 +43,18 @@ class CRUDJob(CRUDBase):
                 detail=f"You can only run {settings.MAX_NUMBER_PARALLEL_JOBS} jobs at a time.",
             )
 
-        # Create job.
+        # Create job
+        # Get job steps if job type is in job_mapping else create empty dict.
+        if job_type not in job_mapping:
+            job_status = {}
+        else:
+            job_status = job_mapping[job_type.value]().dict()
+
         job = Job(
             user_id=user_id,
             type=job_type.value,
             payload={},
-            status=job_mapping[job_type.value]().dict(),
+            status=job_status,
             status_simple=JobStatusType.pending.value,
         )
         if project_id:
@@ -145,7 +151,7 @@ class CRUDJob(CRUDBase):
         """Mark a job as read."""
 
         # Get the jobs owned by the user and ids in the list.
-        query_get = select(Job).where(and_(Job.id.in_(job_ids), Job.user_id == user_id))
+        query_get = select(Job).where(and_(Job.id.in_(job_ids), Job.user_id == user_id, Job.status_simple.notin_([JobStatusType.pending.value, JobStatusType.running.value])))
         jobs = await self.get_multi(async_session, query=query_get)
         jobs = [job[0] for job in jobs]
         if jobs == []:

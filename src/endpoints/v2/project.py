@@ -16,7 +16,7 @@ from src.schemas.common import ContentIdList, OrderEnum
 from src.schemas.project import (
     IExternalImageryProjectRead,
     IExternalVectorTileProjectRead,
-    IFeatureIndicatorProjectRead,
+    IFeatureToolProjectRead,
     IFeatureScenarioProjectRead,
     IFeatureStandardProjectRead,
     InitialViewState,
@@ -280,7 +280,7 @@ async def update_project_initial_view_state(
     "/{id}/layer",
     response_model=List[
         IFeatureStandardProjectRead
-        | IFeatureIndicatorProjectRead
+        | IFeatureToolProjectRead
         | IFeatureScenarioProjectRead
         | ITableProjectRead
         | IExternalVectorTileProjectRead
@@ -318,7 +318,7 @@ async def add_layers_to_project(
     "/{id}/layer",
     response_model=List[
         IFeatureStandardProjectRead
-        | IFeatureIndicatorProjectRead
+        | IFeatureToolProjectRead
         | IFeatureScenarioProjectRead
         | ITableProjectRead
         | IExternalVectorTileProjectRead
@@ -348,7 +348,7 @@ async def get_layers_from_project(
 @router.get(
     "/{id}/layer/{layer_project_id}",
     response_model=IFeatureStandardProjectRead
-    | IFeatureIndicatorProjectRead
+    | IFeatureToolProjectRead
     | IFeatureScenarioProjectRead
     | ITableProjectRead
     | IExternalVectorTileProjectRead
@@ -373,7 +373,7 @@ async def get_layer_from_project(
 @router.put(
     "/{id}/layer/{layer_project_id}",
     response_model=IFeatureStandardProjectRead
-    | IFeatureIndicatorProjectRead
+    | IFeatureToolProjectRead
     | IFeatureScenarioProjectRead
     | ITableProjectRead
     | IExternalVectorTileProjectRead

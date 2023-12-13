@@ -13,8 +13,6 @@ from sqlmodel import (
 )
 
 from src.db.models._base_class import DateTimeBase
-from src.schemas.layer import LayerOtherProperties
-from src.schemas.project import LayerProjectProperties
 
 if TYPE_CHECKING:
     from .layer import Layer

@@ -4,10 +4,13 @@ from datetime import datetime
 
 # TODO: Add other job types
 
+
 class JobType(str, Enum):
     """Job types."""
-    file_validate = "file_validate"
+
     file_import = "file_import"
+    join = "join"
+
 
 class JobStatusType(str, Enum):
     """Status types."""
@@ -19,6 +22,7 @@ class JobStatusType(str, Enum):
     timeout = "timeout"
     killed = "killed"
 
+
 class MsgType(str, Enum):
     """Message types."""
 
@@ -26,11 +30,13 @@ class MsgType(str, Enum):
     warning = "warning"
     error = "error"
 
+
 class Msg(BaseModel):
     """Message attribute types."""
 
     type: MsgType
     text: str
+
 
 class JobStep(BaseModel):
     """Job step attribute types."""
@@ -47,6 +53,5 @@ class JobStatusFileImport(BaseModel):
     upload: JobStep = {}
     migration: JobStep = {}
 
-job_mapping = {
-    JobType.file_import: JobStatusFileImport
-}
+# Only add jobs here that are consisting of multiple steps
+job_mapping = {JobType.file_import: JobStatusFileImport}

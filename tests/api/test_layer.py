@@ -5,8 +5,8 @@ import pytest
 from httpx import AsyncClient
 
 from src.core.config import settings
+from src.schemas.layer import AreaStatisticsOperation, ColumnStatisticsOperation
 from tests.utils import get_with_wrong_id
-from src.schemas.layer import ColumnStatisticsOperation, AreaStatisticsOperation
 
 
 @pytest.mark.asyncio

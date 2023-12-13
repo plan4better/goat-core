@@ -6,28 +6,28 @@ from pydantic import BaseModel, Field, validator
 
 from src.schemas.toolbox_base import (
     ColumnStatistic,
-    ColumStatisticsOperation,
+    ColumnStatisticsOperation,
     ResultTarget,
 )
 
 
 class IJoin(BaseModel):
-    """Join indicator schema."""
+    """Join tool schema."""
 
-    target_layer_id: UUID = Field(
+    target_layer_project_id: int = Field(
         ...,
-        title="Target Layer ID",
-        description="The ID of the layer the data will be joined.",
+        title="Target Layer Project ID",
+        description="The ID of the layer project the data will be joined.",
     )
     target_field: str = Field(
         ...,
         title="Target Field",
         description="The field in the target layer that is used for the join.",
     )
-    join_layer_id: UUID = Field(
+    join_layer_project_id: int = Field(
         ...,
         title="Join Layer ID",
-        description="The ID of the layer that contains the joined data.",
+        description="The ID of the layer project that contains the joined data.",
     )
     join_field: str = Field(
         ...,
@@ -54,7 +54,7 @@ class AreaLayerType(str, Enum):
 
 
 class IAggregationPoint(BaseModel):
-    """Aggregation indicator schema."""
+    """Aggregation tool schema."""
 
     point_layer_id: UUID = Field(
         ...,
@@ -130,7 +130,7 @@ request_examples_join = {
             "join_layer_id": "87654321-8765-4321-8765-432187654321",
             "join_field": "join_field_example",
             "column_statistics": {
-                "operation": ColumStatisticsOperation.count.value,
+                "operation": ColumnStatisticsOperation.count.value,
                 "field": "field_example1",
             },
             "result_target": {
@@ -148,7 +148,7 @@ request_examples_join = {
             "join_layer_id": "98765432-9876-5432-9876-543298765432",
             "join_field": "join_field_example2",
             "column_statistics": {
-                "operation": ColumStatisticsOperation.mean.value,
+                "operation": ColumnStatisticsOperation.mean.value,
                 "field": "field_example2",
             },
             "result_target": {
