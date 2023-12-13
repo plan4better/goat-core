@@ -1,9 +1,10 @@
 from typing import Generator
-from fastapi import HTTPException, Header
-from src.db.session import AsyncSession, async_session, session_manager
-from fastapi import HTTPException
+
+from fastapi import HTTPException, Request
 from jose import jwt
+
 from src.core.config import settings
+from src.db.session import AsyncSession, async_session, session_manager
 
 
 async def get_db() -> Generator:
@@ -16,7 +17,11 @@ async def get_db_session() -> AsyncSession:
         yield session
 
 
-def get_user_id(authorization: str = None):
+def get_user_id(request: Request):
+    """Get the user ID from the JWT token or use the pre-defined user_id if running without authentication."""
+    # Check if the request has an Authorization header
+    authorization = request.headers.get("Authorization")
+
     if authorization:
         # Split the Authorization header into the scheme and the token
         scheme, _, token = authorization.partition(" ")
