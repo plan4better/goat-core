@@ -101,4 +101,7 @@ async def item_already_exists_handler(request: Request, exc: IntegrityError):
             "detail": str(exc.__dict__.get("orig")),
         },
     )
-# add_pagination(app)
+
+# Create data folder in case it does not exist
+if not os.path.exists(settings.DATA_DIR):
+    os.makedirs(settings.DATA_DIR)
