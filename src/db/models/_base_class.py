@@ -61,7 +61,7 @@ class ContentBaseAttributes(SQLModel):
         sa_column=Column(ARRAY(Text()), nullable=True), description="Layer tags"
     )
     thumbnail_url: str | None = Field(
-        sa_column=Column(Text, nullable=True), description="Layer thumbnail URL"
+        sa_column=Column(Text, nullable=True), description="Layer thumbnail URL", default="https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png"
     )
 
 
