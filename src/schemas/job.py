@@ -10,6 +10,7 @@ class JobType(str, Enum):
 
     file_import = "file_import"
     join = "join"
+    isochrone_active_mobility = "isochrone_active_mobility"
 
 
 class JobStatusType(str, Enum):
@@ -53,5 +54,10 @@ class JobStatusFileImport(BaseModel):
     upload: JobStep = {}
     migration: JobStep = {}
 
+class JobStatusJoin(BaseModel):
+    """Job layer upload attribute types."""
+
+    join: JobStep = {}
+
 # Only add jobs here that are consisting of multiple steps
-job_mapping = {JobType.file_import: JobStatusFileImport}
+job_mapping = {JobType.file_import: JobStatusFileImport, JobType.join: JobStatusJoin}

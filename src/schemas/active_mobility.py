@@ -1,8 +1,8 @@
 from enum import Enum
 from uuid import UUID
 from pydantic import BaseModel, Field, validator, root_validator
-from src.schemas.toolbox_base import ResultTarget, IsochroneStartingPointsBase
-
+from src.schemas.toolbox_base import IsochroneStartingPointsBase
+from src.schemas.layer import ToolType
 
 class IsochroneStartingPointsActiveMobility(IsochroneStartingPointsBase):
     """Model for the active mobility isochrone starting points."""
@@ -91,67 +91,75 @@ class IIsochroneActiveMobility(BaseModel):
         title="Routing Type",
         description="The routing type of the isochrone.",
     )
-    travel_cost: TravelTimeCostActiveMobility | TravelDistanceCostActiveMobility = Field(
-        ...,
-        title="Travel Cost",
-        description="The travel cost of the isochrone.",
+    travel_cost: TravelTimeCostActiveMobility | TravelDistanceCostActiveMobility = (
+        Field(
+            ...,
+            title="Travel Cost",
+            description="The travel cost of the isochrone.",
+        )
     )
-    result_target: ResultTarget = Field(
+    layer_name: str = Field(
         ...,
-        title="Result Target",
-        description="The target location of the produced layer.",
+        title="Layer Name",
+        description="The name of the layer.",
     )
     scenario_id: UUID | None = Field(
         None,
         title="Scenario ID",
         description="The ID of the scenario that is used for the routing.",
     )
+    @property
+    def tool_type(self):
+        return ToolType.isochrone_active_mobility
+
+    @property
+    def geofence_table(self):
+        mode = ToolType.isochrone_active_mobility.value.replace('isochrone_', "")
+        return f"basic.geofence_{mode}"
 
 
 request_examples = {
     "isochrone_active_mobility": {
-        # 1. Single isochrone for walking
         "single_point_walking": {
             "summary": "Single point isochrone walking",
             "value": {
                 "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
                 "routing_type": "walking",
-                "travel_cost": {"max_traveltime": 30, "traveltime_step": 10, "speed": 5},
-                "result_target": {
-                    "layer_name": "WalkingIsochroneExample1",
-                    "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
-                    "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "travel_cost": {
+                    "max_traveltime": 30,
+                    "traveltime_step": 10,
+                    "speed": 5,
                 },
+                "layer_name": "WalkingIsochroneExample1",
             },
         },
-        # 2. Single isochrone for cycling
         "single_point_cycling": {
             "summary": "Single point isochrone cycling",
             "value": {
                 "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
                 "routing_type": "bicycle",
-                "travel_cost": {"max_traveltime": 15, "traveltime_step": 5, "speed": 15},
-                "result_target": {
-                    "layer_name": "CyclingIsochroneExample1",
-                    "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
+                "travel_cost": {
+                    "max_traveltime": 15,
+                    "traveltime_step": 5,
+                    "speed": 15,
                 },
+                "layer_name": "CyclingIsochroneExample1",
             },
         },
-        # 3. Single isochrone for walking with scenario
         "single_point_walking_scenario": {
             "summary": "Single point isochrone walking",
             "value": {
                 "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
                 "routing_type": "walking",
-                "travel_cost": {"max_traveltime": 30, "traveltime_step": 10, "speed": 5},
-                "result_target": {
-                    "layer_name": "WalkingIsochroneExample1",
-                    "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
+                "travel_cost": {
+                    "max_traveltime": 30,
+                    "traveltime_step": 10,
+                    "speed": 5,
                 },
+                "layer_name": "WalkingIsochroneExample1",
                 "scenario_id": "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
             },
         },
-        # 4. Multi-isochrone walking with more than one starting point
         "multi_point_walking": {
             "summary": "Multi point isochrone walking",
             "value": {
@@ -182,14 +190,14 @@ request_examples = {
                     ],
                 },
                 "routing_type": "walking",
-                "travel_cost": {"max_traveltime": 30, "traveltime_step": 10, "speed": 5},
-                "result_target": {
-                    "layer_name": "WalkingMultiIsochroneExample1",
-                    "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
+                "travel_cost": {
+                    "max_traveltime": 30,
+                    "traveltime_step": 10,
+                    "speed": 5,
                 },
+                "layer_name": "WalkingMultiIsochroneExample1",
             },
         },
-        # 5. Multi-isochrone cycling with more than one starting point
         "multi_point_cycling": {
             "summary": "Multi point isochrone cycling",
             "value": {
@@ -220,14 +228,14 @@ request_examples = {
                     ],
                 },
                 "routing_type": "bicycle",
-                "travel_cost": {"max_traveltime": 15, "traveltime_step": 5, "speed": 15},
-                "result_target": {
-                    "layer_name": "CyclingMultiIsochroneExample1",
-                    "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
+                "travel_cost": {
+                    "max_traveltime": 15,
+                    "traveltime_step": 5,
+                    "speed": 15,
                 },
+                "layer_name": "CyclingMultiIsochroneExample1",
             },
         },
-        # 6. Isochrone for walking with layer as the starting point
         "layer_based_walking": {
             "summary": "Layer based isochrone walking",
             "value": {
@@ -235,11 +243,12 @@ request_examples = {
                     "layer_id": "39e16c27-2b03-498e-8ccc-68e798c64b8d"  # Sample UUID for the layer
                 },
                 "routing_type": "walking",
-                "travel_cost": {"max_traveltime": 30, "traveltime_step": 10, "speed": 5},
-                "result_target": {
-                    "layer_name": "LayerBasedWalkingIsochrone",
-                    "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
+                "travel_cost": {
+                    "max_traveltime": 30,
+                    "traveltime_step": 10,
+                    "speed": 5,
                 },
+                "layer_name": "LayerBasedWalkingIsochrone",
             },
         },
     }

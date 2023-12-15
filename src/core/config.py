@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     TEST_DATA_DIR: str = "/app/tests/data"
     PROJECT_NAME: Optional[str] = "GOAT Core API"
     USER_DATA_SCHEMA: Optional[str] = "user_data"
+    CUSTOMER_SCHEMA: Optional[str] = "customer"
 
     SENTRY_DSN: Optional[HttpUrl] = None
     POSTGRES_SERVER: str

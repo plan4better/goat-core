@@ -39,10 +39,10 @@ class IJoin(BaseModel):
         title="Column Statistics",
         description="The column statistics to be calculated.",
     )
-    result_target: ResultTarget = Field(
+    layer_name: str = Field(
         ...,
-        title="Result Target",
-        description="The target location of the produced layer.",
+        title="Layer Name",
+        description="The name of the layer.",
     )
 
 
@@ -56,7 +56,7 @@ class AreaLayerType(str, Enum):
 class IAggregationPoint(BaseModel):
     """Aggregation tool schema."""
 
-    point_layer_id: UUID = Field(
+    point_layer_project_id: UUID = Field(
         ...,
         title="Point Layer ID",
         description="The ID of the layer that contains the points to be aggregated.",
@@ -86,10 +86,10 @@ class IAggregationPoint(BaseModel):
         title="Area Group By Field",
         description="The field in the area layer that is used to group the aggregated points.",
     )
-    result_target: ResultTarget = Field(
+    layer_name: str = Field(
         ...,
-        title="Result Target",
-        description="The target location of the produced layer.",
+        title="Layer Name",
+        description="The name of the layer.",
     )
 
     @validator("h3_resolution", pre=True, always=True)
@@ -133,11 +133,7 @@ request_examples_join = {
                 "operation": ColumnStatisticsOperation.count.value,
                 "field": "field_example1",
             },
-            "result_target": {
-                "layer_name": "IJoin Result Layer Example",
-                "folder_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
-                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-            },
+            "layer_name": "IJoin Result Layer Example",
         },
     },
     "join_mean": {
@@ -151,11 +147,7 @@ request_examples_join = {
                 "operation": ColumnStatisticsOperation.mean.value,
                 "field": "field_example2",
             },
-            "result_target": {
-                "layer_name": "IJoin Result Layer Example 2",
-                "folder_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
-                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-            },
+            "layer_name": "IJoin Result Layer Example 2",
         },
     },
 }
@@ -164,30 +156,23 @@ request_examples_aggregation = {
     "aggregation_feature_layer": {
         "summary": "Aggregation Feature Layer",
         "value": {
-            "point_layer_id": "abcdef12-3456-7890-fedc-ba9876543210",
+            "point_layer_project_id": "abcdef12-3456-7890-fedc-ba9876543210",
             "area_type": "feature",
             "area_layer_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
             "column_statistics": {"operation": "sum", "field": "field_example1"},
             "area_group_by_field": ["group_by_example1"],
-            "result_target": {
-                "layer_name": "Aggregation Result Layer Feature Layer",
-                "folder_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
-            },
+            "layer_name": "Aggregation Result Layer Feature Layer",
         },
     },
     "aggregation_h3_grid": {
         "summary": "Aggregation H3 Grid",
         "value": {
-            "point_layer_id": "fedcba98-7654-3210-0123-456789abcdef",
+            "point_layer_project_id": "fedcba98-7654-3210-0123-456789abcdef",
             "area_type": "h3_grid",
             "h3_resolution": 6,
             "column_statistics": {"operation": "mean", "field": "field_example2"},
             "area_group_by_field": ["group_by_example2"],
-            "result_target": {
-                "layer_name": "Aggregation Result Layer H3 Grid",
-                "folder_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
-                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-            },
+            "layer_name": "Aggregation Result Layer H3 Grid",
         },
     },
 }

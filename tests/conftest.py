@@ -1,6 +1,7 @@
 # Standard library imports
 import asyncio
 import os
+
 # Third party imports
 import pytest
 import pytest_asyncio
@@ -14,7 +15,8 @@ from src.main import app
 from src.schemas.active_mobility import (
     request_examples as active_mobility_request_examples,
 )
-from src.schemas.layer import request_examples as layer_request_examples, LayerType
+from src.schemas.layer import LayerType
+from src.schemas.layer import request_examples as layer_request_examples
 from src.schemas.motorized_mobility import (
     request_example_oev_gueteklasse,
     request_examples_isochrone_car,
@@ -29,18 +31,17 @@ from src.schemas.tool import (
 )
 from src.utils import get_user_table
 from tests.utils import (
-    check_if_job_finished,
+    check_job_status,
     generate_random_string,
+    upload_file,
     upload_invalid_file,
     upload_valid_file,
     upload_valid_files,
-    upload_file
 )
 
 settings.RUN_AS_BACKGROUND_TASK = True
 settings.USER_DATA_SCHEMA = "test_user_data"
-schema_customer = "test_customer"
-schema_user_data = "test_user_data"
+settings.CUSTOMER_SCHEMA = "test_customer"
 settings.MAX_FOLDER_COUNT = 10
 
 
@@ -61,14 +62,14 @@ def event_loop():
 async def session_fixture(event_loop):
     session_manager.init(settings.ASYNC_SQLALCHEMY_DATABASE_URI)
     session_manager._engine.update_execution_options(
-        schema_translate_map={"customer": schema_customer}
+        schema_translate_map={"customer": settings.CUSTOMER_SCHEMA}
     )
     async with session_manager.connect() as connection:
         await connection.execute(
-            text(f"""CREATE SCHEMA IF NOT EXISTS {schema_customer}""")
+            text(f"""CREATE SCHEMA IF NOT EXISTS {settings.CUSTOMER_SCHEMA}""")
         )
         await connection.execute(
-            text(f"""CREATE SCHEMA IF NOT EXISTS {schema_user_data}""")
+            text(f"""CREATE SCHEMA IF NOT EXISTS {settings.USER_DATA_SCHEMA}""")
         )
         await session_manager.drop_all(connection)
         await session_manager.create_all(connection)
@@ -76,10 +77,10 @@ async def session_fixture(event_loop):
     async with session_manager.connect() as connection:
         pass
         await connection.execute(
-            text(f"""DROP SCHEMA IF EXISTS {schema_customer} CASCADE""")
+            text(f"""DROP SCHEMA IF EXISTS {settings.CUSTOMER_SCHEMA} CASCADE""")
         )
         await connection.execute(
-            text(f"""DROP SCHEMA IF EXISTS {schema_user_data} CASCADE""")
+            text(f"""DROP SCHEMA IF EXISTS {settings.USER_DATA_SCHEMA} CASCADE""")
         )
     await session_manager.close()
 
@@ -306,7 +307,7 @@ async def create_internal_layer(
     job_id = response.json()["job_id"]
 
     # Check if job is finished
-    job = await check_if_job_finished(client, job_id)
+    job = await check_job_status(client, job_id)
     assert job["status_simple"] == "finished"
 
     # Get layer
@@ -335,10 +336,9 @@ async def fixture_create_internal_layers(
         )
     return layer
 
+
 @pytest.fixture
-async def fixture_create_join_layers(
-    client: AsyncClient, fixture_get_home_folder
-):
+async def fixture_create_join_layers(client: AsyncClient, fixture_get_home_folder):
     # Upload files
     dir_csv = os.path.join(settings.TEST_DATA_DIR, "layers", "tool", "events.csv")
     dir_gpkg = os.path.join(settings.TEST_DATA_DIR, "layers", "tool", "zipcode.gpkg")
@@ -349,9 +349,17 @@ async def fixture_create_join_layers(
         client, dataset_csv["dataset_id"], fixture_get_home_folder, "table"
     )
     layer_gpkg = await create_internal_layer(
-        client, dataset_gpkg["dataset_id"], fixture_get_home_folder, "feature_layer_standard"
+        client,
+        dataset_gpkg["dataset_id"],
+        fixture_get_home_folder,
+        "feature_layer_standard",
     )
-    return {"home_folder": fixture_get_home_folder, "layer_csv": layer_csv, "layer_gpkg": layer_gpkg}
+    return {
+        "home_folder": fixture_get_home_folder,
+        "layer_csv": layer_csv,
+        "layer_gpkg": layer_gpkg,
+    }
+
 
 @pytest.fixture
 async def fixture_add_join_layers_to_project(
@@ -372,7 +380,12 @@ async def fixture_add_join_layers_to_project(
         elif layer["type"] == LayerType.feature.value:
             layer_id_gpkg = layer["id"]
 
-    return {"layer_id_table": layer_id_table, "layer_id_gpkg": layer_id_gpkg, "project_id": project_id}
+    return {
+        "layer_id_table": layer_id_table,
+        "layer_id_gpkg": layer_id_gpkg,
+        "project_id": project_id,
+    }
+
 
 async def create_external_layer(client: AsyncClient, home_folder, layer_type):
     # Get table layer dict and add layer ID
@@ -432,6 +445,7 @@ async def fixture_create_internal_feature_polygon_layer(
         fixture_get_home_folder,
         "feature_layer_standard",
     )
+
 
 @pytest.fixture
 async def fixture_create_internal_and_external_layer(
@@ -510,7 +524,10 @@ def create_generic_toolbox_fixture(endpoint: str, request_examples: dict):
         client: AsyncClient, fixture_create_project, request
     ):
         payload = request_examples[request.param]["value"]
-        response = await client.post(f"{settings.API_V2_STR}{endpoint}", json=payload)
+        project_id = fixture_create_project["id"]
+        response = await client.post(
+            f"{settings.API_V2_STR}{endpoint}?project_id={project_id}", json=payload
+        )
         assert response.status_code == 201
         return response.json()
 

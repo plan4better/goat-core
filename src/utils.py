@@ -1269,7 +1269,7 @@ def search_value(d, target):
     for key, value in d.items():
         if value == target:
             return key
-    raise ValueError(f"{target} is not in the dictionary")
+    raise Exception(f"{target} is not in the dictionary")
 
 
 def next_column_name(attribute_mapping: dict, data_type: str):

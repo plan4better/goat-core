@@ -1,18 +1,14 @@
-# Standard Libraries
-from uuid import UUID, uuid4
-
-# Third-party Libraries
 from fastapi import APIRouter, Body, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
-# Project-specific Modules
-from src.endpoints.deps import get_db, get_user_id
 from src.schemas.active_mobility import (
     IIsochroneActiveMobility,
     request_examples as active_mobility_request_examples,
 )
 from src.schemas.toolbox_base import IToolResponse
-
+from src.schemas.job import JobType
+from src.crud.crud_isochrone import CRUDIsochrone
+from src.core.tool import start_calculation
+from src.schemas.toolbox_base import CommonToolParams
 
 router = APIRouter()
 
@@ -24,8 +20,7 @@ router = APIRouter()
 )
 async def compute_active_mobility_isochrone(
     *,
-    async_session: AsyncSession = Depends(get_db),
-    user_id: UUID = Depends(get_user_id),
+    common: CommonToolParams = Depends(),
     params: IIsochroneActiveMobility = Body(
         ...,
         examples=active_mobility_request_examples["isochrone_active_mobility"],
@@ -33,4 +28,14 @@ async def compute_active_mobility_isochrone(
     ),
 ):
     """Compute isochrones for active mobility."""
-    return {"job_id": uuid4()}
+
+    return await start_calculation(
+        job_type=JobType.isochrone_active_mobility,
+        tool_class=CRUDIsochrone,
+        crud_method="active_mobility",
+        async_session=common.async_session,
+        user_id=common.user_id,
+        background_tasks=common.background_tasks,
+        project_id=common.project_id,
+        params=params,
+)

@@ -1,9 +1,9 @@
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, Field, root_validator, validator
+from pydantic import BaseModel, Field, validator
 from sqlmodel import SQLModel
-from src.core.config import settings
+
 from src.db.models._base_class import DateTimeBase
 from src.db.models.layer import ContentBaseAttributes, internal_layer_table_name
 from src.schemas.layer import (
@@ -16,7 +16,6 @@ from src.schemas.layer import (
     ITableRead,
     LayerOtherProperties,
     LayerProperties,
-    LayerType,
 )
 from src.utils import build_where, optional
 
@@ -69,6 +68,7 @@ class IProjectCreate(ContentBaseAttributes):
         ..., description="Initial view state of the project"
     )
 
+
 class IProjectRead(ContentBaseAttributes, DateTimeBase):
     id: UUID = Field(..., description="Project ID")
     layer_order: list[int] | None = Field(None, description="Layer order in project")
@@ -79,7 +79,7 @@ class IProjectBaseUpdate(ContentBaseAttributes):
     layer_order: list[int] | None = Field(None, description="Layer order in project")
 
 
-class LayerProjectProperties(LayerProperties):
+class dict(dict):
     layout: dict = Field(
         {"visibility": "visible"},
         description="Layout properties",
@@ -96,29 +96,41 @@ class LayerProjectIds(BaseModel):
 class IFeatureBaseProject(CQLQuery):
     name: str = Field(..., description="Layer name")
     group: str | None = Field(None, description="Layer group name")
-    properties: LayerProjectProperties = Field(
+    properties: dict = Field(
         ...,
         description="Layer properties",
     )
 
+
 class IFeatureBaseProjectRead(IFeatureBaseProject):
-    total_count: int | None = Field(None, description="Total count of features in the layer")
+    total_count: int | None = Field(
+        None, description="Total count of features in the layer"
+    )
     filtered_count: int | None = Field(
         None, description="Filtered count of features in the layer"
     )
+
     @property
     def table_name(self):
         return internal_layer_table_name(self)
+
     @property
     def where_query(self):
         return where_query(self)
+
 
 def where_query(values: SQLModel | BaseModel):
     table_name = internal_layer_table_name(values)
     # Check if query exists then build where query
     if values.query:
-        return build_where(id=values.layer_id, table_name=table_name, query=values.query, attribute_mapping=values.attribute_mapping)
+        return build_where(
+            id=values.layer_id,
+            table_name=table_name,
+            query=values.query,
+            attribute_mapping=values.attribute_mapping,
+        )
     return None
+
 
 class IFeatureStandardProjectRead(
     LayerProjectIds, IFeatureStandardRead, IFeatureBaseProjectRead
@@ -155,20 +167,23 @@ class IFeatureScenarioProjectUpdate(IFeatureBaseProject):
 
 class ITableProjectRead(LayerProjectIds, ITableRead, CQLQuery):
     group: str = Field(None, description="Layer group name")
-    total_count: int | None = Field(None, description="Total count of features in the layer")
+    total_count: int | None = Field(
+        None, description="Total count of features in the layer"
+    )
     filtered_count: int | None = Field(
         None, description="Filtered count of features in the layer"
     )
     table_name: str | None = Field(None, description="Table name")
     where_query: str | None = Field(None, description="Where query")
+
     # Compute table_name and where_query
     @property
     def table_name(self):
         return internal_layer_table_name(self)
+
     @property
     def where_query(self):
         return where_query(self)
-
 
 
 @optional
@@ -179,7 +194,7 @@ class ITableProjectUpdate(CQLQuery):
 
 class IExternalVectorTileProjectRead(LayerProjectIds, IExternalVectorTileRead):
     group: str = Field(None, description="Layer group name")
-    properties: LayerProjectProperties = Field(
+    properties: dict = Field(
         ...,
         description="Layer properties",
     )
@@ -189,7 +204,7 @@ class IExternalVectorTileProjectRead(LayerProjectIds, IExternalVectorTileRead):
 class IExternalVectorTileProjectUpdate(BaseModel):
     name: str | None = Field(None, description="Layer name")
     group: str | None = Field(None, description="Layer group name")
-    properties: LayerProjectProperties | None = Field(
+    properties: dict | None = Field(
         None,
         description="Layer properties",
     )
@@ -197,7 +212,7 @@ class IExternalVectorTileProjectUpdate(BaseModel):
 
 class IExternalImageryProjectRead(LayerProjectIds, IExternalImageryRead):
     group: str = Field(None, description="Layer group name")
-    properties: LayerProjectProperties = Field(
+    properties: dict = Field(
         ...,
         description="Layer properties",
     )
@@ -211,7 +226,7 @@ class IExternalImageryProjectRead(LayerProjectIds, IExternalImageryRead):
 class IExternalImageryProjectUpdate(BaseModel):
     name: str | None = Field(None, description="Layer name")
     group: str | None = Field(None, description="Layer group name")
-    properties: LayerProjectProperties | None = Field(
+    properties: dict | None = Field(
         None,
         description="Layer properties",
     )

@@ -2,15 +2,19 @@ import pytest
 from httpx import AsyncClient
 
 from src.core.config import settings
+from src.schemas.job import JobStatusType
 from src.schemas.toolbox_base import ColumnStatisticsOperation
-from tests.utils import check_if_job_finished
+from tests.utils import check_job_status
 
 
 @pytest.mark.asyncio
 async def test_join(client: AsyncClient, fixture_add_join_layers_to_project):
-
-    layer_id_table, layer_id_gpkg, project_id = fixture_add_join_layers_to_project.values()
-    #TODO: Check the produced results
+    (
+        layer_id_table,
+        layer_id_gpkg,
+        project_id,
+    ) = fixture_add_join_layers_to_project.values()
+    # TODO: Check the produced results
     for operation in ColumnStatisticsOperation:
         # Request join endpoint
         params = {
@@ -22,21 +26,24 @@ async def test_join(client: AsyncClient, fixture_add_join_layers_to_project):
                 "operation": operation.value,
                 "field": "events",
             },
-            "result_target": {
-                "layer_name": f"{operation.value} result layer",
-            },
+            "layer_name": f"{operation.value} result layer",
         }
 
         response = await client.post(
             f"{settings.API_V2_STR}/tool/join?project_id={project_id}", json=params
         )
         assert response.status_code == 201
-        job = await check_if_job_finished(client, response.json()["job_id"])
+        job = await check_job_status(client, response.json()["job_id"])
         assert job["status_simple"] == "finished"
+
 
 @pytest.mark.asyncio
 async def test_join_filter(client: AsyncClient, fixture_add_join_layers_to_project):
-    layer_id_table, layer_id_gpkg, project_id = fixture_add_join_layers_to_project.values()
+    (
+        layer_id_table,
+        layer_id_gpkg,
+        project_id,
+    ) = fixture_add_join_layers_to_project.values()
 
     # Update target layer project and add filter plz=80799
     response = await client.put(
@@ -63,20 +70,48 @@ async def test_join_filter(client: AsyncClient, fixture_add_join_layers_to_proje
         "join_layer_project_id": layer_id_table,
         "join_field": "plz",
         "column_statistics": {
-            "operation": "sum",
+            "operation": ColumnStatisticsOperation.sum.value,
             "field": "events",
         },
-        "result_target": {
-            "layer_name": "join result layer",
-        },
+        "layer_name": "join result layer",
     }
     response = await client.post(
         f"{settings.API_V2_STR}/tool/join?project_id={project_id}", json=params
     )
     assert response.status_code == 201
-    job = await check_if_job_finished(client, response.json()["job_id"])
+    job = await check_job_status(client, response.json()["job_id"])
     assert job["status_simple"] == "finished"
 
+
+@pytest.mark.asyncio
+async def test_join_wrong_join_field(
+    client: AsyncClient, fixture_add_join_layers_to_project
+):
+    (
+        layer_id_table,
+        layer_id_gpkg,
+        project_id,
+    ) = fixture_add_join_layers_to_project.values()
+    # Request join endpoint
+    params = {
+        "target_layer_project_id": layer_id_gpkg,
+        "target_field": "zipcode",
+        "join_layer_project_id": layer_id_table,
+        "join_field": "not_existing_field",
+        "column_statistics": {
+            "operation": ColumnStatisticsOperation.sum.value,
+            "field": "events",
+        },
+        "layer_name": f"{ColumnStatisticsOperation.sum.value} result layer",
+    }
+
+    response = await client.post(
+        f"{settings.API_V2_STR}/tool/join?project_id={project_id}", json=params
+    )
+    assert response.status_code == 201
+    await check_job_status(
+        client, response.json()["job_id"], JobStatusType.failed.value
+    )
 
 
 @pytest.mark.asyncio

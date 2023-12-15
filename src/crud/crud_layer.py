@@ -75,6 +75,7 @@ class CRUDLayer(CRUDBase):
                 **additional_attributes
             ).dict()
 
+        # TODO: Add dynamically created thumbnail to layer.
         # Populate layer_in with additional attributes
         layer_in = Layer(
             **layer_in.dict(exclude_none=True),

@@ -1,9 +1,7 @@
 # Standard library imports
 from enum import Enum
 from typing import List
-from uuid import UUID
-from uuid import uuid4
-import json
+from uuid import UUID, uuid4
 
 # Third party imports
 from pydantic import BaseModel, Field, ValidationError, validator
@@ -20,8 +18,8 @@ from src.db.models.layer import (
     LayerBase,
     LayerType,
     ScenarioType,
-    layer_base_example,
     ToolType,
+    layer_base_example,
 )
 from src.schemas.job import Msg
 
@@ -157,6 +155,12 @@ class AreaStatisticsOperation(Enum):
     min = "min"
     max = "max"
 
+class UserDataTable(str, Enum):
+    """Created user tables"""
+    point = "point"
+    line = "line"
+    polygon = "polygon"
+    no_geometry = "no_geometry"
 
 class LayerReadBaseAttributes(BaseModel):
     id: UUID = Field(..., description="Content ID of the layer", alias="id")
@@ -187,13 +191,13 @@ class FeatureReadBaseAttributes(
     )
     attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
     size: int = Field(..., description="Size of the layer in bytes")
-    properties: LayerProperties = Field(..., description="Layer properties.")
+    properties: dict = Field(..., description="Layer properties.")
 
 
 class FeatureUpdateBase(LayerBase, GeospatialAttributes):
     """Base model for feature layer updates."""
 
-    properties: LayerProperties | None = Field(None, description="Layer properties.")
+    properties: dict | None = Field(None, description="Layer properties.")
 
 
 feature_layer_update_base_example = {
@@ -218,7 +222,7 @@ class IInternalLayerCreate(LayerBase):
     dataset_id: UUID = Field(..., description="Dataset ID")
 
 
-class IFeatureLayerIndicatorCreate(BaseModel):
+class IFeatureLayerToolCreate(BaseModel):
     id: UUID = Field(
         default_factory=uuid4, description="Content ID of the layer", alias="id"
     )
@@ -238,8 +242,8 @@ class IFeatureStandardCreateAdditionalAttributes(BaseModel):
     feature_layer_type: FeatureType = Field(..., description="Feature layer type")
     feature_layer_geometry_type: FeatureGeometryType = Field(
         ..., description="Feature layer geometry type"
-    )    
-    properties: LayerProperties = Field(..., description="Layer properties.")
+    )
+    properties: dict = Field(..., description="Layer properties.")
     extent: str = Field(..., description="Geographical Extent of the layer")
     attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
 
@@ -338,7 +342,7 @@ class ExternalImageryAttributesBase(BaseModel):
 
     url: str = Field(..., description="Layer URL")
     data_type: ExternalImageryDataType = Field(..., description="Content data type")
-    properties: LayerProperties = Field(..., description="Layer properties.")
+    properties: dict = Field(..., description="Layer properties.")
     other_properties: LayerOtherProperties = Field(
         ..., description="Additional layer properties."
     )
@@ -388,7 +392,7 @@ class IExternalImageryUpdate(LayerBase, GeospatialAttributes):
     """Model to update a imagery layer."""
 
     url: str | None = Field(None, description="Layer URL")
-    properties: LayerProperties | None = Field(..., description="Layer properties.")
+    properties: dict | None = Field(..., description="Layer properties.")
     other_properties: LayerOtherProperties | None = Field(
         None, description="Additional layer properties."
     )
@@ -420,7 +424,7 @@ class ExternalVectorTileAttributesBase(BaseModel):
 
     url: str = Field(..., description="Layer URL")
     data_type: ExternalVectorTileDataType = Field(..., description="Content data type")
-    properties: LayerProperties | None = Field(None, description="Layer properties.")
+    properties: dict | None = Field(None, description="Layer properties.")
 
 
 tile_layer_attributes_example = {

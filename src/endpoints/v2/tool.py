@@ -1,3 +1,4 @@
+from fastapi import APIRouter, Depends, Body
 from src.schemas.tool import (
     IAggregationPoint,
     IJoin,
@@ -5,15 +6,15 @@ from src.schemas.tool import (
     request_examples_join,
 )
 from src.schemas.job import JobType
-from src.crud.crud_tool import tool as crud_tool
-from src.crud.crud_job import job as crud_job
+from src.crud.crud_tool import CRUDTool
 from uuid import UUID
 from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.endpoints.deps import get_db, get_user_id
-from fastapi import APIRouter, Depends, Body, BackgroundTasks, Query
 
+from src.core.tool import start_calculation
 from src.schemas.toolbox_base import IToolResponse
+from src.schemas.toolbox_base import CommonToolParams
 
 router = APIRouter()
 
@@ -25,15 +26,7 @@ router = APIRouter()
     status_code=201,
 )
 async def join(
-    *,
-    background_tasks: BackgroundTasks,
-    async_session: AsyncSession = Depends(get_db),
-    user_id: UUID = Depends(get_user_id),
-    project_id: str = Query(
-        ...,
-        title="Project ID of the project that contains the layers.",
-        description="The project ID of the project that contains the layers.",
-    ),
+    common: CommonToolParams = Depends(),
     params: IJoin = Body(
         ...,
         examples=request_examples_join,
@@ -42,22 +35,16 @@ async def join(
 ):
     """Join two layers based on a matching column and create a new layer containing the attributes of the target layer and the new column for the statistics results."""
 
-    # Create job and check if user can create a new job
-    job = await crud_job.check_and_create(
-        async_session=async_session,
-        user_id=user_id,
+    return await start_calculation(
         job_type=JobType.join,
-    )
-
-    await crud_tool.join(
-        background_tasks=background_tasks,
-        job_id=job.id,
-        async_session=async_session,
-        user_id=user_id,
-        project_id=project_id,
+        tool_class=CRUDTool,
+        crud_method="join_run",
+        async_session=common.async_session,
+        user_id=common.user_id,
+        background_tasks=common.background_tasks,
+        project_id=common.project_id,
         params=params,
     )
-    return {"job_id": job.id}
 
 
 @router.post(

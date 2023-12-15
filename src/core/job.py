@@ -7,14 +7,22 @@ from src.utils import sanitize_error_message
 
 
 def job_init():
-    def decorator(func):
+    def decorator(func, timeout: int = 1):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            # Get async_session
-            async_session = kwargs["async_session"]
+            self = args[0]
+            # Check if job_id and async_session are provided in kwards else search them in the class
+            if kwargs.get("async_session"):
+                async_session = kwargs["async_session"]
+            else:
+                async_session = self.async_session
+
+            if kwargs.get("job_id"):
+                job_id = kwargs["job_id"]
+            else:
+                job_id = self.job_id
 
             # Get job id
-            job_id = kwargs["job_id"]
             job = await crud_job.get(db=async_session, id=job_id)
             job = await crud_job.update(
                 db=async_session,
@@ -55,7 +63,9 @@ def job_init():
 async def run_failure_func(instance, func, *args, **kwargs):
     # Get failure function
     failure_func_name = f"{func.__name__}_fail"  # Construct the failure function name
-    failure_func = getattr(instance, failure_func_name, None)  # Get the failure function
+    failure_func = getattr(
+        instance, failure_func_name, None
+    )  # Get the failure function
     # Run failure function if exists
     if failure_func:
         # Merge args and kwargs
@@ -68,7 +78,8 @@ async def run_failure_func(instance, func, *args, **kwargs):
             await failure_func(**func_args)
         except Exception as e:
             print(f"Failure function {failure_func_name} failed with error: {e}")
-
+    else:
+        print(f"Failure function {failure_func_name} does not exist.")
 
 def job_log(job_step_name: str, timeout: int = 120):
     def decorator(func):
@@ -76,11 +87,17 @@ def job_log(job_step_name: str, timeout: int = 120):
         async def wrapper(*args, **kwargs):
             # Get async_session
             self = args[0] if args else None
-            async_session = self.async_session if self else None
+            # Check if job_id and async_session are provided in kwards else search them in the class
+            if kwargs.get("job_id"):
+                job_id = kwargs["job_id"]
+            else:
+                job_id = self.job_id
 
-            # Get job
-            job_id = kwargs["job_id"]
-            # job = await crud_job.get(db=async_session, id=job_id)
+            # Get async_session
+            if kwargs.get("async_session"):
+                async_session = kwargs["async_session"]
+            else:
+                async_session = self.async_session
 
             # Update job status to indicate running
             job = await crud_job.update_status(
@@ -157,7 +174,10 @@ def job_log(job_step_name: str, timeout: int = 120):
                 msg_text=msg_text,
             )
             # Check if job is killed and run failure function if exists
-            if job.status_simple in [JobStatusType.killed.value, JobStatusType.failed.value]:
+            if job.status_simple in [
+                JobStatusType.killed.value,
+                JobStatusType.failed.value,
+            ]:
                 await run_failure_func(self, func, *args, **kwargs)
                 return {
                     "status": job.status_simple,
@@ -170,11 +190,18 @@ def job_log(job_step_name: str, timeout: int = 120):
 
     return decorator
 
+
 def run_background_or_immediately(settings):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            background_tasks = kwargs["background_tasks"]
+            # Get background tasks either from class or from function kwargs
+
+            if kwargs.get("background_tasks"):
+                background_tasks = kwargs["background_tasks"]
+            else:
+                background_tasks = args[0].background_tasks
+
             if settings.RUN_AS_BACKGROUND_TASK is False:
                 return await func(*args, **kwargs)
             else:

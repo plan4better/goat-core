@@ -11,7 +11,7 @@ from src.core.config import settings
 from src.schemas.job import JobStatusType
 
 
-async def check_if_job_finished(client: AsyncClient, job_id: str):
+async def check_job_status(client: AsyncClient, job_id: str, target_status: str = JobStatusType.finished.value):
     """Check if job is finished."""
 
     # Get job status recursively until they return status_simplified = finished
@@ -37,10 +37,10 @@ async def check_if_job_finished(client: AsyncClient, job_id: str):
         retries < max_retries
     ), f"Job {job_id} did not finish within the allowed retries."
     # Make sure job is finished
-    assert job["status_simple"] == JobStatusType.finished.value
+    assert job["status_simple"] == target_status
     # Make sure each job_step is finished
     for job_step in job["status"]:
-        assert job["status"][job_step]["status"] == JobStatusType.finished.value
+        assert job["status"][job_step]["status"] == target_status
 
     return job
 

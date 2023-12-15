@@ -34,11 +34,10 @@ if TYPE_CHECKING:
 class ToolType(str, Enum):
     """Indicator types."""
 
-    single_isochrone = "isochrone"
-    multi_isochrone = "multi_isochrone"
-    heatmap = "heatmap"
+    isochrone_active_mobility = "isochrone_active_mobility"
+    isochrone_pt = "isochrone_pt"
+    isochrone_car = "isochrone_car"
     oev_gueteklasse = "oev_gueteklasse"
-    public_transport_frequency = "public_transport_frequency"
     join = "join"
 
 

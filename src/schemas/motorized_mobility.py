@@ -9,6 +9,7 @@ from src.schemas.toolbox_base import (
     PTSupportedDay,
     ResultTarget,
 )
+from src.schemas.layer import ToolType
 
 
 class IsochroneStartingPointsMotorizedMobility(IsochroneStartingPointsBase):
@@ -137,11 +138,20 @@ class IIsochronePT(BaseModel):
         title="Time Window",
         description="The time window of the isochrone.",
     )
-    result_target: ResultTarget = Field(
+    layer_name: str = Field(
         ...,
-        title="Result Target",
-        description="The target location of the produced layer.",
+        title="Layer Name",
+        description="The name of the layer.",
     )
+
+    @property
+    def tool_type(self):
+        return ToolType.isochrone_pt
+
+    @property
+    def geofence_table(self):
+        mode = ToolType.isochrone_pt.value.replace('isochrone_', "")
+        return f"basic.geofence_{mode}"
 
 
 class RoutingCarType(str, Enum):
@@ -168,12 +178,20 @@ class IIsochroneCar(BaseModel):
         title="Travel Cost",
         description="The travel cost of the isochrone.",
     )
-    result_target: ResultTarget = Field(
+    layer_name: str = Field(
         ...,
-        title="Result Target",
-        description="The target location of the produced layer.",
+        title="Layer Name",
+        description="The name of the layer.",
     )
 
+    @property
+    def tool_type(self):
+        return ToolType.isochrone_car
+
+    @property
+    def geofence_table(self):
+        mode = ToolType.isochrone_car.value.value.replace('isochrone_', "")
+        return f"basic.geofence_{mode}"
 
 class CountLimitPerTool(int, Enum):
     oev_gueteklasse = 1000
@@ -224,10 +242,10 @@ class IOevGueteklasse(BaseModel):
         title="Station Config",
         description="The station config of the ÖV-Güteklasse.",
     )
-    result_target: ResultTarget = Field(
+    layer_name: str = Field(
         ...,
-        title="Result Target",
-        description="The target location of the produced layer.",
+        title="Layer Name",
+        description="The name of the layer.",
     )
 
 
@@ -249,11 +267,7 @@ request_examples_isochrone_pt = {
             },
             "travel_cost": {"max_traveltime": 40, "traveltime_step": 10},
             "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
-            "result_target": {
-                "layer_name": "AllModesPTIsochrone",
-                "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
-                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-            },
+            "layer_name": "AllModesPTIsochrone",
         },
     },
     # 2. Isochrone for public transport excluding bus mode
@@ -272,11 +286,7 @@ request_examples_isochrone_pt = {
             },
             "travel_cost": {"max_traveltime": 35, "traveltime_step": 5},
             "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
-            "result_target": {
-                "layer_name": "AllModesPTIsochrone",
-                "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
-                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-            },
+            "layer_name": "AllModesPTIsochrone",
         },
     },
 }
@@ -289,11 +299,7 @@ request_examples_isochrone_car = {
             "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
             "routing_type": "car_peak",
             "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
-            "result_target": {
-                "layer_name": "AllModesPTIsochrone",
-                "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
-                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-            },
+            "layer_name": "AllModesPTIsochrone",
         },
     },
     # 2. Multiisochrone for car
@@ -306,11 +312,7 @@ request_examples_isochrone_car = {
             },
             "routing_type": "car_peak",
             "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
-            "result_target": {
-                "layer_name": "AllModesPTIsochrone",
-                "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
-                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-            },
+            "layer_name": "AllModesPTIsochrone",
         },
     },
 }
@@ -393,11 +395,7 @@ request_example_oev_gueteklasse = {
             "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
             "reference_area": "99261caf-bb4a-42ef-8212-423a3dd6d613",
             "station_config": station_config_example,
-            "result_target": {
-                "layer_name": "Öv-Güteklassen Weekday",
-                "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
-                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-            },
+            "layer_name": "Öv-Güteklassen Weekday",
         },
     },
     "oev_gueteklasse_saturday": {
@@ -411,14 +409,11 @@ request_example_oev_gueteklasse = {
             },
             "reference_area": "99261caf-bb4a-42ef-8212-423a3dd6d613",
             "station_config": station_config_example,
-            "result_target": {
-                "layer_name": "Öv-Güteklassen Saturday",
-                "folder_id": "6e5e1267-a8a5-4c7b-8f4d-14f8bb5d363d",
-                "project_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-            },
+            "layer_name": "Öv-Güteklassen Saturday",
         },
     },
 }
+
 
 oev_gueteklasse_station_config_layer_base = {
     "name": "ÖV-Güteklassen stations",

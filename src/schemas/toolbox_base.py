@@ -5,6 +5,14 @@ from uuid import UUID
 
 # Third-party Libraries
 from pydantic import BaseModel, Field, root_validator
+from fastapi import Depends, Query, BackgroundTasks
+from sqlalchemy.ext.asyncio import AsyncSession
+
+# Local Packages
+from src.endpoints.deps import get_db, get_user_id
+
+
+
 
 class ColumnStatisticsOperation(str, Enum):
     count = "count"
@@ -26,7 +34,8 @@ class MaxFeatureCnt(int, Enum):
     """Max feature count schema."""
 
     area_statistics = 100000
-    join = 1000000
+    join = 100000
+    isochrone_active_mobility = 1000
 
 
 class ResultTarget(BaseModel):
@@ -66,21 +75,21 @@ class IsochroneStartingPointsBase(BaseModel):
         title="Longitude",
         description="The longitude of the isochrone center.",
     )
-    layer_id: UUID | None = Field(
+    layer_project_id: UUID | None = Field(
         None,
         title="Layer ID",
         description="The ID of the layer that contains the starting points.",
     )
 
     @root_validator(pre=True)
-    def check_either_coords_or_layer_id(cls, values):
+    def check_either_coords_or_layer_project_id(cls, values):
         lat = values.get("latitude")
         long = values.get("longitude")
-        layer_id = values.get("layer_id")
+        layer_project_id = values.get("layer_project_id")
 
         if lat and long:
-            if layer_id:
-                raise ValueError("Either provide latitude and longitude or layer_id, not both.")
+            if layer_project_id:
+                raise ValueError("Either provide latitude and longitude or layer_project_id, not both.")
             if len(lat) != len(long):
                 raise ValueError("Latitude and longitude must have the same length.")
 
@@ -92,8 +101,8 @@ class IsochroneStartingPointsBase(BaseModel):
                 if lon_val < -180 or lon_val > 180:
                     raise ValueError("Longitude must be between -180 and 180.")
 
-        if not (lat and long) and not layer_id:
-            raise ValueError("Must provide either latitude and longitude or layer_id.")
+        if not (lat and long) and not layer_project_id:
+            raise ValueError("Must provide either latitude and longitude or layer_project_id.")
 
         return values
 
@@ -104,3 +113,20 @@ class PTSupportedDay(str, Enum):
     weekday = "weekday"
     saturday = "saturday"
     sunday = "sunday"
+
+class CommonToolParams:
+    def __init__(
+        self,
+        background_tasks: BackgroundTasks,
+        async_session: AsyncSession = Depends(get_db),
+        user_id: UUID = Depends(get_user_id),
+        project_id: str = Query(
+            ...,
+            title="Project ID of the project that contains the layers.",
+            description="The project ID of the project that contains the layers.",
+        ),
+    ):
+        self.background_tasks = background_tasks
+        self.async_session = async_session
+        self.user_id = user_id
+        self.project_id = project_id
