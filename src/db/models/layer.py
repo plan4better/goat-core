@@ -39,6 +39,7 @@ class ToolType(str, Enum):
     isochrone_car = "isochrone_car"
     oev_gueteklasse = "oev_gueteklasse"
     join = "join"
+    aggregation_point = "aggregation_point"
 
 
 class FeatureType(str, Enum):

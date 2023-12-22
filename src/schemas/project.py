@@ -122,15 +122,12 @@ class IFeatureBaseProjectRead(IFeatureBaseProject):
 def where_query(values: SQLModel | BaseModel):
     table_name = internal_layer_table_name(values)
     # Check if query exists then build where query
-    if values.query:
-        return build_where(
-            id=values.layer_id,
-            table_name=table_name,
-            query=values.query,
-            attribute_mapping=values.attribute_mapping,
-        )
-    return None
-
+    return build_where(
+        id=values.layer_id,
+        table_name=table_name,
+        query=values.query,
+        attribute_mapping=values.attribute_mapping,
+    )
 
 class IFeatureStandardProjectRead(
     LayerProjectIds, IFeatureStandardRead, IFeatureBaseProjectRead

@@ -11,12 +11,51 @@ from uuid import UUID
 from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.endpoints.deps import get_db, get_user_id
-
 from src.core.tool import start_calculation
-from src.schemas.toolbox_base import IToolResponse
-from src.schemas.toolbox_base import CommonToolParams
+from src.schemas.toolbox_base import IToolResponse, CommonToolParams
+from src.schemas.job import Msg
+from src.schemas.toolbox_base import ToolsWithReferenceAreaCheck
+from src.core.tool import CRUDToolBase
+from src.schemas.error import http_error_handler
 
 router = APIRouter()
+
+
+@router.post(
+    "/check-reference-area",
+    summary="Check reference area",
+    response_model=Msg,
+    status_code=200,
+)
+async def check_reference_area(
+    common: CommonToolParams = Depends(),
+    layer_project_id: int = Body(
+        ...,
+        title="Layer Project ID",
+        description="The ID of the layer project.",
+    ),
+    tool_type: ToolsWithReferenceAreaCheck = Body(
+        ...,
+        title="Tool Type",
+        description="The type of the tool.",
+    ),
+):
+    """Check if the reference area is suitable for the requested tool operation."""
+    # Catch exception nand return HTTP error message
+    crud_tool_base = CRUDToolBase(
+        job_id=None,
+        background_tasks=common.background_tasks,
+        async_session=common.async_session,
+        user_id=common.user_id,
+        project_id=common.project_id,
+    )
+    # Excute and handle exception
+    result = await http_error_handler(
+        crud_tool_base.check_reference_area,
+        layer_project_id=layer_project_id,
+        tool_type=tool_type,
+    )
+    return result["msg"]
 
 
 @router.post(

@@ -2,6 +2,7 @@ import pytest
 from httpx import AsyncClient
 
 from src.core.config import settings
+from src.db.models.layer import ToolType
 from src.schemas.job import JobStatusType
 from src.schemas.toolbox_base import ColumnStatisticsOperation
 from tests.utils import check_job_status
@@ -117,3 +118,38 @@ async def test_join_wrong_join_field(
 @pytest.mark.asyncio
 async def test_aggregate_points(client: AsyncClient, fixture_aggregation_points):
     assert fixture_aggregation_points["job_id"] is not None
+
+
+@pytest.mark.asyncio
+async def test_reference_area(
+    client: AsyncClient, fixture_add_polygon_layer_to_project
+):
+    project_id = fixture_add_polygon_layer_to_project["project_id"]
+    layer_project_id = fixture_add_polygon_layer_to_project["layer_project_id"]
+    # Request reference area endpoint
+    response = await client.post(
+        f"{settings.API_V2_STR}/tool/check-reference-area?project_id={project_id}",
+        json={
+            "layer_project_id": layer_project_id,
+            "tool_type": ToolType.oev_gueteklasse.value,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["type"] == "info"
+
+@pytest.mark.asyncio
+async def test_to_large_reference_area(
+    client: AsyncClient, fixture_add_large_polygon_layer_to_project
+):
+    project_id = fixture_add_large_polygon_layer_to_project["project_id"]
+    layer_project_id = fixture_add_large_polygon_layer_to_project["layer_project_id"]
+    # Request reference area endpoint
+    response = await client.post(
+        f"{settings.API_V2_STR}/tool/check-reference-area?project_id={project_id}",
+        json={
+            "layer_project_id": layer_project_id,
+            "tool_type": ToolType.oev_gueteklasse.value,
+        },
+    )
+    assert response.status_code == 422

@@ -16,3 +16,4 @@ BEGIN
 	RETURN h3_3_arr;
 END ;
 $function$
+PARALLEL SAFE;

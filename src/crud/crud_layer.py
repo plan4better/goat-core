@@ -463,17 +463,13 @@ class CRUDLayer(CRUDBase):
             layer=layer,
             where_query=where_query,
         )
+        where_query = "WHERE " + where_query
         # Call SQL function
-        sql_query = """
-            SELECT * FROM basic.area_statistics(:operation, :table_name, :where_query)
+        sql_query = f"""
+            SELECT * FROM basic.area_statistics('{operation.value}', '{layer.table_name}', '{where_query.replace("'", "''")}')
         """
         res = await async_session.execute(
             sql_query,
-            {
-                "operation": operation.value,
-                "table_name": layer.table_name,
-                "where_query": where_query,
-            },
         )
         res = res.fetchall()
         return res[0][0] if res else None

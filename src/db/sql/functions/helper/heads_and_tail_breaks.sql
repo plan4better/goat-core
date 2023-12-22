@@ -13,7 +13,7 @@ DECLARE
     current_break float;
 BEGIN 
     -- Compute min and max values
-    EXECUTE format('SELECT AVG(%I), MIN(%I), MAX(%I) FROM %s WHERE %s', 
+    EXECUTE format('SELECT AVG(%I::float), MIN(%I::float), MAX(%I::float) FROM %s WHERE %s', 
                    column_name, column_name, column_name, table_name, where_filter) 
                    INTO mean_val, min_val, max_val;
 
@@ -23,15 +23,19 @@ BEGIN
 
     -- Iteratively calculate the average of elements greater than the last average
     WHILE i < breaks LOOP
-        EXECUTE format('SELECT AVG(%I) FROM %s WHERE %I > %s AND %s', 
+        EXECUTE format('SELECT AVG(%I::float) FROM %s WHERE %I::float > %s AND %s', 
                        column_name, table_name, column_name, current_break, where_filter)
                        INTO current_break;
 
         -- Break loop if no more distinct values
         IF current_break IS NULL THEN
-            EXIT;
-        END IF;
-
+	        WHILE i < breaks LOOP
+	            reply := array_append(reply, max_val);
+	            i := i + 1;
+	        END LOOP;
+	        EXIT;
+	    END IF;
+	   
         -- Append the break and increment
         reply := array_append(reply, current_break);
         i := i + 1;
@@ -40,8 +44,8 @@ BEGIN
     result := jsonb_build_object('mean', mean_val, 'min', min_val, 'max', max_val, 'breaks', reply);
     RETURN result;
 END;
-$$ LANGUAGE plpgsql;
-
+$$ LANGUAGE plpgsql
+PARALLEL SAFE;
 /*
 DROP TABLE temporal.test;
 CREATE TABLE temporal.test AS 

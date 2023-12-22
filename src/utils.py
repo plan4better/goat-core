@@ -1269,7 +1269,7 @@ def search_value(d, target):
     for key, value in d.items():
         if value == target:
             return key
-    raise Exception(f"{target} is not in the dictionary")
+    raise ValueError(f"{target} is not in the dictionary")
 
 
 def next_column_name(attribute_mapping: dict, data_type: str):
@@ -1361,3 +1361,19 @@ def build_where_clause(queries: [str]):
         return "WHERE " + queries[0]
     else:
         return "WHERE " + " AND ".join(queries)
+    
+def build_insert_query(read_table_name: str, result_table_name: str, attribute_mapping: dict, result_column: str = "") -> [str, str]:
+    # Create insert statement
+    insert_columns = (
+        ", ".join(attribute_mapping.keys())
+    )
+    if result_column:
+        insert_columns += ", " + result_column
+    select_columns = ", ".join(
+        f"{read_table_name}." + value
+        for value in ["geom"] + list(attribute_mapping.keys())
+    )
+    insert_statement = (
+        f"INSERT INTO {result_table_name} (layer_id, geom, {insert_columns})"
+    )
+    return insert_statement, select_columns

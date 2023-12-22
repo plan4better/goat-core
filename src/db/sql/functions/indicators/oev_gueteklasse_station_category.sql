@@ -59,3 +59,4 @@ BEGIN
     END IF;
 END;
 $function$;
+PARALLEL SAFE;

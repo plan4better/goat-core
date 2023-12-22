@@ -336,6 +336,77 @@ async def fixture_create_internal_layers(
         )
     return layer
 
+@pytest.fixture
+async def fixture_create_polygon_layer(
+    client: AsyncClient, fixture_create_user, fixture_get_home_folder
+):
+    dir_gpkg = os.path.join(settings.TEST_DATA_DIR, "layers", "tool", "zipcode.gpkg")
+    dataset_gpkg = await upload_file(client, dir_gpkg)
+
+    # Create layer
+    layer_gpkg = await create_internal_layer(
+        client,
+        dataset_gpkg["dataset_id"],
+        fixture_get_home_folder,
+        "feature_layer_standard",
+    )
+    return layer_gpkg
+
+@pytest.fixture
+async def fixture_add_polygon_layer_to_project(
+    client: AsyncClient, fixture_create_project, fixture_create_polygon_layer
+):
+    layer_gpkg = fixture_create_polygon_layer
+    project_id = fixture_create_project["id"]
+    # Add layers to project
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_gpkg['id']}"
+    )
+    assert response.status_code == 200
+    layers_project = response.json()
+    layer_project_id = layers_project[0]["id"]
+
+    return {
+        "layer_project_id": layer_project_id,
+        "project_id": project_id,
+    }
+
+@pytest.fixture
+async def fixture_create_large_polygon_layer(
+    client: AsyncClient, fixture_create_user, fixture_get_home_folder
+):
+    dir_gpkg = os.path.join(settings.TEST_DATA_DIR, "layers", "tool", "large_polygon.gpkg")
+    dataset_gpkg = await upload_file(client, dir_gpkg)
+
+    # Create layer
+    layer_gpkg = await create_internal_layer(
+        client,
+        dataset_gpkg["dataset_id"],
+        fixture_get_home_folder,
+        "feature_layer_standard",
+    )
+    return layer_gpkg
+
+
+@pytest.fixture
+async def fixture_add_large_polygon_layer_to_project(
+    client: AsyncClient, fixture_create_project, fixture_create_large_polygon_layer
+):
+    layer_gpkg = fixture_create_large_polygon_layer
+    project_id = fixture_create_project["id"]
+    # Add layers to project
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_gpkg['id']}"
+    )
+    assert response.status_code == 200
+    layers_project = response.json()
+    layer_project_id = layers_project[0]["id"]
+
+    return {
+        "layer_project_id": layer_project_id,
+        "project_id": project_id,
+    }
+    
 
 @pytest.fixture
 async def fixture_create_join_layers(client: AsyncClient, fixture_get_home_folder):

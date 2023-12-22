@@ -286,7 +286,7 @@ async def test_get_statistics_column(
         },
         "equal_interval": {
             **base_results,
-            "breaks": [641321, 1248551, 1855781, 2463011, 3070241],
+            "breaks": [641321.1666666666, 1248551.3333333333, 1855781.5, 2463011.6666666665, 3070241.833333333],
         },
         "heads_and_tails": {
             **base_results,

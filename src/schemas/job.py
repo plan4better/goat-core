@@ -11,6 +11,7 @@ class JobType(str, Enum):
     file_import = "file_import"
     join = "join"
     isochrone_active_mobility = "isochrone_active_mobility"
+    oev_gueteklasse = "oev_gueteklasse"
 
 
 class JobStatusType(str, Enum):
@@ -35,7 +36,7 @@ class MsgType(str, Enum):
 class Msg(BaseModel):
     """Message attribute types."""
 
-    type: MsgType
+    type: MsgType = MsgType.info
     text: str
 
 
@@ -59,5 +60,12 @@ class JobStatusJoin(BaseModel):
 
     join: JobStep = {}
 
+class JobStatusOevGueteklasse(BaseModel):
+    """Job layer upload attribute types."""
+
+    station_category: JobStep = {}
+    station_buffer: JobStep = {}
+
+
 # Only add jobs here that are consisting of multiple steps
-job_mapping = {JobType.file_import: JobStatusFileImport, JobType.join: JobStatusJoin}
+job_mapping = {JobType.file_import: JobStatusFileImport, JobType.join: JobStatusJoin, JobType.oev_gueteklasse: JobStatusOevGueteklasse}

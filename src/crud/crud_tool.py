@@ -15,7 +15,8 @@ from src.utils import (
     get_user_table,
     search_value,
 )
-
+from src.schemas.error import UnsupportedLayerTypeError, ColumnTypeError
+from src.schemas.toolbox_base import DefaultResultLayerName
 
 class CRUDTool(CRUDToolBase):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
@@ -45,7 +46,7 @@ class CRUDTool(CRUDToolBase):
         )
         # Check that the target layer is a feature layer. This is done because tool layers are currently a subset of feature layers.
         if target_layer_project.type != LayerType.feature.value:
-            raise Exception(
+            raise UnsupportedLayerTypeError(
                 f"Target layer {target_layer_project.name} is not a feature layer."
             )
 
@@ -62,7 +63,7 @@ class CRUDTool(CRUDToolBase):
 
         # Check if mapped_target_field and mapped_join_field are having the same type
         if mapped_target_field.split("_")[0] != mapped_join_field.split("_")[0]:
-            raise Exception(
+            raise ColumnTypeError(
                 "Mapped target field and mapped join field are not having the same type."
             )
 
@@ -73,7 +74,7 @@ class CRUDTool(CRUDToolBase):
             OgrPostgresType.Real,
             OgrPostgresType.Integer64,
         ]:
-            raise Exception(
+            raise ColumnTypeError(
                 f"Mapped statistics field is not {OgrPostgresType.Integer}, {OgrPostgresType.Real}, {OgrPostgresType.Integer64}. The operation cannot be performed on the {mapped_statistics_field_type} type."
             )
 
@@ -88,7 +89,7 @@ class CRUDTool(CRUDToolBase):
 
         # Create new layer
         layer_in = IFeatureLayerToolCreate(
-            name=params.layer_name,
+            name=DefaultResultLayerName.join.value,
             feature_layer_geometry_type=target_layer_project.feature_layer_geometry_type,
             attribute_mapping=new_layer_attribute_mapping,
             tool_type=ToolType.join.value,

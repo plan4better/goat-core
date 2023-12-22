@@ -1,12 +1,14 @@
 DROP FUNCTION IF EXISTS basic.create_distributed_polygon_table; 
-CREATE OR REPLACE FUNCTION basic.create_distributed_polygon_table(input_sql text, max_vertices_polygon integer, result_table_name text)
+CREATE OR REPLACE FUNCTION basic.create_distributed_polygon_table(input_table text, where_filter text, max_vertices_polygon integer, result_table_name text)
 RETURNS SETOF void
 LANGUAGE plpgsql
 AS $function$
 BEGIN
-	
+	RAISE NOTICE '%', format(
+		'DROP TABLE IF EXISTS polygons; CREATE TEMP TABLE polygons AS SELECT geom FROM %s %s;', input_table, where_filter 
+	);
 	EXECUTE format(
-		'DROP TABLE IF EXISTS polygons; CREATE TEMP TABLE polygons AS %s;', input_sql
+		'DROP TABLE IF EXISTS polygons; CREATE TEMP TABLE polygons AS SELECT geom FROM %s %s;', input_table, where_filter 
 	);
 	-- Create subdivided polygon table
 	DROP TABLE IF EXISTS polygons_subdivided; 
@@ -56,15 +58,13 @@ BEGIN
 
 END;
 $function$ 
-
+PARALLEL SAFE;
 /*
-SELECT basic.create_distributed_polygon_table
-(
-	'SELECT *
-	FROM user_data.polygon_744e4fd1685c495c8b02efebce875359
-	WHERE text_attr1 LIKE ''DE%''
-	AND float_attr1 = 3
-	AND layer_id = ''097d6f2b-11a3-48bc-b592-1cf6e6c9e9a3''',
-	30, 'temporal.test'
+EXPLAIN ANALYZE 
+SELECT basic.create_distributed_polygon_table(
+	'user_data.polygon_744e4fd1685c495c8b02efebce875359', 
+	'WHERE layer_id = ''4bdbed8f-4804-4913-9b42-c547e7be0fd5'' AND text_attr1=''Niedersachsen''',
+	30,
+	'temporal.test'
 )
 */

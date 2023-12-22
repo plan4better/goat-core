@@ -16,8 +16,16 @@ from src.db.models.layer import FeatureType, Layer, LayerType, ToolType
 from src.schemas.job import JobStatusType, JobType
 from src.schemas.layer import IFeatureLayerToolCreate, UserDataTable
 from src.schemas.style import base_properties
-from src.schemas.toolbox_base import MaxFeatureCnt
-
+from src.schemas.toolbox_base import (
+    MaxFeatureCnt,
+    ColumnStatisticsOperation,
+    MaxSizeReferenceArea,
+)
+from src.schemas.layer import UserDataGeomType
+from src.schemas.toolbox_base import GeofenceTable
+from src.utils import build_where_clause
+from src.schemas.job import Msg, MsgType
+from src.schemas.error import LayerSizeError, LayerExtentError, LayerProjectTypeError, FeatureCountError, GeometryTypeError, AreaSizeError
 
 async def start_calculation(
     job_type: JobType,
@@ -102,9 +110,9 @@ class CRUDToolBase:
         )
         # Raise error if extent or size is None
         if layer.size is None:
-            raise Exception("The layer size is None.")
+            raise LayerSizeError("The layer size is None.")
         if layer.extent is None:
-            raise Exception("The layer extent is None.")
+            raise LayerExtentError("The layer extent is None.")
 
         layer = await crud_layer.create(
             db=self.async_session,
@@ -133,13 +141,106 @@ class CRUDToolBase:
             elif isinstance(layer_project, dict):
                 feature_cnt = layer_project.filtered_count or layer_project.total_count
             else:
-                raise Exception(
+                raise LayerProjectTypeError(
                     "The layer_project is not of type BaseModel, SQLModel or dict."
                 )
             if feature_cnt > MaxFeatureCnt[tool_type.value].value:
-                raise Exception(
+                raise FeatureCountError(
                     f"The operation cannot be performed on more than {MaxFeatureCnt[tool_type.value].value} features."
                 )
+
+    async def check_reference_area_size(
+        self,
+        layer_project: BaseModel | SQLModel | dict,
+        tool_type: MaxSizeReferenceArea,
+    ):
+        # Build where query for layer
+        where_query = build_where_clause([layer_project.where_query])
+
+        # Check if layer has polygon geoms
+        if layer_project.feature_layer_geometry_type.value != UserDataGeomType.polygon.value:
+            raise GeometryTypeError(
+                "Operation not supported. The layer does not contain polygon geometries. Pick a layer with polygon geometries."
+            )
+
+        # Call SQL function
+        sql_query = """
+            SELECT *
+            FROM basic.area_statistics(:operation, :table_name, :where_query)
+        """
+        res = await self.async_session.execute(
+            sql_query,
+            {
+                "operation": ColumnStatisticsOperation.sum.value,
+                "table_name": layer_project.table_name,
+                "where_query": where_query,
+            },
+        )
+        res = res.fetchall()
+        area = res[0][0]["sum"]  / 1000000
+        if area  > MaxSizeReferenceArea[tool_type.value].value:
+            raise AreaSizeError(
+                f"The operation cannot be performed on more than {MaxSizeReferenceArea[tool_type.value].value} km2."
+            )
+        return
+
+    async def check_reference_area_geofence(
+        self,
+        layer_project: BaseModel | SQLModel | dict,
+        tool_type: MaxSizeReferenceArea,
+    ):
+        # Build where query for layer
+        where_query = build_where_clause([layer_project.where_query])
+        geofence_table = GeofenceTable[tool_type.value].value
+        # Check if layer has polygon geoms
+        sql = f"""
+            WITH to_test AS
+            (
+                SELECT *
+                FROM {layer_project.table_name}
+                {where_query}
+            )
+            SELECT COUNT(*)
+            FROM to_test t
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM {geofence_table} AS g
+                WHERE ST_WITHIN(t.geom, g.geom)
+            )
+        """
+        # Execute query
+        cnt_not_within = await self.async_session.execute(sql)
+        cnt_not_within = cnt_not_within.scalar()
+
+        if cnt_not_within > 0:
+            return Msg(
+                type=MsgType.warning,
+                text=f"{cnt_not_within} features are not within the geofence.",
+            )
+        return Msg(type=MsgType.info, text="All features are within the geofence.")
+
+    async def check_reference_area(
+        self, layer_project_id: int, tool_type: MaxSizeReferenceArea
+    ):
+        # Get layer project
+        layer_project = await crud_layer_project.get_internal(
+            async_session=self.async_session, id=layer_project_id, project_id=self.project_id
+        )
+        # Check if the feature count is below the limit
+        await self.check_max_feature_cnt(
+            layers_project=[layer_project], tool_type=tool_type
+        )
+        # Check if the reference area size is below the limit
+        await self.check_reference_area_size(
+            layer_project=layer_project, tool_type=tool_type
+        )
+        # Check if the reference area is within in geofence
+        return {
+            "msg": await self.check_reference_area_geofence(
+            layer_project=layer_project, tool_type=tool_type
+            ),
+            "layer_project": layer_project,
+        }
 
     async def delete_orphan_data(self):
         # Delete orphan data from user tables

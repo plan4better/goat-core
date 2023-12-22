@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field, root_validator
 from src.schemas.toolbox_base import (
     IsochroneStartingPointsBase,
     PTSupportedDay,
-    ResultTarget,
 )
 from src.schemas.layer import ToolType
 
@@ -113,6 +112,14 @@ class PTTimeWindow(BaseModel):
         lt=86400,
         description="(PT) To time . Number of seconds since midnight",
     )
+    @property
+    def weekday_integer(self):
+        mapping = {
+            "weekday": 1,
+            "saturday": 2,
+            "sunday": 3,
+        }
+        return mapping[PTSupportedDay(self.weekday).value]
 
 
 class IIsochronePT(BaseModel):
@@ -138,11 +145,6 @@ class IIsochronePT(BaseModel):
         title="Time Window",
         description="The time window of the isochrone.",
     )
-    layer_name: str = Field(
-        ...,
-        title="Layer Name",
-        description="The name of the layer.",
-    )
 
     @property
     def tool_type(self):
@@ -150,7 +152,7 @@ class IIsochronePT(BaseModel):
 
     @property
     def geofence_table(self):
-        mode = ToolType.isochrone_pt.value.replace('isochrone_', "")
+        mode = ToolType.isochrone_pt.value.replace("isochrone_", "")
         return f"basic.geofence_{mode}"
 
 
@@ -178,11 +180,6 @@ class IIsochroneCar(BaseModel):
         title="Travel Cost",
         description="The travel cost of the isochrone.",
     )
-    layer_name: str = Field(
-        ...,
-        title="Layer Name",
-        description="The name of the layer.",
-    )
 
     @property
     def tool_type(self):
@@ -190,8 +187,9 @@ class IIsochroneCar(BaseModel):
 
     @property
     def geofence_table(self):
-        mode = ToolType.isochrone_car.value.value.replace('isochrone_', "")
+        mode = ToolType.isochrone_car.value.value.replace("isochrone_", "")
         return f"basic.geofence_{mode}"
+
 
 class CountLimitPerTool(int, Enum):
     oev_gueteklasse = 1000
@@ -227,26 +225,27 @@ class StationConfig(BaseModel):
 
 
 class IOevGueteklasse(BaseModel):
+    reference_area_layer_project_id: int = Field(
+        ...,
+        title="The layer project serving reference Area for the calculation.",
+        description="The reference area of the ÖV-Güteklasse.",
+    )
     time_window: PTTimeWindow = Field(
         ...,
         title="Time Window",
         description="The time window of the ÖV-Güteklasse.",
-    )
-    reference_area: UUID = Field(
-        ...,
-        title="Reference Area",
-        description="The reference area of the ÖV-Güteklasse.",
     )
     station_config: StationConfig = Field(
         ...,
         title="Station Config",
         description="The station config of the ÖV-Güteklasse.",
     )
-    layer_name: str = Field(
-        ...,
-        title="Layer Name",
-        description="The name of the layer.",
-    )
+    @property
+    def tool_type(self):
+        return ToolType.oev_gueteklasse
+    @property
+    def geofence_table(self):
+        return "basic.geofence_pt"
 
 
 request_examples_isochrone_pt = {
@@ -267,7 +266,6 @@ request_examples_isochrone_pt = {
             },
             "travel_cost": {"max_traveltime": 40, "traveltime_step": 10},
             "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
-            "layer_name": "AllModesPTIsochrone",
         },
     },
     # 2. Isochrone for public transport excluding bus mode
@@ -286,7 +284,6 @@ request_examples_isochrone_pt = {
             },
             "travel_cost": {"max_traveltime": 35, "traveltime_step": 5},
             "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
-            "layer_name": "AllModesPTIsochrone",
         },
     },
 }
@@ -299,7 +296,6 @@ request_examples_isochrone_car = {
             "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
             "routing_type": "car_peak",
             "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
-            "layer_name": "AllModesPTIsochrone",
         },
     },
     # 2. Multiisochrone for car
@@ -312,10 +308,54 @@ request_examples_isochrone_car = {
             },
             "routing_type": "car_peak",
             "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
-            "layer_name": "AllModesPTIsochrone",
         },
     },
 }
+
+
+public_transport_types = {
+    "Bus": {
+        3: "Bus",
+        11: "Trolleybus",
+        700: "Bus Service",
+        702: "Express Bus Service",
+        704: "Local Bus Service",
+        705: "Night Bus Service",
+        710: "Sightseeing Bus",
+        712: "School Bus",
+        715: "Demand and Response Bus Service",
+        800: "Trolleybus Service",
+    },
+    "Tram": {0: "Tram, Streetcar, Light rail", 900: "Tram Service"},
+    "Rail": {
+        1: "Subway, Metro",
+        2: "Rail",
+        100: "Railway Service",
+        101: "High Speed Rail Service",
+        102: "Long Distance Trains",
+        103: "Inter Regional Rail Service",
+        105: "Sleeper Rail Service",
+        106: "Regional Rail Service",
+        107: "Tourist Railway Service",
+        109: "Suburban Railway",
+        202: "National Coach Service",
+        400: "Metro Service",
+        401: "Underground Metro Service",
+        402: "Urban Railway Service",
+        403: "All Urban Railway Services",
+    },
+    "Other": {
+        4: "Ferry",
+        6: "Aerial lift",
+        7: "Funicular",
+        1000: "Water Transport Service",
+        1300: "Aerial Lift Service",
+        1400: "Funicular Service",
+        1500: "Taxi Service",
+        1700: "Gondola, Suspended cable car",
+    },
+}
+
 
 # Check for extended route_type defintion: https://developers.google.com/transit/gtfs/reference/extended-route-types
 station_config_example = {
@@ -324,6 +364,7 @@ station_config_example = {
         "1": "A",
         "2": "A",
         "3": "C",
+        "7": "B",
         "100": "A",
         "101": "A",
         "102": "A",
@@ -353,6 +394,8 @@ station_config_example = {
         "701": "C",
         "702": "C",
         "704": "C",
+        "705": "C",
+        "712": "C",
         "715": "C",
         "800": "C",
         "900": "B",
@@ -362,6 +405,7 @@ station_config_example = {
         "904": "B",
         "905": "B",
         "906": "B",
+        "1400": "B",
     },
     "time_frequency": [0, 4, 10, 19, 39, 60, 119],
     "categories": [
@@ -391,25 +435,21 @@ request_example_oev_gueteklasse = {
     "oev_gueteklasse_weekday": {
         "summary": "ÖV-Güteklassen Weekday",
         "value": {
-            "folder_id": "732fc631-e1a4-44c5-b7ef-27c7d49e65f7",
             "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
-            "reference_area": "99261caf-bb4a-42ef-8212-423a3dd6d613",
+            "reference_area_layer_project_id": "1",
             "station_config": station_config_example,
-            "layer_name": "Öv-Güteklassen Weekday",
         },
     },
     "oev_gueteklasse_saturday": {
         "summary": "ÖV-Güteklassen Saturday",
         "value": {
-            "folder_id": "732fc631-e1a4-44c5-b7ef-27c7d49e65f7",
             "time_window": {
                 "weekday": "saturday",
                 "from_time": 25200,
                 "to_time": 32400,
             },
-            "reference_area": "99261caf-bb4a-42ef-8212-423a3dd6d613",
+            "reference_area_layer_project_id": "1",
             "station_config": station_config_example,
-            "layer_name": "Öv-Güteklassen Saturday",
         },
     },
 }

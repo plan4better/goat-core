@@ -20,6 +20,7 @@ from src.schemas.project import (
 # Local application imports
 from .base import CRUDBase
 from .crud_project import project as crud_project
+from src.schemas.error import UnsupportedLayerTypeError, LayerNotFoundError
 
 
 class CRUDLayerProject(CRUDBase):
@@ -123,25 +124,22 @@ class CRUDLayerProject(CRUDBase):
 
         # Make sure layer project exists
         if layer_project == []:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Layer project not found",
-            )
-
+            raise LayerNotFoundError("Layer project not found")
         layer_project = layer_project[0]
         # Check if internal layer
         if layer_project.type not in [
             LayerType.table.value,
             LayerType.feature.value,
         ]:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Layer is not an internal layer",
+            raise UnsupportedLayerTypeError(
+                f"Layer {layer_project.name} is not an internal layer"
             )
 
         return layer_project
 
-    async def check_and_alter_layer_name(self, async_session: AsyncSession, project_id: UUID, layer_name):
+    async def check_and_alter_layer_name(
+        self, async_session: AsyncSession, project_id: UUID, layer_name
+    ):
         """Check if layer name already exists in project and alter it like layer (n+1) if necessary"""
 
         # Regular expression to find layer names with a number
@@ -150,7 +148,7 @@ class CRUDLayerProject(CRUDBase):
         # Modify the query to select only the name attribute of layers that start with the given layer_name
         query = select(LayerProjectLink.name).where(
             LayerProjectLink.project_id == project_id,
-            LayerProjectLink.name.like(f"{layer_name}%")
+            LayerProjectLink.name.like(f"{layer_name}%"),
         )
 
         # Execute the query
@@ -158,7 +156,11 @@ class CRUDLayerProject(CRUDBase):
         layer_names = [row[0] for row in result.fetchall()]
 
         # Find the highest number (n) among the layer names using list comprehension
-        numbers = [int(match.group(1)) for name in layer_names if (match := pattern.match(name))]
+        numbers = [
+            int(match.group(1))
+            for name in layer_names
+            if (match := pattern.match(name))
+        ]
         highest_num = max(numbers, default=0)
 
         # Check if the base layer name exists
@@ -315,7 +317,6 @@ class CRUDLayerProject(CRUDBase):
         # Update layer
         layer_dict.update(layer_project_dict)
         layer_project = model_type_read(**layer_dict)
-
 
         # Get feature cnt
         feature_cnt = await crud_layer.get_feature_cnt(

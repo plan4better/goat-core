@@ -1,13 +1,14 @@
+from src.core.config import settings
+from src.core.tool import CRUDToolBase
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.schemas.active_mobility import (
     IIsochroneActiveMobility,
 )
-from src.schemas.motorized_mobility import IIsochroneCar, IIsochronePT
 from src.schemas.job import JobStatusType
 from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
-from src.core.tool import CRUDToolBase
-from src.core.config import settings
-
+from src.schemas.motorized_mobility import IIsochroneCar, IIsochronePT
+from src.schemas.toolbox_base import DefaultResultLayerName
+from src.schemas.error import OutOfGeofenceError
 
 class CRUDIsochrone(CRUDToolBase):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
@@ -21,7 +22,7 @@ class CRUDIsochrone(CRUDToolBase):
     ):
         # Create layer object
         layer = IFeatureLayerToolCreate(
-            name="Starting Points",
+            name=DefaultResultLayerName.isochrone_starting_points.value,
             feature_layer_geometry_type=UserDataGeomType.point.value,
             attribute_mapping={},
             tool_type=params.tool_type.value,
@@ -52,7 +53,7 @@ class CRUDIsochrone(CRUDToolBase):
             cnt_not_intersecting = cnt_not_intersecting.scalars().first()
 
             if cnt_not_intersecting > 0:
-                raise Exception(
+                raise OutOfGeofenceError(
                     f"There are {cnt_not_intersecting} starting points that are not within the geofence. Please check your starting points."
                 )
 

@@ -38,4 +38,4 @@ async def compute_active_mobility_isochrone(
         background_tasks=common.background_tasks,
         project_id=common.project_id,
         params=params,
-)
+    )

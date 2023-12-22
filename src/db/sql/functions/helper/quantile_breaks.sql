@@ -23,7 +23,8 @@ BEGIN
    	res = jsonb_build_object('mean', mean_val, 'min', min_val, 'max', max_val, 'breaks', computed_breaks[1:array_length(computed_breaks, 1) - 1]);
     RETURN res;
 END;
-$function$;
+$function$
+PARALLEL SAFE;
 
 /*
 SELECT basic.quantile_breaks('user_data.point_744e4fd1685c495c8b02efebce875359', 'integer_attr1', 'layer_id = ''ac9cdd4f-8712-459b-bfb8-3e4664c48abb''', 5)

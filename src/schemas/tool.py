@@ -7,9 +7,9 @@ from pydantic import BaseModel, Field, validator
 from src.schemas.toolbox_base import (
     ColumnStatistic,
     ColumnStatisticsOperation,
-    ResultTarget,
 )
-
+from src.schemas.active_mobility import IIsochroneActiveMobility
+from src.schemas.motorized_mobility import IOevGueteklasse, IIsochroneCar, IIsochronePT
 
 class IJoin(BaseModel):
     """Join tool schema."""
@@ -38,11 +38,6 @@ class IJoin(BaseModel):
         None,
         title="Column Statistics",
         description="The column statistics to be calculated.",
-    )
-    layer_name: str = Field(
-        ...,
-        title="Layer Name",
-        description="The name of the layer.",
     )
 
 
@@ -86,11 +81,6 @@ class IAggregationPoint(BaseModel):
         title="Area Group By Field",
         description="The field in the area layer that is used to group the aggregated points.",
     )
-    layer_name: str = Field(
-        ...,
-        title="Layer Name",
-        description="The name of the layer.",
-    )
 
     @validator("h3_resolution", pre=True, always=True)
     def h3_grid_requires_resolution(cls, v, values):
@@ -120,6 +110,15 @@ class IAggregationPoint(BaseModel):
                 )
         return v
 
+class IToolParam(BaseModel):
+    data: object
+
+    @validator('data', pre=True)
+    def check_type(cls, v):
+        allowed_types = (IJoin, IAggregationPoint, IIsochroneActiveMobility, IOevGueteklasse, IIsochroneCar, IIsochronePT)
+        if not isinstance(v, allowed_types):
+            raise ValueError(f'Input type {type(v).__name__} not allowed')
+        return v
 
 request_examples_join = {
     "join_count": {
@@ -133,7 +132,6 @@ request_examples_join = {
                 "operation": ColumnStatisticsOperation.count.value,
                 "field": "field_example1",
             },
-            "layer_name": "IJoin Result Layer Example",
         },
     },
     "join_mean": {
@@ -147,7 +145,6 @@ request_examples_join = {
                 "operation": ColumnStatisticsOperation.mean.value,
                 "field": "field_example2",
             },
-            "layer_name": "IJoin Result Layer Example 2",
         },
     },
 }
@@ -161,7 +158,6 @@ request_examples_aggregation = {
             "area_layer_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
             "column_statistics": {"operation": "sum", "field": "field_example1"},
             "area_group_by_field": ["group_by_example1"],
-            "layer_name": "Aggregation Result Layer Feature Layer",
         },
     },
     "aggregation_h3_grid": {
@@ -172,7 +168,6 @@ request_examples_aggregation = {
             "h3_resolution": 6,
             "column_statistics": {"operation": "mean", "field": "field_example2"},
             "area_group_by_field": ["group_by_example2"],
-            "layer_name": "Aggregation Result Layer H3 Grid",
         },
     },
 }

@@ -98,11 +98,6 @@ class IIsochroneActiveMobility(BaseModel):
             description="The travel cost of the isochrone.",
         )
     )
-    layer_name: str = Field(
-        ...,
-        title="Layer Name",
-        description="The name of the layer.",
-    )
     scenario_id: UUID | None = Field(
         None,
         title="Scenario ID",
@@ -130,7 +125,6 @@ request_examples = {
                     "traveltime_step": 10,
                     "speed": 5,
                 },
-                "layer_name": "WalkingIsochroneExample1",
             },
         },
         "single_point_cycling": {
@@ -143,7 +137,6 @@ request_examples = {
                     "traveltime_step": 5,
                     "speed": 15,
                 },
-                "layer_name": "CyclingIsochroneExample1",
             },
         },
         "single_point_walking_scenario": {
@@ -156,7 +149,6 @@ request_examples = {
                     "traveltime_step": 10,
                     "speed": 5,
                 },
-                "layer_name": "WalkingIsochroneExample1",
                 "scenario_id": "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
             },
         },
@@ -195,7 +187,6 @@ request_examples = {
                     "traveltime_step": 10,
                     "speed": 5,
                 },
-                "layer_name": "WalkingMultiIsochroneExample1",
             },
         },
         "multi_point_cycling": {
@@ -233,7 +224,6 @@ request_examples = {
                     "traveltime_step": 5,
                     "speed": 15,
                 },
-                "layer_name": "CyclingMultiIsochroneExample1",
             },
         },
         "layer_based_walking": {
@@ -248,7 +238,6 @@ request_examples = {
                     "traveltime_step": 10,
                     "speed": 5,
                 },
-                "layer_name": "LayerBasedWalkingIsochrone",
             },
         },
     }

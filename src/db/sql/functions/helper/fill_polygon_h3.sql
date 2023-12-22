@@ -26,3 +26,4 @@ BEGIN
 	FROM h3_ids; 
 END;
 $function$ 
+PARALLEL SAFE;
