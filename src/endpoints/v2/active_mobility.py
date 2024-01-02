@@ -6,9 +6,9 @@ from src.schemas.active_mobility import (
 )
 from src.schemas.toolbox_base import IToolResponse
 from src.schemas.job import JobType
-from src.crud.crud_isochrone import CRUDIsochrone
 from src.core.tool import start_calculation
 from src.schemas.toolbox_base import CommonToolParams
+from src.crud.crud_isochrone import CRUDIsochroneActiveMobility
 
 router = APIRouter()
 
@@ -31,8 +31,8 @@ async def compute_active_mobility_isochrone(
 
     return await start_calculation(
         job_type=JobType.isochrone_active_mobility,
-        tool_class=CRUDIsochrone,
-        crud_method="active_mobility",
+        tool_class=CRUDIsochroneActiveMobility,
+        crud_method="run_isochrone",
         async_session=common.async_session,
         user_id=common.user_id,
         background_tasks=common.background_tasks,

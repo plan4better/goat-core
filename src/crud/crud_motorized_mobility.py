@@ -71,18 +71,18 @@ class CRUDOevGueteklasse(CRUDToolBase):
         """Compute station buffer."""
 
         # Create temp table names
-        table_suffix = str(self.user_id).replace("-", "")
+        table_suffix = str(self.job_id).replace("-", "")
         temp_buffered_stations = f"temporal.temp_buffered_stations_{table_suffix}"
         temp_union_buffer = f"temporal.temp_union_buffered_stations_{table_suffix}"
 
         try:
             # Create temp distributed table for buffered stations
             await self.async_session.execute(
-                "DROP TABLE IF EXISTS temporal.temp_buffered_stations_744e4fd1685c495c8b02efebce875359"
+                f"DROP TABLE IF EXISTS {temp_buffered_stations};"
             )
             await self.async_session.execute(
-                """
-                CREATE TABLE temporal.temp_buffered_stations_744e4fd1685c495c8b02efebce875359
+                f"""
+                CREATE TABLE {temp_buffered_stations}
                 (
                     stop_id TEXT,
                     pt_class integer,
@@ -93,7 +93,7 @@ class CRUDOevGueteklasse(CRUDToolBase):
             """
             )
             await self.async_session.execute(
-                "SELECT create_distributed_table('temporal.temp_buffered_stations_744e4fd1685c495c8b02efebce875359', 'h3_3')"
+                f"SELECT create_distributed_table('{temp_buffered_stations}', 'h3_3')"
             )
 
             # Buffer the stations in their respective intervals
@@ -153,6 +153,14 @@ class CRUDOevGueteklasse(CRUDToolBase):
                 ) j ON TRUE;
                 """
             )
+            # Drop temp tables
+            await self.async_session.execute(
+                f"DROP TABLE IF EXISTS {temp_buffered_stations};"
+            )
+            await self.async_session.execute(
+                f"DROP TABLE IF EXISTS {temp_union_buffer};"
+            )
+            await self.async_session.commit()
         except Exception as e:
             # Drop temp tables
             await self.async_session.execute(
@@ -161,6 +169,7 @@ class CRUDOevGueteklasse(CRUDToolBase):
             await self.async_session.execute(
                 f"DROP TABLE IF EXISTS {temp_union_buffer};"
             )
+            await self.async_session.commit()
             raise SQLError(e)
         return {"status": JobStatusType.finished.value, "msg": "Station buffers are created."}
 

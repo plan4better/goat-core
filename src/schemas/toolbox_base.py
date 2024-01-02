@@ -1,16 +1,18 @@
 # Standard Libraries
 from enum import Enum
-from typing import List
+from typing import List, Union
 from uuid import UUID
 
 from fastapi import BackgroundTasks, Depends, Query
 
 # Third-party Libraries
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, root_validator, validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Local Packages
 from src.endpoints.deps import get_db, get_user_id
+from src.db.models.layer import LayerType
+from src.schemas.layer import FeatureGeometryType
 
 
 class ColumnStatisticsOperation(str, Enum):
@@ -28,6 +30,7 @@ class ColumnStatistic(BaseModel):
     operation: ColumnStatisticsOperation
     field: str
 
+
 class DefaultResultLayerName(str, Enum):
     """Default result layer name schema."""
 
@@ -38,7 +41,10 @@ class DefaultResultLayerName(str, Enum):
     isochrone_car = "Car Isochrone"
     oev_gueteklasse = "ÖV-Güteklassen"
     oev_gueteklasse_station = "ÖV-Güteklassen Station"
-    aggregation_point = "Aggregation Point"
+    aggregate_point = "Aggregation Point"
+    aggregate_polygon = "Aggregation Polygon"
+    aggregate_line = "Aggregation Line"
+
 
 class MaxFeatureCnt(int, Enum):
     """Max feature count schema."""
@@ -47,11 +53,15 @@ class MaxFeatureCnt(int, Enum):
     join = 100000
     isochrone_active_mobility = 1000
     oev_gueteklasse = 10000
+    aggregate_point = 1000000
+    aggregate_polygon = 100000
+
 
 class ToolsWithReferenceAreaCheck(str, Enum):
     """Tools with reference area check schema."""
 
     oev_gueteklasse = "oev_gueteklasse"
+
 
 class MaxSizeReferenceArea(int, Enum):
     """Max size reference in km2."""
@@ -61,11 +71,25 @@ class MaxSizeReferenceArea(int, Enum):
 
 class GeofenceTable(str, Enum):
     """Geofence tool table mapping."""
+
     isochrone_active_mobility = "basic.geofence_active_mobility"
     isochrone_pt = "basic.geofence_pt"
     isochrone_car = "basic.geofence_car"
     oev_gueteklasse = "basic.geofence_pt"
 
+class IsochroneType(str, Enum):
+    """Isochrone type schema."""
+
+    polygon = "polygon"
+    network = "network"
+    rectangular_grid = "rectangular_grid"
+
+class IsochroneGeometryTypeMapping(str, Enum):
+    """Isochrone geometry type mapping schema."""
+
+    polygon = FeatureGeometryType.polygon.value
+    network = FeatureGeometryType.line.value
+    rectangular_grid = FeatureGeometryType.polygon.value
 
 class IToolResponse(BaseModel):
     """Tool response schema."""
@@ -90,10 +114,10 @@ class IsochroneStartingPointsBase(BaseModel):
         title="Longitude",
         description="The longitude of the isochrone center.",
     )
-    layer_project_id: UUID | None = Field(
+    layer_project_id: int | None = Field(
         None,
-        title="Layer ID",
-        description="The ID of the layer that contains the starting points.",
+        title="Layer Project ID",
+        description="The ID of the layer project that contains the starting points.",
     )
 
     @root_validator(pre=True)
@@ -150,3 +174,44 @@ class CommonToolParams:
         self.async_session = async_session
         self.user_id = user_id
         self.project_id = project_id
+
+class InputLayerType(BaseModel):
+    """Input layer type schema."""
+    layer_types: List[LayerType] | None = Field(
+        [LayerType.feature.value, LayerType.table.value],
+        title="Layer Types",
+        description="The layer types that are supported for the respective input layer of the tool.",
+    )
+    feature_layer_geometry_types: List[FeatureGeometryType] | None = Field(
+        None,
+        title="Feature Layer Geometry Types",
+        description="The feature layer geometry types that are supported for the respective input layer of the tool.",
+    )
+
+    @validator('layer_types', each_item=True)
+    def validate_layer_types(cls, layer_type):
+        if layer_type not in LayerType.__members__:
+            raise ValueError(f"{layer_type} is not a valid LayerType")
+        return layer_type
+
+    @root_validator(pre=True)
+    def validate_feature_layer_geometry_types(cls, values):
+        layer_types = values.get("layer_types")
+        feature_layer_geometry_types = values.get("feature_layer_geometry_types")
+
+        if LayerType.feature.value in layer_types:
+            if feature_layer_geometry_types is None:
+                raise ValueError(
+                    "If layer_type is feature then feature_layer_geometry_types cannot be null."
+                )
+        elif LayerType.table.value in layer_types:
+            if feature_layer_geometry_types is not None:
+                raise ValueError(
+                    "If layer_type is table then feature_layer_geometry_types must be null."
+                )
+        else:
+            raise ValueError(
+                "layer_type must be either feature or table, not both or none."
+            )
+
+        return values

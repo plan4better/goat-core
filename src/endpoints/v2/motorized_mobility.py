@@ -17,6 +17,7 @@ from uuid import uuid4
 from src.core.tool import start_calculation
 from src.schemas.toolbox_base import CommonToolParams
 from src.crud.crud_motorized_mobility import CRUDOevGueteklasse
+from src.crud.crud_isochrone import CRUDIsochroneActiveMobility, CRUDIsochronePT
 from src.schemas.job import JobType
 
 router = APIRouter()
@@ -30,8 +31,7 @@ router = APIRouter()
 )
 async def compute_pt_isochrone(
     *,
-    async_session: AsyncSession = Depends(get_db),
-    user_id: UUID = Depends(get_user_id),
+    common: CommonToolParams = Depends(),
     params: IIsochronePT = Body(
         ...,
         examples=request_examples_isochrone_pt,
@@ -39,7 +39,16 @@ async def compute_pt_isochrone(
     ),
 ):
     """Compute isochrones for public transport."""
-    return {"job_id": uuid4()}
+    return await start_calculation(
+        job_type=JobType.oev_gueteklasse,
+        tool_class=CRUDIsochronePT,
+        crud_method="isochrone_pt_run",
+        async_session=common.async_session,
+        user_id=common.user_id,
+        background_tasks=common.background_tasks,
+        project_id=common.project_id,
+        params=params,
+    )
 
 
 @router.post(

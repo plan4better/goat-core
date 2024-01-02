@@ -1,8 +1,9 @@
 from enum import Enum
 from uuid import UUID
 from pydantic import BaseModel, Field, validator, root_validator
-from src.schemas.toolbox_base import IsochroneStartingPointsBase
+from src.schemas.toolbox_base import IsochroneStartingPointsBase, IsochroneType
 from src.schemas.layer import ToolType
+
 
 class IsochroneStartingPointsActiveMobility(IsochroneStartingPointsBase):
     """Model for the active mobility isochrone starting points."""
@@ -103,13 +104,24 @@ class IIsochroneActiveMobility(BaseModel):
         title="Scenario ID",
         description="The ID of the scenario that is used for the routing.",
     )
+    isochrone_type: IsochroneType = Field(
+        ...,
+        title="Return Type",
+        description="The return type of the isochrone.",
+    )
+    polygon_difference: bool | None = Field(
+        None,
+        title="Polygon Difference",
+        description="If true, the polygons returned will be the geometrical difference of two following calculations.",
+    )
+
     @property
     def tool_type(self):
         return ToolType.isochrone_active_mobility
 
     @property
     def geofence_table(self):
-        mode = ToolType.isochrone_active_mobility.value.replace('isochrone_', "")
+        mode = ToolType.isochrone_active_mobility.value.replace("isochrone_", "")
         return f"basic.geofence_{mode}"
 
 

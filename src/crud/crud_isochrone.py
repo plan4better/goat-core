@@ -1,25 +1,33 @@
 from src.core.config import settings
 from src.core.tool import CRUDToolBase
+from src.core.job import job_log, job_init, run_background_or_immediately
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.schemas.active_mobility import (
     IIsochroneActiveMobility,
 )
-from src.schemas.job import JobStatusType
+from src.schemas.job import JobStatusType, JobType, JobStatusIsochroneActiveMobility, JobStatusIsochronePT, JobStatusIsochroneCar
 from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
 from src.schemas.motorized_mobility import IIsochroneCar, IIsochronePT
-from src.schemas.toolbox_base import DefaultResultLayerName
+from src.schemas.toolbox_base import DefaultResultLayerName, IsochroneGeometryTypeMapping
 from src.schemas.error import OutOfGeofenceError
 
-class CRUDIsochrone(CRUDToolBase):
+class CRUDIsochroneBase(CRUDToolBase):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
         self.table_starting_points = (
             f"{settings.USER_DATA_SCHEMA}.point_{str(self.user_id).replace('-', '')}"
         )
 
-    async def create_layer_starting_points(
+    async def create_or_return_layer_starting_points(
         self, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT
     ):
+        # Check if starting points are a layer
+        if params.starting_points.layer_project_id:
+            layer = await crud_layer_project.get(
+                db=self.async_session, id=params.starting_points.layer_project_id
+            )
+            return layer
+
         # Create layer object
         layer = IFeatureLayerToolCreate(
             name=DefaultResultLayerName.isochrone_starting_points.value,
@@ -73,22 +81,57 @@ class CRUDIsochrone(CRUDToolBase):
 
         return layer
 
-    async def active_mobility(
+
+class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
+    def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
+        super().__init__(job_id, background_tasks, async_session, user_id, project_id)
+
+    @job_log(job_step_name="isochrone")
+    async def isochrone(
         self,
         params: IIsochroneActiveMobility,
     ):
-        # Check if starting points are a layer
-        if params.starting_points.layer_project_id:
-            await crud_layer_project.get(
-                db=self.async_session, id=params.starting_points.layer_project_id
-            )
-        else:
-            # If starting points are not a layer then create a new layer and save x,y to the db
-            await self.create_layer_starting_points(
-                params=params
-            )
+        layer_starting_points = await self.create_or_return_layer_starting_points(
+            params=params
+        )
+        layer_isochrone = IFeatureLayerToolCreate(
+            name=DefaultResultLayerName.isochrone_active_mobility.value,
+            feature_layer_geometry_type=IsochroneGeometryTypeMapping[params.isochrone_type.value],
+            attribute_mapping={"integer_attr1": "travel_cost"},
+            tool_type=params.tool_type.value,
+        )
 
         #TODO: Call isochrone routing endpoint
-        #TODO: Create layer
-        #TODO: Add layer_ids to job
-        return {"status": JobStatusType.finished.value}
+        #TODO: Create layer using defined schemas above. Don't create the starting points if the starting points are passed as layer_id
+        #NOTE: The result_table of the layer is stored in layer.table_name
+        return {
+            "status": JobStatusType.finished.value,
+            "msg": "Active mobility isochrone was successfully computed.",
+        }
+
+    @run_background_or_immediately(settings)
+    @job_init()
+    async def run_isochrone(self, params: IIsochroneActiveMobility):
+        return await self.isochrone(params=params)
+
+    async def join_fail(self, params: IIsochroneActiveMobility):
+        await self.delete_orphan_data()
+
+
+class CRUDIsochronePT(CRUDIsochroneBase):
+    async def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
+        super().__init__(job_id, background_tasks, async_session, user_id, project_id)
+    
+    @job_log(job_step_name="isochrone")
+    async def isochrone(
+        self,
+        params: IIsochronePT,
+    ):
+        layer_starting_points = await self.create_or_return_layer_starting_points(
+            params=params
+        )
+    
+        return {
+            "status": JobStatusType.finished.value,
+            "msg": "Public transport isochrone was successfully computed.",
+        }

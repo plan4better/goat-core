@@ -14,7 +14,7 @@ from src.schemas.layer import ToolType
 class IsochroneStartingPointsMotorizedMobility(IsochroneStartingPointsBase):
     """Model for the active mobility isochrone starting points."""
 
-    # Check that the starting points for active mobility are below 20
+    # Check that the starting points for motorized mobility are below 20
     @root_validator(pre=True)
     def check_starting_points(cls, values):
         lat = values.get("latitude")

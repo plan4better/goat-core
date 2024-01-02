@@ -320,6 +320,17 @@ async def create_internal_layer(
 internal_layers = ["feature_layer_standard", "table"]
 
 
+async def upload_and_create_layer(client, file_dir, home_folder, layer_type):
+    dataset = await upload_file(client, file_dir)
+    layer = await create_internal_layer(
+        client,
+        dataset["dataset_id"],
+        home_folder,
+        layer_type,
+    )
+    return layer
+
+
 @pytest.fixture(params=internal_layers)
 async def fixture_create_internal_layers(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder, request
@@ -336,21 +347,16 @@ async def fixture_create_internal_layers(
         )
     return layer
 
+
 @pytest.fixture
 async def fixture_create_polygon_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
     dir_gpkg = os.path.join(settings.TEST_DATA_DIR, "layers", "tool", "zipcode.gpkg")
-    dataset_gpkg = await upload_file(client, dir_gpkg)
-
-    # Create layer
-    layer_gpkg = await create_internal_layer(
-        client,
-        dataset_gpkg["dataset_id"],
-        fixture_get_home_folder,
-        "feature_layer_standard",
+    return await upload_and_create_layer(
+        client, dir_gpkg, fixture_get_home_folder, "feature_layer_standard"
     )
-    return layer_gpkg
+
 
 @pytest.fixture
 async def fixture_add_polygon_layer_to_project(
@@ -371,21 +377,17 @@ async def fixture_add_polygon_layer_to_project(
         "project_id": project_id,
     }
 
+
 @pytest.fixture
 async def fixture_create_large_polygon_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
-    dir_gpkg = os.path.join(settings.TEST_DATA_DIR, "layers", "tool", "large_polygon.gpkg")
-    dataset_gpkg = await upload_file(client, dir_gpkg)
-
-    # Create layer
-    layer_gpkg = await create_internal_layer(
-        client,
-        dataset_gpkg["dataset_id"],
-        fixture_get_home_folder,
-        "feature_layer_standard",
+    dir_gpkg = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "tool", "large_polygon.gpkg"
     )
-    return layer_gpkg
+    return await upload_and_create_layer(
+        client, dir_gpkg, fixture_get_home_folder, "feature_layer_standard"
+    )
 
 
 @pytest.fixture
@@ -406,30 +408,59 @@ async def fixture_add_large_polygon_layer_to_project(
         "layer_project_id": layer_project_id,
         "project_id": project_id,
     }
-    
+
 
 @pytest.fixture
 async def fixture_create_join_layers(client: AsyncClient, fixture_get_home_folder):
-    # Upload files
     dir_csv = os.path.join(settings.TEST_DATA_DIR, "layers", "tool", "events.csv")
     dir_gpkg = os.path.join(settings.TEST_DATA_DIR, "layers", "tool", "zipcode.gpkg")
-    dataset_csv = await upload_file(client, dir_csv)
-    dataset_gpkg = await upload_file(client, dir_gpkg)
-    # Create layers
-    layer_csv = await create_internal_layer(
-        client, dataset_csv["dataset_id"], fixture_get_home_folder, "table"
+    layer_csv = await upload_and_create_layer(
+        client, dir_csv, fixture_get_home_folder, "table"
     )
-    layer_gpkg = await create_internal_layer(
-        client,
-        dataset_gpkg["dataset_id"],
-        fixture_get_home_folder,
-        "feature_layer_standard",
+    layer_gpkg = await upload_and_create_layer(
+        client, dir_gpkg, fixture_get_home_folder, "feature_layer_standard"
     )
     return {
         "home_folder": fixture_get_home_folder,
         "layer_csv": layer_csv,
         "layer_gpkg": layer_gpkg,
     }
+
+
+@pytest.fixture
+async def fixture_create_aggregate_point_layers(
+    client: AsyncClient, fixture_get_home_folder
+):
+    dir_points = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "tool", "points_with_category.gpkg"
+    )
+    dir_polygons = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "tool", "zipcode.gpkg"
+    )
+    layer_points = await upload_and_create_layer(
+        client, dir_points, fixture_get_home_folder, "feature_layer_standard"
+    )
+    layer_polygons = await upload_and_create_layer(
+        client, dir_polygons, fixture_get_home_folder, "feature_layer_standard"
+    )
+    return {
+        "home_folder": fixture_get_home_folder,
+        "layer_points": layer_points,
+        "layer_polygons": layer_polygons,
+    }
+
+
+@pytest.fixture
+async def fixture_create_aggregate_point_layer(
+    client: AsyncClient, fixture_get_home_folder
+):
+    dir_points = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "tool", "points_with_category.gpkg"
+    )
+    layer_points = await upload_and_create_layer(
+        client, dir_points, fixture_get_home_folder, "feature_layer_standard"
+    )
+    return {"home_folder": fixture_get_home_folder, "layer_points": layer_points}
 
 
 @pytest.fixture
@@ -454,6 +485,110 @@ async def fixture_add_join_layers_to_project(
     return {
         "layer_id_table": layer_id_table,
         "layer_id_gpkg": layer_id_gpkg,
+        "project_id": project_id,
+    }
+
+
+@pytest.fixture
+async def fixture_add_aggregate_point_layers_to_project(
+    client: AsyncClient, fixture_create_project, fixture_create_aggregate_point_layers
+):
+    layer_points = fixture_create_aggregate_point_layers["layer_points"]
+    layer_polygons = fixture_create_aggregate_point_layers["layer_polygons"]
+    project_id = fixture_create_project["id"]
+
+    # Add layers to project one by one and return layer_project_id
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_points['id']}"
+    )
+    assert response.status_code == 200
+    layer_project_points = response.json()
+    source_layer_project_id = layer_project_points[0]["id"]
+
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_polygons['id']}"
+    )
+    assert response.status_code == 200
+    layer_project_polygons = response.json()
+    aggregation_layer_project_id = layer_project_polygons[0]["id"]
+
+    return {
+        "source_layer_project_id": source_layer_project_id,
+        "aggregation_layer_project_id": aggregation_layer_project_id,
+        "project_id": project_id,
+    }
+
+
+@pytest.fixture
+async def fixture_add_aggregate_point_layer_to_project(
+    client: AsyncClient, fixture_create_project, fixture_create_aggregate_point_layer
+):
+    layer_points = fixture_create_aggregate_point_layer["layer_points"]
+    project_id = fixture_create_project["id"]
+
+    # Add layers to project one by one and return layer_project_id
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_points['id']}"
+    )
+    assert response.status_code == 200
+    layer_project_points = response.json()
+    source_layer_project_id = layer_project_points[0]["id"]
+
+    return {
+        "source_layer_project_id": source_layer_project_id,
+        "project_id": project_id,
+    }
+
+
+@pytest.fixture
+async def fixture_create_aggregate_polygon_layers(
+    client: AsyncClient, fixture_get_home_folder
+):
+    dir_source_layer = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "tool", "green_areas.gpkg"
+    )
+    dir_aggregation_layer = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "tool", "zipcode.gpkg"
+    )
+    layer_source = await upload_and_create_layer(
+        client, dir_source_layer, fixture_get_home_folder, "feature_layer_standard"
+    )
+    layer_aggregation = await upload_and_create_layer(
+        client, dir_aggregation_layer, fixture_get_home_folder, "feature_layer_standard"
+    )
+    return {
+        "home_folder": fixture_get_home_folder,
+        "layer_source": layer_source,
+        "layer_aggregation": layer_aggregation,
+    }
+
+
+@pytest.fixture
+async def fixture_add_aggregate_polygon_layers_to_project(
+    client: AsyncClient, fixture_create_project, fixture_create_aggregate_polygon_layers
+):
+    layer_source = fixture_create_aggregate_polygon_layers["layer_source"]
+    layer_aggregation = fixture_create_aggregate_polygon_layers["layer_aggregation"]
+    project_id = fixture_create_project["id"]
+
+    # Add layers to project one by one and return layer_project_id
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_source['id']}"
+    )
+    assert response.status_code == 200
+    layer_project_source = response.json()
+    source_layer_project_id = layer_project_source[0]["id"]
+
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_aggregation['id']}"
+    )
+    assert response.status_code == 200
+    layer_project_aggregation = response.json()
+    aggregation_layer_project_id = layer_project_aggregation[0]["id"]
+
+    return {
+        "source_layer_project_id": source_layer_project_id,
+        "aggregation_layer_project_id": aggregation_layer_project_id,
         "project_id": project_id,
     }
 
