@@ -1,15 +1,19 @@
 from enum import Enum
 from typing import List
-from uuid import UUID
 
 from pydantic import BaseModel, Field, validator
 
+from src.schemas.active_mobility import IIsochroneActiveMobility
+from src.schemas.motorized_mobility import IIsochroneCar, IIsochronePT, IOevGueteklasse
 from src.schemas.toolbox_base import (
     ColumnStatistic,
     ColumnStatisticsOperation,
+    InputLayerType,
 )
-from src.schemas.active_mobility import IIsochroneActiveMobility
-from src.schemas.motorized_mobility import IOevGueteklasse, IIsochroneCar, IIsochronePT
+from src.db.models.layer import LayerType
+from src.schemas.layer import FeatureGeometryType
+from src.db.models.layer import ToolType
+
 
 class IJoin(BaseModel):
     """Join tool schema."""
@@ -40,6 +44,31 @@ class IJoin(BaseModel):
         description="The column statistics to be calculated.",
     )
 
+    @property
+    def input_layer_types(self):
+        return {
+            "target_layer_project_id": InputLayerType(
+                layer_types=[LayerType.feature, LayerType.table],
+                feature_layer_geometry_types=[
+                    FeatureGeometryType.point,
+                    FeatureGeometryType.polygon,
+                    FeatureGeometryType.line,
+                ],
+            ),
+            "join_layer_project_id": InputLayerType(
+                layer_types=[LayerType.feature, LayerType.table],
+                feature_layer_geometry_types=[
+                    FeatureGeometryType.point,
+                    FeatureGeometryType.polygon,
+                    FeatureGeometryType.line,
+                ],
+            ),
+        }
+
+    @property
+    def tool_type(self):
+        return ToolType.join
+
 
 class AreaLayerType(str, Enum):
     """Area layer type schema."""
@@ -48,23 +77,21 @@ class AreaLayerType(str, Enum):
     h3_grid = "h3_grid"
 
 
-class IAggregationPoint(BaseModel):
-    """Aggregation tool schema."""
-
-    point_layer_project_id: UUID = Field(
+class IAggregationBase(BaseModel):
+    source_layer_project_id: int = Field(
         ...,
         title="Point Layer ID",
-        description="The ID of the layer that contains the points to be aggregated.",
+        description="The ID of the layer that contains the feature to be aggregated.",
     )
     area_type: AreaLayerType = Field(
         ...,
         title="Area Type",
-        description="The type of the layer that contains the areas that are used to aggregate the points. It can be a feature layer or a H3 grid.",
+        description="The type of the layer that contains the areas that are used to aggregate the source layer. It can be a feature layer or a H3 grid.",
     )
-    area_layer_id: UUID | None = Field(
+    aggregation_layer_project_id: int | None = Field(
         None,
         title="Area Layer ID",
-        description="The ID of the layer that contains the areas that are used to aggregate the points.",
+        description="The ID of the layer that contains the areas that are used to aggregate the source layer.",
     )
     h3_resolution: int | None = Field(
         None,
@@ -76,10 +103,10 @@ class IAggregationPoint(BaseModel):
         title="Column Statistics",
         description="The column statistics to be calculated.",
     )
-    area_group_by_field: List[str] | None = Field(
+    source_group_by_field: List[str] | None = Field(
         None,
-        title="Area Group By Field",
-        description="The field in the area layer that is used to group the aggregated points.",
+        title="Source Group By Field",
+        description="The field in the source layer that is used to group the aggregated points.",
     )
 
     @validator("h3_resolution", pre=True, always=True)
@@ -90,35 +117,98 @@ class IAggregationPoint(BaseModel):
             )
         return v
 
-    @validator("area_layer_id", pre=True, always=True)
-    def feature_layer_requires_area_layer_id(cls, v, values):
+    @validator("aggregation_layer_project_id", pre=True, always=True)
+    def feature_layer_requires_aggregation_layer_project_id(cls, v, values):
         if values.get("area_type") == AreaLayerType.feature and v is None:
             raise ValueError(
-                "If area_type is feature then area_layer_id cannot be null."
+                "If area_type is feature then aggregation_layer_project_id cannot be null."
             )
         return v
 
-    @validator("h3_resolution", "area_layer_id", pre=True, always=True)
+    @validator("h3_resolution", "aggregation_layer_project_id", pre=True, always=True)
     def no_conflicting_area_layer_and_resolution(cls, v, values, field):
-        if "area_layer_id" in values and "h3_resolution" in values:
+        if "aggregation_layer_project_id" in values and "h3_resolution" in values:
             if (
-                values["area_layer_id"] is not None
+                values["aggregation_layer_project_id"] is not None
                 and values["h3_resolution"] is not None
             ):
                 raise ValueError(
-                    "Cannot specify both area_layer_id and h3_resolution at the same time."
+                    "Cannot specify both aggregation_layer_project_id and h3_resolution at the same time."
                 )
         return v
+
+
+input_layer_type_point = InputLayerType(
+    layer_types=[LayerType.feature],
+    feature_layer_geometry_types=[
+        FeatureGeometryType.point,
+    ],
+)
+input_layer_type_polygon = InputLayerType(
+    layer_types=[LayerType.feature],
+    feature_layer_geometry_types=[
+        FeatureGeometryType.polygon,
+    ],
+)
+
+
+class IAggregationPoint(IAggregationBase):
+    """Aggregation tool schema."""
+
+    @property
+    def input_layer_types(self):
+        if self.area_type == AreaLayerType.feature:
+            return {
+                "source_layer_project_id": input_layer_type_point,
+                "aggregation_layer_project_id": input_layer_type_polygon,
+            }
+        elif self.area_type == AreaLayerType.h3_grid:
+            return {"source_layer_project_id": input_layer_type_point}
+
+    @property
+    def tool_type(self):
+        return ToolType.aggregate_point
+
+
+class IAggregationPolygon(IAggregationBase):
+
+    weigthed_by_intersecting_area: bool | None = Field(
+        False,
+        title="Weighted By Intersection Area",
+        description="If true, the aggregated values are weighted by the share of the intersection area between the source layer and the aggregation layer.",
+    )
+
+    @property
+    def input_layer_types(self):
+        if self.area_type == AreaLayerType.feature:
+            return {
+                "source_layer_project_id": input_layer_type_polygon,
+                "aggregation_layer_project_id": input_layer_type_polygon,
+            }
+        elif self.area_type == AreaLayerType.h3_grid:
+            return {"source_layer_project_id": input_layer_type_polygon}
+
+    @property
+    def tool_type(self):
+        return ToolType.aggregate_polygon
 
 class IToolParam(BaseModel):
     data: object
 
-    @validator('data', pre=True)
+    @validator("data", pre=True)
     def check_type(cls, v):
-        allowed_types = (IJoin, IAggregationPoint, IIsochroneActiveMobility, IOevGueteklasse, IIsochroneCar, IIsochronePT)
+        allowed_types = (
+            IJoin,
+            IAggregationPoint,
+            IIsochroneActiveMobility,
+            IOevGueteklasse,
+            IIsochroneCar,
+            IIsochronePT,
+        )
         if not isinstance(v, allowed_types):
-            raise ValueError(f'Input type {type(v).__name__} not allowed')
+            raise ValueError(f"Input type {type(v).__name__} not allowed")
         return v
+
 
 request_examples_join = {
     "join_count": {
@@ -153,21 +243,21 @@ request_examples_aggregation = {
     "aggregation_feature_layer": {
         "summary": "Aggregation Feature Layer",
         "value": {
-            "point_layer_project_id": "abcdef12-3456-7890-fedc-ba9876543210",
+            "source_layer_project_id": "1",
             "area_type": "feature",
-            "area_layer_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
+            "aggregation_layer_project_id": "2",
             "column_statistics": {"operation": "sum", "field": "field_example1"},
-            "area_group_by_field": ["group_by_example1"],
+            "source_group_by_field": ["group_by_example1"],
         },
     },
     "aggregation_h3_grid": {
         "summary": "Aggregation H3 Grid",
         "value": {
-            "point_layer_project_id": "fedcba98-7654-3210-0123-456789abcdef",
+            "source_layer_project_id": "1",
             "area_type": "h3_grid",
             "h3_resolution": 6,
             "column_statistics": {"operation": "mean", "field": "field_example2"},
-            "area_group_by_field": ["group_by_example2"],
+            "source_group_by_field": ["group_by_example2"],
         },
     },
 }

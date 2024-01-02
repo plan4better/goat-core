@@ -11,11 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.crud.crud_layer import layer as crud_layer
 from src.db.models._link_model import LayerProjectLink
 from src.db.models.layer import Layer
-from src.schemas.layer import LayerType
+from src.schemas.layer import LayerType, FeatureGeometryType
 from src.schemas.project import (
     layer_type_mapping_read,
     layer_type_mapping_update,
 )
+from typing import Union
 
 # Local application imports
 from .base import CRUDBase
@@ -104,7 +105,14 @@ class CRUDLayerProject(CRUDBase):
         return layer_projects
 
     async def get_internal(
-        self, async_session: AsyncSession, id: int, project_id: UUID
+        self,
+        async_session: AsyncSession,
+        id: int,
+        project_id: UUID,
+        expected_layer_types: [Union[LayerType.feature, LayerType.table]] = [
+            LayerType.feature
+        ],
+        expected_geometry_types: [FeatureGeometryType] = None,
     ):
         """Get internal layer from layer project"""
 
@@ -126,20 +134,25 @@ class CRUDLayerProject(CRUDBase):
         if layer_project == []:
             raise LayerNotFoundError("Layer project not found")
         layer_project = layer_project[0]
-        # Check if internal layer
-        if layer_project.type not in [
-            LayerType.table.value,
-            LayerType.feature.value,
-        ]:
+        # Check if one of the expected layer types is given
+        if layer_project.type not in expected_layer_types:
             raise UnsupportedLayerTypeError(
-                f"Layer {layer_project.name} is not an internal layer"
+                f"Layer {layer_project.name} is not a {[layer_type.value for layer_type in expected_layer_types]} layer"
             )
+
+        # Check if geometry type is correct
+        if layer_project.type == LayerType.feature.value:
+            if expected_geometry_types is not None:
+                if layer_project.feature_layer_geometry_type not in expected_geometry_types:
+                    raise UnsupportedLayerTypeError(
+                        f"Layer {layer_project.name} is not a {[geom_type.value for geom_type in expected_geometry_types]} layer"
+                    )
 
         return layer_project
 
     async def check_and_alter_layer_name(
-        self, async_session: AsyncSession, project_id: UUID, layer_name
-    ):
+        self, async_session: AsyncSession, project_id: UUID, layer_name: str
+    ) -> str:
         """Check if layer name already exists in project and alter it like layer (n+1) if necessary"""
 
         # Regular expression to find layer names with a number

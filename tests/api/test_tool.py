@@ -5,7 +5,7 @@ from src.core.config import settings
 from src.db.models.layer import ToolType
 from src.schemas.job import JobStatusType
 from src.schemas.toolbox_base import ColumnStatisticsOperation
-from tests.utils import check_job_status
+from tests.utils import check_job_status, test_aggregate
 
 
 @pytest.mark.asyncio
@@ -116,8 +116,79 @@ async def test_join_wrong_join_field(
 
 
 @pytest.mark.asyncio
-async def test_aggregate_points(client: AsyncClient, fixture_aggregation_points):
-    assert fixture_aggregation_points["job_id"] is not None
+async def test_aggregate_points_polygon(
+    client: AsyncClient, fixture_add_aggregate_point_layers_to_project
+):
+    await test_aggregate(
+        client, fixture_add_aggregate_point_layers_to_project, "feature", "points"
+    )
+
+
+@pytest.mark.asyncio
+async def test_aggregate_points_polygon_group_by(
+    client: AsyncClient, fixture_add_aggregate_point_layers_to_project
+):
+    await test_aggregate(
+        client, fixture_add_aggregate_point_layers_to_project, "feature", "points", ["category"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_aggregate_points_polygon_filter(
+    client: AsyncClient, fixture_add_aggregate_point_layers_to_project
+):
+    filters = [
+        {
+            "layer_project_id": 1,
+            "filter": {
+                "op": "=",
+                "args": [{"property": "category"}, "second_category"],
+            },
+        },
+        {
+            "layer_project_id": 2,
+            "filter": {"op": "=", "args": [{"property": "zipcode"}, "80802"]},
+        },
+    ]
+    await test_aggregate(
+        client,
+        fixture_add_aggregate_point_layers_to_project,
+        "feature",
+        "points",
+        ["category"],
+        filters,
+    )
+
+
+@pytest.mark.asyncio
+async def test_aggregate_points_h3_grid(
+    client: AsyncClient, fixture_add_aggregate_point_layer_to_project
+):
+    await test_aggregate(
+        client, fixture_add_aggregate_point_layer_to_project, "h3_grid", "points"
+    )
+
+
+@pytest.mark.asyncio
+async def test_aggregate_points_h3_grid_group_by(
+    client: AsyncClient, fixture_add_aggregate_point_layer_to_project
+):
+    await test_aggregate(
+        client, fixture_add_aggregate_point_layer_to_project, "h3_grid", "points", ["category"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_aggregate_polygons_polygon(
+    client: AsyncClient, fixture_add_aggregate_polygon_layers_to_project
+):
+    await test_aggregate(
+        client,
+        fixture_add_aggregate_polygon_layers_to_project,
+        "feature",
+        "polygons",
+        other_properties={"weigthed_by_intersecting_area": True},
+    )
 
 
 @pytest.mark.asyncio
@@ -137,6 +208,7 @@ async def test_reference_area(
 
     assert response.status_code == 200
     assert response.json()["type"] == "info"
+
 
 @pytest.mark.asyncio
 async def test_to_large_reference_area(

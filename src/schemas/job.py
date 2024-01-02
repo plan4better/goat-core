@@ -1,6 +1,7 @@
-from enum import Enum
-from pydantic import BaseModel
 from datetime import datetime
+from enum import Enum
+
+from pydantic import BaseModel
 
 # TODO: Add other job types
 
@@ -11,7 +12,11 @@ class JobType(str, Enum):
     file_import = "file_import"
     join = "join"
     isochrone_active_mobility = "isochrone_active_mobility"
+    isochrone_pt = "isochrone_pt"
+    isochrone_car = "isochrone_car"
     oev_gueteklasse = "oev_gueteklasse"
+    aggregate_point = "aggregate_point"
+    aggregate_polygon = "aggregate_polygon"
 
 
 class JobStatusType(str, Enum):
@@ -50,22 +55,51 @@ class JobStep(BaseModel):
 
 
 class JobStatusFileImport(BaseModel):
-    """Job layer upload attribute types."""
-
     upload: JobStep = {}
     migration: JobStep = {}
 
-class JobStatusJoin(BaseModel):
-    """Job layer upload attribute types."""
 
+class JobStatusJoin(BaseModel):
     join: JobStep = {}
 
-class JobStatusOevGueteklasse(BaseModel):
-    """Job layer upload attribute types."""
 
+class JobStatusOevGueteklasse(BaseModel):
     station_category: JobStep = {}
     station_buffer: JobStep = {}
 
 
+class JobStatusAggregationPoint(BaseModel):
+    aggregation: JobStep = {}
+
+
+class JobStatusAggregationPolygon(BaseModel):
+    aggregation: JobStep = {}
+
+
+class JobStatusIsochroneBase(BaseModel):
+    isochrone: JobStep = {}
+
+
+class JobStatusIsochroneActiveMobility(JobStatusIsochroneBase):
+    pass
+
+
+class JobStatusIsochronePT(JobStatusIsochroneBase):
+    pass
+
+
+class JobStatusIsochroneCar(JobStatusIsochroneBase):
+    pass
+
+
 # Only add jobs here that are consisting of multiple steps
-job_mapping = {JobType.file_import: JobStatusFileImport, JobType.join: JobStatusJoin, JobType.oev_gueteklasse: JobStatusOevGueteklasse}
+job_mapping = {
+    JobType.file_import: JobStatusFileImport,
+    JobType.join: JobStatusJoin,
+    JobType.oev_gueteklasse: JobStatusOevGueteklasse,
+    JobType.aggregate_point: JobStatusAggregationPoint,
+    JobType.aggregate_polygon: JobStatusAggregationPolygon,
+    JobType.isochrone_active_mobility: JobStatusIsochroneActiveMobility,
+    JobType.isochrone_pt: JobStatusIsochronePT,
+    JobType.isochrone_car: JobStatusIsochroneCar,
+}

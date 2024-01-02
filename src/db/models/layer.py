@@ -4,12 +4,11 @@ from uuid import UUID
 
 from geoalchemy2 import Geometry, WKBElement
 from geoalchemy2.shape import to_shape
-from pydantic import validator, root_validator
+from pydantic import BaseModel, validator
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
-    ARRAY,
     Column,
     Field,
     ForeignKey,
@@ -20,16 +19,16 @@ from sqlmodel import (
     UniqueConstraint,
 )
 
+from src.core.config import settings
 from src.db.models._base_class import ContentBaseAttributes, DateTimeBase
 from src.db.models.scenario_feature import ScenarioType
-from src.core.config import settings
-from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from ._link_model import LayerProjectLink
     from .data_store import DataStore
     from .scenario import Scenario
     from .scenario_feature import ScenarioFeature
+
 
 class ToolType(str, Enum):
     """Indicator types."""
@@ -39,7 +38,10 @@ class ToolType(str, Enum):
     isochrone_car = "isochrone_car"
     oev_gueteklasse = "oev_gueteklasse"
     join = "join"
-    aggregation_point = "aggregation_point"
+    aggregate_point = "aggregate_point"
+    aggregate_polygon = "aggregate_polygon"
+    aggregate_line = "aggregate_line"
+    intersect = "intersect"
 
 
 class FeatureType(str, Enum):
@@ -136,6 +138,7 @@ layer_base_example = {
     "data_source": "data_source plan4better example",
     "data_reference_year": 2020,
 }
+
 
 def internal_layer_table_name(values: SQLModel | BaseModel):
     """Get the table name for the internal layer."""
@@ -268,9 +271,11 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     @property
     def table_name(self):
         return internal_layer_table_name(self)
+
     @property
     def layer_id(self):
         return self.id
+
 
 # Constraints
 UniqueConstraint(Layer.__table__.c.folder_id, Layer.__table__.c.name)

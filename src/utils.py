@@ -1265,7 +1265,7 @@ async def check_file_size(file: UploadFile, max_size: int) -> bool:
     return True
 
 
-def search_value(d, target):
+def search_value(d, target) -> str:
     for key, value in d.items():
         if value == target:
             return key
@@ -1321,6 +1321,10 @@ def get_result_column(
 
 
 def get_statistics_sql(field, operation):
+
+    if field == "$area":
+        field = "ST_Area(geom::geography)"
+
     if operation == ColumnStatisticsOperation.count:
         query = f"COUNT({field})"
     elif operation == ColumnStatisticsOperation.sum:
@@ -1333,6 +1337,8 @@ def get_statistics_sql(field, operation):
         query = f"MIN({field})"
     elif operation == ColumnStatisticsOperation.max:
         query = f"MAX({field})"
+    else:
+        raise ValueError(f"Unsupported operation {operation}")
 
     return query
 

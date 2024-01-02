@@ -9,9 +9,12 @@ from httpx import AsyncClient
 
 from src.core.config import settings
 from src.schemas.job import JobStatusType
+from src.schemas.toolbox_base import ColumnStatisticsOperation
 
 
-async def check_job_status(client: AsyncClient, job_id: str, target_status: str = JobStatusType.finished.value):
+async def check_job_status(
+    client: AsyncClient, job_id: str, target_status: str = JobStatusType.finished.value
+):
     """Check if job is finished."""
 
     # Get job status recursively until they return status_simplified = finished
@@ -100,13 +103,33 @@ async def upload_valid_file(client: AsyncClient, file_type: str):
     """Validate valid file."""
 
     if file_type == "point":
-        response = await upload_file(client, os.path.join(settings.TEST_DATA_DIR, "layers", "valid", "point", "valid.geojson"))
+        response = await upload_file(
+            client,
+            os.path.join(
+                settings.TEST_DATA_DIR, "layers", "valid", "point", "valid.geojson"
+            ),
+        )
     elif file_type == "polygon":
-        response = await upload_file(client, os.path.join(settings.TEST_DATA_DIR, "layers", "valid", "polygon", "valid.geojson"))
+        response = await upload_file(
+            client,
+            os.path.join(
+                settings.TEST_DATA_DIR, "layers", "valid", "polygon", "valid.geojson"
+            ),
+        )
     elif file_type == "line":
-        response = await upload_file(client, os.path.join(settings.TEST_DATA_DIR, "layers", "valid", "line", "valid.geojson"))
+        response = await upload_file(
+            client,
+            os.path.join(
+                settings.TEST_DATA_DIR, "layers", "valid", "line", "valid.geojson"
+            ),
+        )
     elif file_type == "no_geometry":
-        response = await upload_file(client, os.path.join(settings.TEST_DATA_DIR, "layers", "valid", "no_geometry", "valid.csv"))
+        response = await upload_file(
+            client,
+            os.path.join(
+                settings.TEST_DATA_DIR, "layers", "valid", "no_geometry", "valid.csv"
+            ),
+        )
     else:
         raise ValueError("file_type must be either point or table")
     return response
@@ -118,7 +141,9 @@ async def upload_valid_files(client: AsyncClient, file_type: str):
 
     dataset_ids = []
     for filename in files:
-        file_dir = os.path.join(settings.TEST_DATA_DIR, "layers", "valid", file_type, filename)
+        file_dir = os.path.join(
+            settings.TEST_DATA_DIR, "layers", "valid", file_type, filename
+        )
         metadata = await upload_file(client, file_dir)
         dataset_ids.append(metadata["dataset_id"])
 
@@ -157,3 +182,50 @@ def generate_random_string(length):
     # Generate the random string
     random_string = "".join(random.choice(characters) for i in range(length))
     return random_string
+
+
+async def test_aggregate(
+    client: AsyncClient, fixture, area_type, aggregate_type, group_by_field=None, filters=None, other_properties={}
+):
+    aggregation_layer_project_id = fixture.get("aggregation_layer_project_id")
+    source_layer_project_id = fixture.get("source_layer_project_id")
+    project_id = fixture.get("project_id")
+
+    if filters:
+        for i in filters:
+            layer_project_id = i["layer_project_id"]
+            filter = i["filter"]
+            response = await client.put(
+                f"{settings.API_V2_STR}/project/{project_id}/layer/{layer_project_id}",
+                json={
+                    "query": filter,
+                },
+            )
+            assert response.status_code == 200
+
+    # Request aggregate points endpoint
+    for operation in ColumnStatisticsOperation:
+        params = {
+            "source_layer_project_id": source_layer_project_id,
+            "area_type": area_type,
+            "column_statistics": {
+                "operation": operation.value,
+                "field": "value",
+            },
+            **other_properties
+        }
+        if aggregation_layer_project_id:
+            params["aggregation_layer_project_id"] = aggregation_layer_project_id
+        if group_by_field:
+            params["source_group_by_field"] = group_by_field
+        if area_type == "h3_grid":
+            params["h3_resolution"] = 10
+
+
+        response = await client.post(
+            f"{settings.API_V2_STR}/tool/aggregate-{aggregate_type}?project_id={project_id}",
+            json=params,
+        )
+        assert response.status_code == 201
+        job = await check_job_status(client, response.json()["job_id"])
+        assert job["status_simple"] == "finished"

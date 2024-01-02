@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Body
 from src.schemas.tool import (
     IAggregationPoint,
+    IAggregationPolygon,
     IJoin,
     request_examples_aggregation,
     request_examples_join,
@@ -17,6 +18,7 @@ from src.schemas.job import Msg
 from src.schemas.toolbox_base import ToolsWithReferenceAreaCheck
 from src.core.tool import CRUDToolBase
 from src.schemas.error import http_error_handler
+from src.crud.crud_tool import CRUDAggregatePoint, CRUDAggregatePolygon
 
 router = APIRouter()
 
@@ -94,8 +96,7 @@ async def join(
 )
 async def aggregate_points(
     *,
-    async_session: AsyncSession = Depends(get_db),
-    user_id: UUID = Depends(get_user_id),
+    common: CommonToolParams = Depends(),
     params: IAggregationPoint = Body(
         ...,
         examples=request_examples_aggregation,
@@ -103,4 +104,40 @@ async def aggregate_points(
     ),
 ):
     """Aggregate points and compute statistics on a group by column."""
-    return {"job_id": uuid4()}
+    return await start_calculation(
+        job_type=JobType.aggregate_point,
+        tool_class=CRUDAggregatePoint,
+        crud_method="aggregate_point_run",
+        async_session=common.async_session,
+        user_id=common.user_id,
+        background_tasks=common.background_tasks,
+        project_id=common.project_id,
+        params=params,
+    )
+
+@router.post(
+    "/aggregate-polygons",
+    summary="Aggregate polygons",
+    response_model=IToolResponse,
+    status_code=201,
+)
+async def aggregate_polygons(
+    *,
+    common: CommonToolParams = Depends(),
+    params: IAggregationPolygon = Body(
+        ...,
+        examples=request_examples_aggregation,
+        description="The aggregation parameters.",
+    ),
+):
+    """Aggregate polygons and compute statistics on a group by column."""
+    return await start_calculation(
+        job_type=JobType.aggregate_polygon,
+        tool_class=CRUDAggregatePolygon,
+        crud_method="aggregate_polygon_run",
+        async_session=common.async_session,
+        user_id=common.user_id,
+        background_tasks=common.background_tasks,
+        project_id=common.project_id,
+        params=params,
+    )

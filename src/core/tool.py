@@ -1,5 +1,6 @@
 from typing import List
 from uuid import UUID
+from uuid import uuid4
 
 from fastapi import BackgroundTasks
 from pydantic import BaseModel
@@ -14,18 +15,33 @@ from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.crud.crud_project import project as crud_project
 from src.db.models.layer import FeatureType, Layer, LayerType, ToolType
 from src.schemas.job import JobStatusType, JobType
-from src.schemas.layer import IFeatureLayerToolCreate, UserDataTable
+from src.schemas.layer import (
+    IFeatureLayerToolCreate,
+    UserDataTable,
+    FeatureGeometryType,
+)
 from src.schemas.style import base_properties
 from src.schemas.toolbox_base import (
     MaxFeatureCnt,
     ColumnStatisticsOperation,
     MaxSizeReferenceArea,
+    GeofenceTable,
 )
-from src.schemas.layer import UserDataGeomType
-from src.schemas.toolbox_base import GeofenceTable
-from src.utils import build_where_clause
+from src.schemas.layer import UserDataGeomType, OgrPostgresType
+from src.schemas.tool import IToolParam
+from src.utils import build_where_clause, search_value
 from src.schemas.job import Msg, MsgType
-from src.schemas.error import LayerSizeError, LayerExtentError, LayerProjectTypeError, FeatureCountError, GeometryTypeError, AreaSizeError
+from src.schemas.error import (
+    LayerSizeError,
+    LayerExtentError,
+    LayerProjectTypeError,
+    FeatureCountError,
+    GeometryTypeError,
+    AreaSizeError,
+    ColumnTypeError,
+    UnsupportedLayerTypeError,
+)
+
 
 async def start_calculation(
     job_type: JobType,
@@ -68,6 +84,37 @@ class CRUDToolBase:
         self.async_session = async_session
         self.user_id = user_id
         self.project_id = project_id
+
+    async def get_layers_project(self, params: IToolParam):
+        # Get all params that have the name layer_project_id and build a dict using the variable name as key
+        layer_project_ids = {}
+        for key, value in params.dict().items():
+            if key.endswith("_layer_project_id") and value is not None:
+                layer_project_ids[key] = value
+
+        # Get all layers_project
+        layers_project = {}
+        for layer_name in layer_project_ids:
+            # Get layer_project
+            layer_project_id = layer_project_ids[layer_name]
+            input_layer_types = params.input_layer_types
+            layer_project = await crud_layer_project.get_internal(
+                async_session=self.async_session,
+                id=layer_project_id,
+                project_id=self.project_id,
+                expected_layer_types=input_layer_types[layer_name].layer_types,
+                expected_geometry_types=input_layer_types[
+                    layer_name
+                ].feature_layer_geometry_types,
+            )
+            layers_project[layer_name] = layer_project
+
+        # Check Max feature count
+        await self.check_max_feature_cnt(
+            layers_project=list(layers_project.values()),
+            tool_type=params.tool_type,
+        )
+        return layers_project
 
     async def create_feature_layer_tool(
         self,
@@ -158,7 +205,10 @@ class CRUDToolBase:
         where_query = build_where_clause([layer_project.where_query])
 
         # Check if layer has polygon geoms
-        if layer_project.feature_layer_geometry_type.value != UserDataGeomType.polygon.value:
+        if (
+            layer_project.feature_layer_geometry_type.value
+            != UserDataGeomType.polygon.value
+        ):
             raise GeometryTypeError(
                 "Operation not supported. The layer does not contain polygon geometries. Pick a layer with polygon geometries."
             )
@@ -177,8 +227,8 @@ class CRUDToolBase:
             },
         )
         res = res.fetchall()
-        area = res[0][0]["sum"]  / 1000000
-        if area  > MaxSizeReferenceArea[tool_type.value].value:
+        area = res[0][0]["sum"] / 1000000
+        if area > MaxSizeReferenceArea[tool_type.value].value:
             raise AreaSizeError(
                 f"The operation cannot be performed on more than {MaxSizeReferenceArea[tool_type.value].value} km2."
             )
@@ -224,7 +274,11 @@ class CRUDToolBase:
     ):
         # Get layer project
         layer_project = await crud_layer_project.get_internal(
-            async_session=self.async_session, id=layer_project_id, project_id=self.project_id
+            async_session=self.async_session,
+            id=layer_project_id,
+            project_id=self.project_id,
+            expected_layer_types=[LayerType.feature],
+            expected_geometry_types=[FeatureGeometryType.polygon],
         )
         # Check if the feature count is below the limit
         await self.check_max_feature_cnt(
@@ -237,9 +291,43 @@ class CRUDToolBase:
         # Check if the reference area is within in geofence
         return {
             "msg": await self.check_reference_area_geofence(
-            layer_project=layer_project, tool_type=tool_type
+                layer_project=layer_project, tool_type=tool_type
             ),
             "layer_project": layer_project,
+        }
+
+    async def check_column_statistics(
+        self,
+        layer_project: BaseModel,
+        column_statistics_field: str,
+    ):
+        # Check if field is $area and geometry type is polygon
+        if column_statistics_field == "$area":
+            if layer_project.feature_layer_geometry_type != FeatureGeometryType.polygon:
+                raise GeometryTypeError(
+                    "The layer does not contain polygon geometries and therefore $area cannot be computed. Pick a layer with polygon geometries."
+                )
+            return {
+                "mapped_statistics_field": "area",
+                "mapped_statistics_field_type": OgrPostgresType.Real,
+            }
+
+        mapped_statistics_field = search_value(
+            layer_project.attribute_mapping, column_statistics_field
+        )
+        # Check if mapped statistics field is float, integer or biginteger
+        mapped_statistics_field_type = mapped_statistics_field.split("_")[0]
+        if mapped_statistics_field_type not in [
+            OgrPostgresType.Integer,
+            OgrPostgresType.Real,
+            OgrPostgresType.Integer64,
+        ]:
+            raise ColumnTypeError(
+                f"Mapped statistics field is not {OgrPostgresType.Integer}, {OgrPostgresType.Real}, {OgrPostgresType.Integer64}. The operation cannot be performed on the {mapped_statistics_field_type} type."
+            )
+        return {
+            "mapped_statistics_field": mapped_statistics_field,
+            "mapped_statistics_field_type": mapped_statistics_field_type,
         }
 
     async def delete_orphan_data(self):
@@ -281,3 +369,48 @@ class CRUDToolBase:
             """
             await self.async_session.execute(text(sql_delete_orphan_data))
         return
+
+    async def create_distributed_polygon_table(
+        self,
+        layer_project: BaseModel,
+    ):
+        # Create table name
+        table_suffix = str(uuid4()).replace("-", "")
+        temp_polygons = f"temporal.temp_polygons_{table_suffix}"
+
+        # Create distributed polygon table using sql
+        where_query_polygon = "WHERE " + layer_project.where_query.replace("'", "''")
+        await self.async_session.execute(
+            f"""SELECT basic.create_distributed_polygon_table(
+                '{layer_project.table_name}',
+                '{'id, ' + ', '.join(list(layer_project.attribute_mapping.keys()))}',
+                '{where_query_polygon}',
+                30,
+                '{temp_polygons}'
+            )"""
+        )
+        # Commit changes
+        await self.async_session.commit()
+        return temp_polygons
+
+    async def create_distributed_point_table(
+        self,
+        layer_project: BaseModel,
+    ):
+        # Create temp table name for points
+        table_suffix = str(uuid4()).replace("-", "")
+        temp_points = f"temporal.temp_points_{table_suffix}"
+
+        # Create distributed point table using sql
+        where_query_point = "WHERE " + layer_project.where_query.replace("'", "''")
+        await self.async_session.execute(
+            f"""SELECT basic.create_distributed_point_table(
+                '{layer_project.table_name}',
+                '{', '.join(list(layer_project.attribute_mapping.keys()))}',
+                '{where_query_point}',
+                '{temp_points}'
+            )"""
+        )
+        # Commit changes
+        await self.async_session.commit()
+        return temp_points

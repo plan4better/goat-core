@@ -1,21 +1,24 @@
 DROP FUNCTION IF EXISTS basic.create_distributed_polygon_table; 
-CREATE OR REPLACE FUNCTION basic.create_distributed_polygon_table(input_table text, where_filter text, max_vertices_polygon integer, result_table_name text)
+CREATE OR REPLACE FUNCTION basic.create_distributed_polygon_table(input_table text, relevant_columns text, where_filter text,
+max_vertices_polygon integer, result_table_name text)
 RETURNS SETOF void
 LANGUAGE plpgsql
 AS $function$
 BEGIN
-	RAISE NOTICE '%', format(
-		'DROP TABLE IF EXISTS polygons; CREATE TEMP TABLE polygons AS SELECT geom FROM %s %s;', input_table, where_filter 
-	);
+
+	-- Create temporary table for polygons
 	EXECUTE format(
-		'DROP TABLE IF EXISTS polygons; CREATE TEMP TABLE polygons AS SELECT geom FROM %s %s;', input_table, where_filter 
+		'DROP TABLE IF EXISTS polygons; CREATE TEMP TABLE polygons AS SELECT %s, geom FROM %s %s;', relevant_columns, input_table, where_filter 
 	);
-	-- Create subdivided polygon table
-	DROP TABLE IF EXISTS polygons_subdivided; 
-	CREATE TEMP TABLE polygons_subdivided AS 
-	SELECT ST_SUBDIVIDE(geom, max_vertices_polygon) AS geom 
-	FROM polygons; 
-	CREATE INDEX ON polygons_subdivided USING GIST(geom); 
+	
+	-- Create subdivided polygon table and add GIST index
+	EXECUTE format(
+		'DROP TABLE IF EXISTS polygons_subdivided; 
+		CREATE TEMP TABLE polygons_subdivided AS 
+		SELECT %s, ST_SUBDIVIDE(geom, %s) AS geom 
+		FROM polygons;', relevant_columns, max_vertices_polygon
+	);
+	CREATE INDEX ON polygons_subdivided USING GIST(geom);
 	
 	-- Identify grids ids and their respective geometries
 	DROP TABLE IF EXISTS h3_3_grids_uuid; 
@@ -31,38 +34,40 @@ BEGIN
 	CREATE INDEX ON h3_3_grids_uuid USING GIST(geom); 
 	CREATE INDEX ON h3_3_grids_uuid USING GIST(border); 
 	
+	
 	-- Create empty distributed table 
 	EXECUTE format(
-		'DROP TABLE IF EXISTS %s; CREATE TABLE %s (geom geometry, h3_3 integer);', 
+		'DROP TABLE IF EXISTS %s; CREATE TABLE %s AS SELECT *, NULL::INTEGER AS h3_3 FROM polygons_subdivided LIMIT 0;', 
 		result_table_name, result_table_name
 	);	
 	-- Make table distributed
 	PERFORM create_distributed_table(result_table_name, 'h3_3'); 
-
+	
 	-- Assign h3 grid id to the intersecting polygons. Split polygons add border where necessary.
 	EXECUTE format(
 		'INSERT INTO %s 
-		SELECT ST_INTERSECTION(g.geom, s.geom) AS geom, g.h3_3 AS h3_3
+		SELECT %s, ST_INTERSECTION(g.geom, s.geom) AS geom, g.h3_3 AS h3_3
 		FROM h3_3_grids_uuid g, polygons_subdivided s 
 		WHERE ST_Intersects(g.border, s.geom)
 		UNION ALL 
-		SELECT s.geom, g.h3_3
+		SELECT %s, s.geom, g.h3_3
 		FROM h3_3_grids_uuid g, polygons_subdivided s 
 		WHERE ST_WITHIN(s.geom, g.geom)
 		AND ST_Intersects(s.geom, g.geom)', 
-		result_table_name
+		result_table_name, relevant_columns, relevant_columns
 	); 
 
 	-- Add GIST index 
 	EXECUTE format('CREATE INDEX ON %s USING GIST(h3_3, geom)', result_table_name);
-
 END;
 $function$ 
 PARALLEL SAFE;
+
 /*
 EXPLAIN ANALYZE 
 SELECT basic.create_distributed_polygon_table(
 	'user_data.polygon_744e4fd1685c495c8b02efebce875359', 
+	'text_attr1',
 	'WHERE layer_id = ''4bdbed8f-4804-4913-9b42-c547e7be0fd5'' AND text_attr1=''Niedersachsen''',
 	30,
 	'temporal.test'

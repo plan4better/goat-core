@@ -3,11 +3,15 @@ from sqlalchemy import text
 from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
 from src.core.tool import CRUDToolBase
-from src.crud.crud_layer_project import layer_project as crud_layer_project
-from src.db.models.layer import LayerType, ToolType
+from src.db.models.layer import ToolType
+from src.schemas.error import ColumnTypeError
 from src.schemas.job import JobStatusType, JobType
-from src.schemas.layer import IFeatureLayerToolCreate, OgrPostgresType
-from src.schemas.tool import IJoin
+from src.schemas.layer import (
+    FeatureGeometryType,
+    IFeatureLayerToolCreate,
+)
+from src.schemas.tool import IAggregationPoint, IAggregationPolygon, IJoin
+from src.schemas.toolbox_base import DefaultResultLayerName
 from src.utils import (
     build_where_clause,
     get_result_column,
@@ -15,9 +19,9 @@ from src.utils import (
     get_user_table,
     search_value,
 )
-from src.schemas.error import UnsupportedLayerTypeError, ColumnTypeError
-from src.schemas.toolbox_base import DefaultResultLayerName
 
+
+# TODO: Refactor give each tools its own class
 class CRUDTool(CRUDToolBase):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
@@ -27,28 +31,12 @@ class CRUDTool(CRUDToolBase):
         self,
         params: IJoin,
     ):
-        # Get target layer
-        target_layer_project = await crud_layer_project.get_internal(
-            async_session=self.async_session,
-            id=params.target_layer_project_id,
-            project_id=self.project_id,
+        # Get layers
+        layers_project = await self.get_layers_project(
+            params=params,
         )
-        # Get join layer
-        join_layer_project = await crud_layer_project.get_internal(
-            async_session=self.async_session,
-            id=params.join_layer_project_id,
-            project_id=self.project_id,
-        )
-        # Check Max feature count
-        await self.check_max_feature_cnt(
-            layers_project=[target_layer_project, join_layer_project],
-            tool_type=ToolType.join,
-        )
-        # Check that the target layer is a feature layer. This is done because tool layers are currently a subset of feature layers.
-        if target_layer_project.type != LayerType.feature.value:
-            raise UnsupportedLayerTypeError(
-                f"Target layer {target_layer_project.name} is not a feature layer."
-            )
+        target_layer_project = layers_project["target_layer_project_id"]
+        join_layer_project = layers_project["join_layer_project_id"]
 
         # Get translated fields
         mapped_target_field = search_value(
@@ -56,9 +44,6 @@ class CRUDTool(CRUDToolBase):
         )
         mapped_join_field = search_value(
             join_layer_project.attribute_mapping, params.join_field
-        )
-        mapped_statistics_field = search_value(
-            join_layer_project.attribute_mapping, params.column_statistics.field
         )
 
         # Check if mapped_target_field and mapped_join_field are having the same type
@@ -68,15 +53,11 @@ class CRUDTool(CRUDToolBase):
             )
 
         # Check if mapped statistics field is float, integer or biginteger
-        mapped_statistics_field_type = mapped_statistics_field.split("_")[0]
-        if mapped_statistics_field_type not in [
-            OgrPostgresType.Integer,
-            OgrPostgresType.Real,
-            OgrPostgresType.Integer64,
-        ]:
-            raise ColumnTypeError(
-                f"Mapped statistics field is not {OgrPostgresType.Integer}, {OgrPostgresType.Real}, {OgrPostgresType.Integer64}. The operation cannot be performed on the {mapped_statistics_field_type} type."
-            )
+        mapped_statistics_field = await self.check_column_statistics(
+            layer_project=join_layer_project,
+            column_statistics_field=params.column_statistics.field,
+        )
+        mapped_statistics_field = mapped_statistics_field["mapped_statistics_field"]
 
         # Get result column name
         result_column = get_result_column(
@@ -158,3 +139,388 @@ class CRUDTool(CRUDToolBase):
 
     async def join_fail(self, params: IJoin):
         await self.delete_orphan_data()
+
+
+class CRUDAggregateBase(CRUDToolBase):
+    def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
+        super().__init__(job_id, background_tasks, async_session, user_id, project_id)
+
+    async def prepare_aggregation(
+        self, params: IAggregationPoint | IAggregationPolygon
+    ):
+        # Get layers
+        layers_project = await self.get_layers_project(
+            params=params,
+        )
+        source_layer_project = layers_project["source_layer_project_id"]
+        aggregation_layer_project = layers_project.get("aggregation_layer_project_id")
+
+        # Check if mapped statistics field is float, integer or biginteger
+        result_check_statistics_field = await self.check_column_statistics(
+            layer_project=source_layer_project,
+            column_statistics_field=params.column_statistics.field,
+        )
+        mapped_statistics_field = result_check_statistics_field[
+            "mapped_statistics_field"
+        ]
+
+        # Create distributed point table or polygon table depend on the geometry type
+        if (
+            source_layer_project.feature_layer_geometry_type
+            == FeatureGeometryType.point
+        ):
+            temp_source = await self.create_distributed_point_table(
+                layer_project=source_layer_project,
+            )
+        elif (
+            source_layer_project.feature_layer_geometry_type
+            == FeatureGeometryType.polygon
+        ):
+            temp_source = await self.create_distributed_polygon_table(
+                layer_project=source_layer_project,
+            )
+
+        # Check if aggregation_layer_project_id exists
+        if aggregation_layer_project:
+            # Create distributed polygon table
+            temp_aggregation = await self.create_distributed_polygon_table(
+                layer_project=aggregation_layer_project,
+            )
+            attribute_mapping_aggregation = (
+                aggregation_layer_project.attribute_mapping.copy()
+            )
+            # Build select columns
+            select_columns_arr = ["geom"] + list(attribute_mapping_aggregation.keys())
+            select_columns = ", ".join(
+                f"{aggregation_layer_project.table_name}.{column}"
+                for column in select_columns_arr
+            )
+        else:
+            attribute_mapping_aggregation = {"text_attr1": f"h3_{params.h3_resolution}"}
+
+        result_column = get_result_column(
+            attribute_mapping=attribute_mapping_aggregation,
+            base_column_name=params.column_statistics.operation.value,
+            datatype=result_check_statistics_field["mapped_statistics_field_type"],
+        )
+
+        # Build group by columns
+        if params.source_group_by_field:
+            # Extend result column with jsonb
+            result_column.update(
+                get_result_column(
+                    attribute_mapping=attribute_mapping_aggregation,
+                    base_column_name=f"{params.column_statistics.operation.value}_grouped",
+                    datatype="jsonb",
+                )
+            )
+            # Build group by columns
+            group_by_columns = ", ".join(
+                f"{temp_source}.{search_value(source_layer_project.attribute_mapping, column)}"
+                for column in params.source_group_by_field
+            )
+            group_by_select_columns = ", ".join(
+                f"{temp_source}.{search_value(source_layer_project.attribute_mapping, column)}::text"
+                for column in params.source_group_by_field
+            )
+            group_column_name = f"ARRAY_TO_STRING(ARRAY[{group_by_select_columns}], '_') AS group_column_name"
+
+        # Get statistics column query
+        statistics_column_query = get_statistics_sql(
+            f"{temp_source}." + mapped_statistics_field,
+            operation=params.column_statistics.operation,
+        )
+
+        # Create insert statement
+        insert_columns_arr = (
+            ["geom"]
+            + list(attribute_mapping_aggregation.keys())
+            + list(result_column.keys())
+        )
+        insert_columns = ", ".join(insert_columns_arr)
+
+        # Create new layer
+        layer_in = IFeatureLayerToolCreate(
+            name=DefaultResultLayerName[params.tool_type].value,
+            feature_layer_geometry_type=FeatureGeometryType.polygon,
+            attribute_mapping={**attribute_mapping_aggregation, **result_column},
+            tool_type=params.tool_type,
+        )
+
+        return {
+            "aggregation_layer_project": locals().get(
+                "aggregation_layer_project", None
+            ),
+            "layer_in": layer_in,
+            "temp_source": temp_source,
+            "temp_aggregation": locals().get("temp_aggregation", None),
+            "group_by_columns": locals().get("group_by_columns", None),
+            "group_column_name": locals().get("group_column_name", None),
+            "statistics_column_query": statistics_column_query,
+            "insert_columns": insert_columns,
+            "select_columns": locals().get("select_columns", None),
+            "result_check_statistics_field": result_check_statistics_field,
+        }
+
+
+class CRUDAggregatePoint(CRUDAggregateBase):
+    """Tool aggregation points."""
+
+    def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
+        super().__init__(job_id, background_tasks, async_session, user_id, project_id)
+        self.result_table = (
+            f"{settings.USER_DATA_SCHEMA}.polygon_{str(self.user_id).replace('-', '')}"
+        )
+
+    @job_log(job_step_name="aggregation")
+    async def aggregate_point(self, params: IAggregationPoint):
+        # Prepare aggregation
+        aggregation = await self.prepare_aggregation(params=params)
+        aggregation_layer_project = aggregation["aggregation_layer_project"]
+        layer_in = aggregation["layer_in"]
+        temp_source = aggregation["temp_source"]
+        temp_aggregation = aggregation["temp_aggregation"]
+        group_by_columns = aggregation["group_by_columns"]
+        group_column_name = aggregation["group_column_name"]
+        statistics_column_query = aggregation["statistics_column_query"]
+        insert_columns = aggregation["insert_columns"]
+        select_columns = aggregation["select_columns"]
+
+        # Create query
+        if aggregation_layer_project:
+            # Define subquery for grouped by id only
+            sql_query_total_stats = f"""
+                SELECT {temp_aggregation}.id, {statistics_column_query} AS stats
+                FROM {temp_aggregation}, {temp_source}
+                WHERE ST_Intersects({temp_aggregation}.geom, {temp_source}.geom)
+                AND {temp_aggregation}.h3_3 = {temp_source}.h3_3
+                GROUP BY {temp_aggregation}.id
+            """
+
+            if params.source_group_by_field:
+                # Define subquery for grouped by id and group_by_field
+                sql_query_group_stats = f"""
+                    SELECT id, JSONB_OBJECT_AGG(group_column_name, stats) AS stats
+                    FROM
+                    (
+                        SELECT {temp_aggregation}.id, {group_column_name}, {statistics_column_query} AS stats
+                        FROM {temp_aggregation}, {temp_source}
+                        WHERE ST_Intersects({temp_aggregation}.geom, {temp_source}.geom)
+                        AND {temp_aggregation}.h3_3 = {temp_source}.h3_3
+                        GROUP BY {temp_aggregation}.id, {group_by_columns}
+                    ) AS to_group
+                    GROUP BY id
+                """
+
+                # Build combined query with two left joins
+                sql_query = f"""
+                    INSERT INTO {self.result_table} (layer_id, {insert_columns})
+                    WITH total_stats AS
+                    (
+                        {sql_query_total_stats}
+                    ),
+                    grouped_stats AS
+                    (
+                        {sql_query_group_stats}
+                    ),
+                    first_join AS
+                    (
+                        SELECT total_stats.id, total_stats.stats AS total_stats, grouped_stats.stats AS grouped_stats
+                        FROM grouped_stats, total_stats
+                        WHERE grouped_stats.id = total_stats.id
+                    )
+                    SELECT '{layer_in.id}', {select_columns}, first_join.total_stats, first_join.grouped_stats
+                    FROM {aggregation_layer_project.table_name}
+                    LEFT JOIN first_join
+                    ON {aggregation_layer_project.table_name}.id = first_join.id
+                    WHERE {aggregation_layer_project.table_name}.layer_id = '{aggregation_layer_project.layer_id}'
+                """
+            else:
+                # Build combined query with one left join
+                sql_query = f"""
+                    INSERT INTO {self.result_table} (layer_id, {insert_columns})
+                    WITH total_stats AS
+                    (
+                        {sql_query_total_stats}
+                    )
+                    SELECT '{layer_in.id}', {select_columns}, total_stats.stats AS total_stats
+                    FROM {aggregation_layer_project.table_name}
+                    LEFT JOIN total_stats
+                    ON {aggregation_layer_project.table_name}.id = total_stats.id
+                    WHERE {aggregation_layer_project.table_name}.layer_id = '{aggregation_layer_project.layer_id}'
+                """
+        else:
+            # If aggregation_layer_project_id does not exist the h3 grid will be taken for the intersection
+            sql_query_total_stats = f"""
+                SELECT h3_lat_lng_to_cell(geom::point, {params.h3_resolution}) h3_index, {statistics_column_query} AS stats
+                FROM {temp_source}
+                GROUP BY h3_lat_lng_to_cell(geom::point, {params.h3_resolution})
+            """
+
+            if params.source_group_by_field:
+                # Define subquery for grouped by id and group_by_field
+                sql_query_group_stats = f"""
+                    SELECT h3_index, JSONB_OBJECT_AGG(group_column_name, stats) AS stats
+                    FROM
+                    (
+                        SELECT h3_lat_lng_to_cell(geom::point, {params.h3_resolution}) h3_index, {group_column_name}, {statistics_column_query} AS stats
+                        FROM {temp_source}
+                        GROUP BY h3_lat_lng_to_cell(geom::point, {params.h3_resolution}), {group_by_columns}
+                    ) AS to_group
+                    GROUP BY h3_index
+                """
+
+                sql_query = f"""
+                    INSERT INTO {self.result_table} (layer_id, {insert_columns})
+                    WITH total_stats AS
+                    (
+                        {sql_query_total_stats}
+                    ),
+                    grouped_stats AS
+                    (
+                        {sql_query_group_stats}
+                    )
+                    SELECT '{layer_in.id}', ST_SETSRID(h3_cell_to_boundary(total_stats.h3_index)::geometry, 4326),
+                    total_stats.h3_index, total_stats.stats AS total_stats, grouped_stats.stats AS grouped_stats
+                    FROM grouped_stats, total_stats
+                    WHERE grouped_stats.h3_index = total_stats.h3_index
+                """
+            else:
+                sql_query = f"""
+                    INSERT INTO {self.result_table} (layer_id, {insert_columns})
+                    WITH total_stats AS
+                    (
+                        {sql_query_total_stats}
+                    )
+                    SELECT '{layer_in.id}', ST_SETSRID(h3_cell_to_boundary(h3_index)::geometry, 4326), h3_index, total_stats.stats AS total_stats
+                    FROM total_stats
+                """
+        # Execute query
+        await self.async_session.execute(text(sql_query))
+
+        # Create new layer
+        await self.create_feature_layer_tool(
+            layer_in=layer_in,
+        )
+        return {
+            "status": JobStatusType.finished.value,
+            "msg": "Points where successfully aggregated.",
+        }
+
+    @run_background_or_immediately(settings)
+    @job_init()
+    async def aggregate_point_run(self, params: IAggregationPoint):
+        return await self.aggregate_point(params=params)
+
+    async def aggregate_point_fail(self, params: IAggregationPoint):
+        await self.delete_orphan_data()
+
+
+class CRUDAggregatePolygon(CRUDAggregateBase):
+    def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
+        super().__init__(job_id, background_tasks, async_session, user_id, project_id)
+        self.result_table = (
+            f"{settings.USER_DATA_SCHEMA}.polygon_{str(self.user_id).replace('-', '')}"
+        )
+
+    @job_log(job_step_name="aggregation")
+    async def aggregate_polygon(self, params: IAggregationPolygon):
+        # Prepare aggregation
+        aggregation = await self.prepare_aggregation(params=params)
+        aggregation_layer_project = aggregation["aggregation_layer_project"]
+        layer_in = aggregation["layer_in"]
+        temp_source = aggregation["temp_source"]
+        temp_aggregation = aggregation["temp_aggregation"]
+        group_by_columns = aggregation["group_by_columns"]
+        group_column_name = aggregation["group_column_name"]
+        statistics_column_query = aggregation["statistics_column_query"]
+        insert_columns = aggregation["insert_columns"]
+        select_columns = aggregation["select_columns"]
+        mapped_statistics_field = aggregation["result_check_statistics_field"]["mapped_statistics_field"]
+
+
+        if params.weigthed_by_intersecting_area:
+            statistics_column_query = f"{statistics_column_query} * (ST_AREA(ST_INTERSECTION({temp_aggregation}.geom, {temp_source}.geom)::geography))"
+
+        if aggregation_layer_project:
+            # Define subquery for grouped by id only
+            sql_query_total_stats = f"""
+                SELECT {temp_aggregation}.id, {statistics_column_query} AS stats
+                FROM {temp_aggregation}, {temp_source}
+                WHERE ST_Intersects({temp_aggregation}.geom, {temp_source}.geom)
+                AND {temp_aggregation}.h3_3 = {temp_source}.h3_3
+                GROUP BY {temp_aggregation}.id
+            """
+
+            if params.source_group_by_field:
+                # Define subquery for grouped by id and group_by_field
+                sql_query_group_stats = f"""
+                    SELECT id, JSONB_OBJECT_AGG(group_column_name, stats) AS stats
+                    FROM
+                    (
+                        SELECT {temp_aggregation}.id, {group_column_name}, {statistics_column_query} AS stats
+                        FROM {temp_aggregation}, {temp_source}
+                        WHERE ST_Intersects({temp_aggregation}.geom, {temp_source}.geom)
+                        AND {temp_aggregation}.h3_3 = {temp_source}.h3_3
+                        GROUP BY {temp_aggregation}.id, {group_by_columns}
+                    ) AS to_group
+                    GROUP BY id
+                """
+
+                # Build combined query with two left joins
+                sql_query = f"""
+                    INSERT INTO {self.result_table} (layer_id, {insert_columns})
+                    WITH total_stats AS
+                    (
+                        {sql_query_total_stats}
+                    ),
+                    grouped_stats AS
+                    (
+                        {sql_query_group_stats}
+                    ),
+                    first_join AS
+                    (
+                        SELECT total_stats.id, total_stats.stats AS total_stats, grouped_stats.stats AS grouped_stats
+                        FROM grouped_stats, total_stats
+                        WHERE grouped_stats.id = total_stats.id
+                    )
+                    SELECT '{layer_in.id}', {select_columns}, first_join.total_stats, first_join.grouped_stats
+                    FROM {aggregation_layer_project.table_name}
+                    LEFT JOIN first_join
+                    ON {aggregation_layer_project.table_name}.id = first_join.id
+                    WHERE {aggregation_layer_project.table_name}.layer_id = '{aggregation_layer_project.layer_id}'
+                """
+            else:
+                # Build combined query with one left join
+                sql_query = f"""
+                    INSERT INTO {self.result_table} (layer_id, {insert_columns})
+                    WITH total_stats AS
+                    (
+                        {sql_query_total_stats}
+                    )
+                    SELECT '{layer_in.id}', {select_columns}, total_stats.stats AS total_stats
+                    FROM {aggregation_layer_project.table_name}
+                    LEFT JOIN total_stats
+                    ON {aggregation_layer_project.table_name}.id = total_stats.id
+                    WHERE {aggregation_layer_project.table_name}.layer_id = '{aggregation_layer_project.layer_id}'
+                """
+        else:
+            print()
+
+        # Execute query
+        await self.async_session.execute(text(sql_query))
+
+        # Create new layer
+        await self.create_feature_layer_tool(
+            layer_in=layer_in,
+        )
+
+        return {
+            "status": JobStatusType.finished.value,
+            "msg": "Polygons where successfully aggregated.",
+        }
+
+    @run_background_or_immediately(settings)
+    @job_init()
+    async def aggregate_polygon_run(self, params: IAggregationPolygon):
+        return await self.aggregate_polygon(params=params)
