@@ -1,4 +1,3 @@
-
 DROP FUNCTION IF EXISTS basic.count_public_transport_services_station;
 CREATE OR REPLACE FUNCTION basic.count_public_transport_services_station(
 	table_area TEXT, 
@@ -14,11 +13,12 @@ DECLARE
 	temp_table_stops TEXT := 'temporal.' || '"' || REPLACE(uuid_generate_v4()::TEXT, '-', '') || '"';
 	temp_table_area TEXT := 'temporal.' || '"' || REPLACE(uuid_generate_v4()::TEXT, '-', '') || '"'; 
 BEGIN
-	
+
 	-- Build table reference area
 	PERFORM basic.create_distributed_polygon_table
 	(
 		table_area,
+		'id',
 		where_filter,
 		30, 
 		temp_table_area
@@ -82,7 +82,7 @@ BEGIN
 		temp_table_stops, temp_table_area
 	);
 END;
-$function$;
+$function$
 PARALLEL SAFE;
 /*
 SELECT *
