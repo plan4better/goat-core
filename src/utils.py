@@ -47,7 +47,6 @@ from starlette.responses import Response
 
 # Local application imports
 from src.core.config import settings
-from src.resources.enums import MaxUploadFileSize, MimeTypes
 from src.schemas.layer import CQLQuery, LayerType
 from src.schemas.toolbox_base import ColumnStatisticsOperation
 
