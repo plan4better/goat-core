@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, conlist
 
 from src.schemas.active_mobility import IIsochroneActiveMobility
 from src.schemas.motorized_mobility import IIsochroneCar, IIsochronePT, IOevGueteklasse
@@ -97,13 +97,15 @@ class IAggregationBase(BaseModel):
         None,
         title="H3 Resolution",
         description="The resolution of the H3 grid that is used to aggregate the points.",
+        ge=3,
+        le=10,
     )
     column_statistics: ColumnStatistic = Field(
         ...,
         title="Column Statistics",
         description="The column statistics to be calculated.",
     )
-    source_group_by_field: List[str] | None = Field(
+    source_group_by_field: conlist(str, min_items=0, max_items=3) | None = Field(
         None,
         title="Source Group By Field",
         description="The field in the source layer that is used to group the aggregated points.",
@@ -150,6 +152,14 @@ input_layer_type_polygon = InputLayerType(
         FeatureGeometryType.polygon,
     ],
 )
+input_layer_type_feature_all = InputLayerType(
+    layer_types=[LayerType.feature],
+    feature_layer_geometry_types=[
+        FeatureGeometryType.point,
+        FeatureGeometryType.polygon,
+        FeatureGeometryType.line,
+    ],
+)
 
 
 class IAggregationPoint(IAggregationBase):
@@ -171,7 +181,6 @@ class IAggregationPoint(IAggregationBase):
 
 
 class IAggregationPolygon(IAggregationBase):
-
     weigthed_by_intersecting_area: bool | None = Field(
         False,
         title="Weighted By Intersection Area",
@@ -191,6 +200,65 @@ class IAggregationPolygon(IAggregationBase):
     @property
     def tool_type(self):
         return ToolType.aggregate_polygon
+
+
+class IBuffer(BaseModel):
+    """Buffer tool schema."""
+
+    source_layer_project_id: int = Field(
+        ...,
+        title="Source Layer Project ID",
+        description="The ID of the layer project that conains the geometries that should be buffered.",
+    )
+    max_distance: int = Field(
+        ...,
+        title="Max Distance",
+        description="The maximum distance in meters.",
+        ge=1,
+        le=5000000,
+    )
+    distance_step: int = Field(
+        ...,
+        title="Distance Step",
+        description="The distance step in meters.",
+    )
+    polygon_union: bool | None = Field(
+        None,
+        title="Polygon Union",
+        description="If true, the polygons returned will be the geometrical union of buffers with the same step.",
+    )
+    polygon_difference: bool | None = Field(
+        None,
+        title="Polygon Difference",
+        description="If true, the polygons returned will be the geometrical difference of the current step and the predecessor steps.",
+    )
+
+    # Make sure that there is a maximum of 20 steps. It can be calculated by max_distance / distance_step
+    @validator("distance_step", pre=True)
+    def check_distance_step(cls, v, values):
+        if 20 < values["max_distance"] / v:
+            raise ValueError(
+                "You can only have a maximum of 20 steps. The distance step is too small for the chosen max_distance."
+            )
+        return v
+
+    # Make sure that polygon difference is only True if polygon union is True
+    @validator("polygon_difference", pre=True)
+    def check_polygon_difference(cls, v, values):
+        if values["polygon_union"] is False and v is True:
+            raise ValueError(
+                "You can only have polygon difference if polygon union is True."
+            )
+        return v
+
+    @property
+    def input_layer_types(self):
+        return input_layer_type_feature_all
+
+    @property
+    def tool_type(self):
+        return ToolType.buffer
+
 
 class IToolParam(BaseModel):
     data: object
@@ -214,9 +282,9 @@ request_examples_join = {
     "join_count": {
         "summary": "Join Count",
         "value": {
-            "target_layer_id": "12345678-1234-5678-1234-567812345678",
+            "target_layer_project_id": 1,
             "target_field": "target_field_example",
-            "join_layer_id": "87654321-8765-4321-8765-432187654321",
+            "join_layer_project_id": 2,
             "join_field": "join_field_example",
             "column_statistics": {
                 "operation": ColumnStatisticsOperation.count.value,
@@ -227,9 +295,9 @@ request_examples_join = {
     "join_mean": {
         "summary": "Join Mean",
         "value": {
-            "target_layer_id": "23456789-2345-6789-2345-678923456789",
+            "target_layer_project_id": 1,
             "target_field": "target_field_example2",
-            "join_layer_id": "98765432-9876-5432-9876-543298765432",
+            "join_layer_project_id": 2,
             "join_field": "join_field_example2",
             "column_statistics": {
                 "operation": ColumnStatisticsOperation.mean.value,
@@ -239,13 +307,13 @@ request_examples_join = {
     },
 }
 
-request_examples_aggregation = {
+request_examples_aggregation_point = {
     "aggregation_feature_layer": {
         "summary": "Aggregation Feature Layer",
         "value": {
-            "source_layer_project_id": "1",
-            "area_type": "feature",
-            "aggregation_layer_project_id": "2",
+            "source_layer_project_id": 1,
+            "area_type": AreaLayerType.feature.value,
+            "aggregation_layer_project_id": 2,
             "column_statistics": {"operation": "sum", "field": "field_example1"},
             "source_group_by_field": ["group_by_example1"],
         },
@@ -253,8 +321,8 @@ request_examples_aggregation = {
     "aggregation_h3_grid": {
         "summary": "Aggregation H3 Grid",
         "value": {
-            "source_layer_project_id": "1",
-            "area_type": "h3_grid",
+            "source_layer_project_id": 1,
+            "area_type": AreaLayerType.h3_grid.value,
             "h3_resolution": 6,
             "column_statistics": {"operation": "mean", "field": "field_example2"},
             "source_group_by_field": ["group_by_example2"],
@@ -262,4 +330,27 @@ request_examples_aggregation = {
     },
 }
 
-IAggregationPoint(**request_examples_aggregation["aggregation_h3_grid"]["value"])
+request_examples_aggregation_polygon = {
+    "aggregation_polygon_feature_layer": {
+        "summary": "Aggregation Polygon Feature Layer",
+        "value": {
+            "source_layer_project_id": 1,
+            "area_type": AreaLayerType.feature.value,
+            "aggregation_layer_project_id": 2,
+            "weigthed_by_intersecting_area": True,
+            "column_statistics": {"operation": "sum", "field": "field_example1"},
+            "source_group_by_field": ["group_by_example1"],
+        },
+    },
+    "aggregation_polygon_h3_grid": {
+        "summary": "Aggregation Polygon H3 Grid",
+        "value": {
+            "source_layer_project_id": 1,
+            "area_type": AreaLayerType.h3_grid.value,
+            "h3_resolution": 6,
+            "weigthed_by_intersecting_area": False,
+            "column_statistics": {"operation": "mean", "field": "field_example2"},
+            "source_group_by_field": ["group_by_example2"],
+        },
+    },
+}

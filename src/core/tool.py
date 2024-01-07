@@ -1,6 +1,5 @@
 from typing import List
-from uuid import UUID
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import BackgroundTasks
 from pydantic import BaseModel
@@ -14,33 +13,32 @@ from src.crud.crud_layer import layer as crud_layer
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.crud.crud_project import project as crud_project
 from src.db.models.layer import FeatureType, Layer, LayerType, ToolType
-from src.schemas.job import JobStatusType, JobType
-from src.schemas.layer import (
-    IFeatureLayerToolCreate,
-    UserDataTable,
-    FeatureGeometryType,
-)
-from src.schemas.style import base_properties
-from src.schemas.toolbox_base import (
-    MaxFeatureCnt,
-    ColumnStatisticsOperation,
-    MaxSizeReferenceArea,
-    GeofenceTable,
-)
-from src.schemas.layer import UserDataGeomType, OgrPostgresType
-from src.schemas.tool import IToolParam
-from src.utils import build_where_clause, search_value
-from src.schemas.job import Msg, MsgType
 from src.schemas.error import (
-    LayerSizeError,
-    LayerExtentError,
-    LayerProjectTypeError,
-    FeatureCountError,
-    GeometryTypeError,
     AreaSizeError,
     ColumnTypeError,
-    UnsupportedLayerTypeError,
+    FeatureCountError,
+    GeometryTypeError,
+    LayerExtentError,
+    LayerProjectTypeError,
+    LayerSizeError,
 )
+from src.schemas.job import JobStatusType, JobType, Msg, MsgType
+from src.schemas.layer import (
+    FeatureGeometryType,
+    IFeatureLayerToolCreate,
+    OgrPostgresType,
+    UserDataGeomType,
+    UserDataTable,
+)
+from src.schemas.style import base_properties
+from src.schemas.tool import IToolParam
+from src.schemas.toolbox_base import (
+    ColumnStatisticsOperation,
+    GeofenceTable,
+    MaxFeatureCnt,
+    MaxFeaturePolygonArea,
+)
+from src.utils import build_where_clause, get_random_string, search_value
 
 
 async def start_calculation(
@@ -114,6 +112,21 @@ class CRUDToolBase:
             layers_project=list(layers_project.values()),
             tool_type=params.tool_type,
         )
+
+        # If geometry is of type polygon and tool type is in MaxFeaturePolygonArea
+        for layer_project in layers_project.values():
+            # Check for each feature layer of type polygon if the tool type is in MaxFeaturePolygonArea
+            if layer_project.type == LayerType.feature:
+                if (
+                    layer_project.feature_layer_geometry_type == FeatureGeometryType.polygon
+                    and params.tool_type in MaxFeaturePolygonArea.__members__
+                ):
+                    # Check reference area size
+                    await self.check_reference_area_size(
+                        layer_project=layer_project,
+                        tool_type=params.tool_type,
+                    )
+
         return layers_project
 
     async def create_feature_layer_tool(
@@ -199,7 +212,7 @@ class CRUDToolBase:
     async def check_reference_area_size(
         self,
         layer_project: BaseModel | SQLModel | dict,
-        tool_type: MaxSizeReferenceArea,
+        tool_type: ToolType,
     ):
         # Build where query for layer
         where_query = build_where_clause([layer_project.where_query])
@@ -228,16 +241,16 @@ class CRUDToolBase:
         )
         res = res.fetchall()
         area = res[0][0]["sum"] / 1000000
-        if area > MaxSizeReferenceArea[tool_type.value].value:
+        if area > MaxFeaturePolygonArea[tool_type.value].value:
             raise AreaSizeError(
-                f"The operation cannot be performed on more than {MaxSizeReferenceArea[tool_type.value].value} km2."
+                f"The operation cannot be performed on more than {MaxFeaturePolygonArea[tool_type.value].value} km2."
             )
         return
 
     async def check_reference_area_geofence(
         self,
         layer_project: BaseModel | SQLModel | dict,
-        tool_type: MaxSizeReferenceArea,
+        tool_type: MaxFeaturePolygonArea,
     ):
         # Build where query for layer
         where_query = build_where_clause([layer_project.where_query])
@@ -269,9 +282,7 @@ class CRUDToolBase:
             )
         return Msg(type=MsgType.info, text="All features are within the geofence.")
 
-    async def check_reference_area(
-        self, layer_project_id: int, tool_type: MaxSizeReferenceArea
-    ):
+    async def check_reference_area(self, layer_project_id: int, tool_type: ToolType):
         # Get layer project
         layer_project = await crud_layer_project.get_internal(
             async_session=self.async_session,
@@ -301,15 +312,15 @@ class CRUDToolBase:
         layer_project: BaseModel,
         column_statistics_field: str,
     ):
-        # Check if field is $area and geometry type is polygon
-        if column_statistics_field == "$area":
+        # Check if field is $intersected_area and geometry type is polygon
+        if column_statistics_field == "$intersected_area":
             if layer_project.feature_layer_geometry_type != FeatureGeometryType.polygon:
                 raise GeometryTypeError(
-                    "The layer does not contain polygon geometries and therefore $area cannot be computed. Pick a layer with polygon geometries."
+                    "The layer does not contain polygon geometries and therefore $intersected_area cannot be computed. Pick a layer with polygon geometries."
                 )
             return {
-                "mapped_statistics_field": "area",
-                "mapped_statistics_field_type": OgrPostgresType.Real,
+                "mapped_statistics_field": "$intersected_area",
+                "mapped_statistics_field_type": OgrPostgresType.Real.value,
             }
 
         mapped_statistics_field = search_value(
@@ -375,15 +386,17 @@ class CRUDToolBase:
         layer_project: BaseModel,
     ):
         # Create table name
-        table_suffix = str(uuid4()).replace("-", "")
-        temp_polygons = f"temporal.temp_polygons_{table_suffix}"
+        table_suffix = str(self.job_id).replace("-", "")
+        temp_polygons = f"temporal.polygons_{get_random_string(6)}_{table_suffix}"
 
         # Create distributed polygon table using sql
         where_query_polygon = "WHERE " + layer_project.where_query.replace("'", "''")
+        arr_columns = ["id"] + list(layer_project.attribute_mapping.keys())
+
         await self.async_session.execute(
             f"""SELECT basic.create_distributed_polygon_table(
                 '{layer_project.table_name}',
-                '{'id, ' + ', '.join(list(layer_project.attribute_mapping.keys()))}',
+                '{', '.join(arr_columns)}',
                 '{where_query_polygon}',
                 30,
                 '{temp_polygons}'
@@ -398,8 +411,8 @@ class CRUDToolBase:
         layer_project: BaseModel,
     ):
         # Create temp table name for points
-        table_suffix = str(uuid4()).replace("-", "")
-        temp_points = f"temporal.temp_points_{table_suffix}"
+        table_suffix = str(self.job_id).replace("-", "")
+        temp_points = f"temporal.points_{get_random_string(6)}_{table_suffix}"
 
         # Create distributed point table using sql
         where_query_point = "WHERE " + layer_project.where_query.replace("'", "''")
@@ -414,3 +427,19 @@ class CRUDToolBase:
         # Commit changes
         await self.async_session.commit()
         return temp_points
+
+    async def delete_temp_tables(self):
+        # Get all tables that end with the job id
+        sql = f"""
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'temporal'
+            AND table_name LIKE '%{str(self.job_id).replace('-', '')}'
+        """
+        res = await self.async_session.execute(text(sql))
+        tables = res.fetchall()
+        # Delete all tables
+        for table in tables:
+            await self.async_session.execute(
+                f"DROP TABLE IF EXISTS temporal.{table[0]}"
+            )

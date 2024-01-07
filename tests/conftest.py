@@ -26,7 +26,7 @@ from src.schemas.project import (
     request_examples as project_request_examples,
 )
 from src.schemas.tool import (
-    request_examples_aggregation,
+    request_examples_aggregation_point,
     request_examples_join,
 )
 from src.utils import get_user_table
@@ -562,6 +562,20 @@ async def fixture_create_aggregate_polygon_layers(
         "layer_aggregation": layer_aggregation,
     }
 
+@pytest.fixture
+async def fixture_create_aggregate_polygon_layer(
+    client: AsyncClient, fixture_get_home_folder
+):
+    dir_source_layer = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "tool", "green_areas.gpkg"
+    )
+    layer_source = await upload_and_create_layer(
+        client, dir_source_layer, fixture_get_home_folder, "feature_layer_standard"
+    )
+    return {
+        "home_folder": fixture_get_home_folder,
+        "layer_source": layer_source,
+    }
 
 @pytest.fixture
 async def fixture_add_aggregate_polygon_layers_to_project(
@@ -592,6 +606,25 @@ async def fixture_add_aggregate_polygon_layers_to_project(
         "project_id": project_id,
     }
 
+@pytest.fixture
+async def fixture_add_aggregate_polygon_layer_to_project(
+    client: AsyncClient, fixture_create_project, fixture_create_aggregate_polygon_layer
+):
+    layer_source = fixture_create_aggregate_polygon_layer["layer_source"]
+    project_id = fixture_create_project["id"]
+
+    # Add layers to project one by one and return layer_project_id
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_source['id']}"
+    )
+    assert response.status_code == 200
+    layer_project_source = response.json()
+    source_layer_project_id = layer_project_source[0]["id"]
+
+    return {
+        "source_layer_project_id": source_layer_project_id,
+        "project_id": project_id,
+    }
 
 async def create_external_layer(client: AsyncClient, home_folder, layer_type):
     # Get table layer dict and add layer ID
@@ -754,13 +787,3 @@ fixture_isochrone_car = create_generic_toolbox_fixture(
     "/motorized-mobility/car/isochrone",
     request_examples_isochrone_car,
 )
-
-fixture_oev_gueteklasse = create_generic_toolbox_fixture(
-    "/motorized-mobility/oev-gueteklassen", request_example_oev_gueteklasse
-)
-
-fixture_aggregation_points = create_generic_toolbox_fixture(
-    "/tool/aggregate-points", request_examples_aggregation
-)
-
-fixture_join = create_generic_toolbox_fixture("/tool/join", request_examples_join)

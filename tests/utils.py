@@ -185,7 +185,7 @@ def generate_random_string(length):
 
 
 async def test_aggregate(
-    client: AsyncClient, fixture, area_type, aggregate_type, group_by_field=None, filters=None, other_properties={}
+    client: AsyncClient, fixture, area_type, aggregate_type, statistics_field, group_by_field=None, filters=None, other_properties={}
 ):
     aggregation_layer_project_id = fixture.get("aggregation_layer_project_id")
     source_layer_project_id = fixture.get("source_layer_project_id")
@@ -210,7 +210,7 @@ async def test_aggregate(
             "area_type": area_type,
             "column_statistics": {
                 "operation": operation.value,
-                "field": "value",
+                "field": statistics_field,
             },
             **other_properties
         }

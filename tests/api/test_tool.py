@@ -120,7 +120,11 @@ async def test_aggregate_points_polygon(
     client: AsyncClient, fixture_add_aggregate_point_layers_to_project
 ):
     await test_aggregate(
-        client, fixture_add_aggregate_point_layers_to_project, "feature", "points"
+        client,
+        fixture_add_aggregate_point_layers_to_project,
+        "feature",
+        "points",
+        "value",
     )
 
 
@@ -129,7 +133,12 @@ async def test_aggregate_points_polygon_group_by(
     client: AsyncClient, fixture_add_aggregate_point_layers_to_project
 ):
     await test_aggregate(
-        client, fixture_add_aggregate_point_layers_to_project, "feature", "points", ["category"]
+        client,
+        fixture_add_aggregate_point_layers_to_project,
+        "feature",
+        "points",
+        "value",
+        ["category"],
     )
 
 
@@ -155,6 +164,7 @@ async def test_aggregate_points_polygon_filter(
         fixture_add_aggregate_point_layers_to_project,
         "feature",
         "points",
+        "value",
         ["category"],
         filters,
     )
@@ -165,7 +175,11 @@ async def test_aggregate_points_h3_grid(
     client: AsyncClient, fixture_add_aggregate_point_layer_to_project
 ):
     await test_aggregate(
-        client, fixture_add_aggregate_point_layer_to_project, "h3_grid", "points"
+        client,
+        fixture_add_aggregate_point_layer_to_project,
+        "h3_grid",
+        "points",
+        "value",
     )
 
 
@@ -174,7 +188,12 @@ async def test_aggregate_points_h3_grid_group_by(
     client: AsyncClient, fixture_add_aggregate_point_layer_to_project
 ):
     await test_aggregate(
-        client, fixture_add_aggregate_point_layer_to_project, "h3_grid", "points", ["category"]
+        client,
+        fixture_add_aggregate_point_layer_to_project,
+        "h3_grid",
+        "points",
+        "value",
+        ["category"],
     )
 
 
@@ -187,6 +206,79 @@ async def test_aggregate_polygons_polygon(
         fixture_add_aggregate_polygon_layers_to_project,
         "feature",
         "polygons",
+        "value",
+        other_properties={"weigthed_by_intersecting_area": True},
+    )
+
+
+@pytest.mark.asyncio
+async def test_aggregate_polygons_polygon_statistics_area(
+    client: AsyncClient, fixture_add_aggregate_polygon_layers_to_project
+):
+    await test_aggregate(
+        client,
+        fixture_add_aggregate_polygon_layers_to_project,
+        "feature",
+        "polygons",
+        "$intersected_area",
+        other_properties={"weigthed_by_intersecting_area": True},
+    )
+
+
+@pytest.mark.asyncio
+async def test_aggregate_polygons_polygon_group_by(
+    client: AsyncClient, fixture_add_aggregate_polygon_layers_to_project
+):
+    await test_aggregate(
+        client,
+        fixture_add_aggregate_polygon_layers_to_project,
+        "feature",
+        "polygons",
+        "value",
+        ["category"],
+        other_properties={"weigthed_by_intersecting_area": True},
+    )
+
+
+@pytest.mark.asyncio
+async def test_aggregate_polygons_h3_grid(
+    client: AsyncClient, fixture_add_aggregate_polygon_layer_to_project
+):
+    await test_aggregate(
+        client,
+        fixture_add_aggregate_polygon_layer_to_project,
+        "h3_grid",
+        "polygons",
+        "value",
+        other_properties={"weigthed_by_intersecting_area": True},
+    )
+
+
+@pytest.mark.asyncio
+async def test_aggregate_polygons_h3_grid_statistics_area(
+    client: AsyncClient, fixture_add_aggregate_polygon_layer_to_project
+):
+    await test_aggregate(
+        client,
+        fixture_add_aggregate_polygon_layer_to_project,
+        "h3_grid",
+        "polygons",
+        "$intersected_area",
+        other_properties={"weigthed_by_intersecting_area": True},
+    )
+
+
+@pytest.mark.asyncio
+async def test_aggregate_polygons_h3_grid_group_by(
+    client: AsyncClient, fixture_add_aggregate_polygon_layer_to_project
+):
+    await test_aggregate(
+        client,
+        fixture_add_aggregate_polygon_layer_to_project,
+        "h3_grid",
+        "polygons",
+        "$intersected_area",
+        ["category"],
         other_properties={"weigthed_by_intersecting_area": True},
     )
 

@@ -1287,6 +1287,7 @@ def next_column_name(attribute_mapping: dict, data_type: str):
     # Construct the new attribute name
     return f"{data_type}_attr{next_number}"
 
+
 def get_result_column(
     attribute_mapping: dict, base_column_name: str, datatype: str
 ) -> dict:
@@ -1319,10 +1320,17 @@ def get_result_column(
         return {mapped_column: base_column_name}
 
 
-def get_statistics_sql(field, operation):
+def convert_geom_measurement_field(field):
+    if field.endswith("$intersected_area"):
+        field = f"ST_AREA({field.replace('$intersected_area', 'geom')}::geography)"
+    elif field.endswith("$length"):
+        field = f"ST_LENGTH({field.replace('$length', 'geom')}::geography)"
+    return field
 
-    if field == "$area":
-        field = "ST_Area(geom::geography)"
+
+def get_statistics_sql(field, operation):
+    # Check if field endswith $intersected_area
+    field = convert_geom_measurement_field(field)
 
     if operation == ColumnStatisticsOperation.count:
         query = f"COUNT({field})"
@@ -1341,6 +1349,7 @@ def get_statistics_sql(field, operation):
 
     return query
 
+
 def build_where(id: UUID, table_name: str, query: str | dict, attribute_mapping: dict):
     if query is None:
         return f"{table_name}.layer_id = '{str(id)}'"
@@ -1353,9 +1362,12 @@ def build_where(id: UUID, table_name: str, query: str | dict, attribute_mapping:
         # Add id to attribute mapping
         attribute_mapping["id"] = "id"
         where = f"{table_name}.layer_id = '{str(id)}' AND "
-        converted_cql = re.sub(r'(?<=\(|\s|,)"', f'{table_name}."', to_sql_where(ast, attribute_mapping))
+        converted_cql = re.sub(
+            r'(?<=\(|\s|,)"', f'{table_name}."', to_sql_where(ast, attribute_mapping)
+        )
         where = where + converted_cql
         return where
+
 
 def build_where_clause(queries: [str]):
     # Remove none values from queries
@@ -1366,12 +1378,16 @@ def build_where_clause(queries: [str]):
         return "WHERE " + queries[0]
     else:
         return "WHERE " + " AND ".join(queries)
-    
-def build_insert_query(read_table_name: str, result_table_name: str, attribute_mapping: dict, result_column: str = "") -> [str, str]:
+
+
+def build_insert_query(
+    read_table_name: str,
+    result_table_name: str,
+    attribute_mapping: dict,
+    result_column: str = "",
+) -> [str, str]:
     # Create insert statement
-    insert_columns = (
-        ", ".join(attribute_mapping.keys())
-    )
+    insert_columns = ", ".join(attribute_mapping.keys())
     if result_column:
         insert_columns += ", " + result_column
     select_columns = ", ".join(

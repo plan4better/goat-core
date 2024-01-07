@@ -1,24 +1,23 @@
-from fastapi import APIRouter, Depends, Body
+from fastapi import APIRouter, Body, Depends
+
+from src.core.tool import CRUDToolBase, start_calculation
+from src.crud.crud_data_management import CRUDJoin
+from src.crud.crud_geoanalysis import CRUDAggregatePoint, CRUDAggregatePolygon
+from src.schemas.error import http_error_handler
+from src.schemas.job import JobType, Msg
 from src.schemas.tool import (
     IAggregationPoint,
     IAggregationPolygon,
     IJoin,
-    request_examples_aggregation,
+    request_examples_aggregation_point,
+    request_examples_aggregation_polygon,
     request_examples_join,
 )
-from src.schemas.job import JobType
-from src.crud.crud_tool import CRUDTool
-from uuid import UUID
-from uuid import uuid4
-from sqlalchemy.ext.asyncio import AsyncSession
-from src.endpoints.deps import get_db, get_user_id
-from src.core.tool import start_calculation
-from src.schemas.toolbox_base import IToolResponse, CommonToolParams
-from src.schemas.job import Msg
-from src.schemas.toolbox_base import ToolsWithReferenceAreaCheck
-from src.core.tool import CRUDToolBase
-from src.schemas.error import http_error_handler
-from src.crud.crud_tool import CRUDAggregatePoint, CRUDAggregatePolygon
+from src.schemas.toolbox_base import (
+    CommonToolParams,
+    IToolResponse,
+    ToolsWithReferenceAreaCheck,
+)
 
 router = APIRouter()
 
@@ -78,7 +77,7 @@ async def join(
 
     return await start_calculation(
         job_type=JobType.join,
-        tool_class=CRUDTool,
+        tool_class=CRUDJoin,
         crud_method="join_run",
         async_session=common.async_session,
         user_id=common.user_id,
@@ -99,7 +98,7 @@ async def aggregate_points(
     common: CommonToolParams = Depends(),
     params: IAggregationPoint = Body(
         ...,
-        examples=request_examples_aggregation,
+        examples=request_examples_aggregation_point,
         description="The aggregation parameters.",
     ),
 ):
@@ -115,6 +114,7 @@ async def aggregate_points(
         params=params,
     )
 
+
 @router.post(
     "/aggregate-polygons",
     summary="Aggregate polygons",
@@ -126,7 +126,7 @@ async def aggregate_polygons(
     common: CommonToolParams = Depends(),
     params: IAggregationPolygon = Body(
         ...,
-        examples=request_examples_aggregation,
+        examples=request_examples_aggregation_polygon,
         description="The aggregation parameters.",
     ),
 ):

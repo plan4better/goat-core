@@ -42,6 +42,7 @@ class ToolType(str, Enum):
     aggregate_polygon = "aggregate_polygon"
     aggregate_line = "aggregate_line"
     intersect = "intersect"
+    buffer = "buffer"
 
 
 class FeatureType(str, Enum):
