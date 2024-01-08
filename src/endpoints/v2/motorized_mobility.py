@@ -17,7 +17,7 @@ from uuid import uuid4
 from src.core.tool import start_calculation
 from src.schemas.toolbox_base import CommonToolParams
 from src.crud.crud_motorized_mobility import CRUDOevGueteklasse
-from src.crud.crud_isochrone import CRUDIsochroneActiveMobility, CRUDIsochronePT
+from src.crud.crud_isochrone import CRUDIsochronePT
 from src.schemas.job import JobType
 
 router = APIRouter()
