@@ -1,8 +1,8 @@
 from typing import List
-from uuid import UUID
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import BackgroundTasks
+from httpx import AsyncClient
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
@@ -14,33 +14,32 @@ from src.crud.crud_layer import layer as crud_layer
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.crud.crud_project import project as crud_project
 from src.db.models.layer import FeatureType, Layer, LayerType, ToolType
-from src.schemas.job import JobStatusType, JobType
-from src.schemas.layer import (
-    IFeatureLayerToolCreate,
-    UserDataTable,
-    FeatureGeometryType,
-)
-from src.schemas.style import base_properties
-from src.schemas.toolbox_base import (
-    MaxFeatureCnt,
-    ColumnStatisticsOperation,
-    MaxSizeReferenceArea,
-    GeofenceTable,
-)
-from src.schemas.layer import UserDataGeomType, OgrPostgresType
-from src.schemas.tool import IToolParam
-from src.utils import build_where_clause, search_value
-from src.schemas.job import Msg, MsgType
 from src.schemas.error import (
-    LayerSizeError,
-    LayerExtentError,
-    LayerProjectTypeError,
-    FeatureCountError,
-    GeometryTypeError,
     AreaSizeError,
     ColumnTypeError,
-    UnsupportedLayerTypeError,
+    FeatureCountError,
+    GeometryTypeError,
+    LayerExtentError,
+    LayerProjectTypeError,
+    LayerSizeError,
 )
+from src.schemas.job import JobStatusType, JobType, Msg, MsgType
+from src.schemas.layer import (
+    FeatureGeometryType,
+    IFeatureLayerToolCreate,
+    OgrPostgresType,
+    UserDataGeomType,
+    UserDataTable,
+)
+from src.schemas.style import base_properties
+from src.schemas.tool import IToolParam
+from src.schemas.toolbox_base import (
+    ColumnStatisticsOperation,
+    GeofenceTable,
+    MaxFeatureCnt,
+    MaxSizeReferenceArea,
+)
+from src.utils import build_where_clause, search_value
 
 
 async def start_calculation(
@@ -52,6 +51,7 @@ async def start_calculation(
     background_tasks: BackgroundTasks,
     project_id: UUID,
     params: BaseModel,
+    http_client: AsyncClient = None,
 ):
     # Create job and check if user can create a new job
     job = await crud_job.check_and_create(
@@ -61,12 +61,23 @@ async def start_calculation(
     )
 
     # Init class
-    tool = tool_class(
-        job_id=job.id,
-        background_tasks=background_tasks,
-        async_session=async_session,
-        user_id=user_id,
-        project_id=project_id,
+    tool = (
+        tool_class(
+            job_id=job.id,
+            background_tasks=background_tasks,
+            async_session=async_session,
+            user_id=user_id,
+            project_id=project_id,
+        )
+        if http_client is None
+        else tool_class(
+            job_id=job.id,
+            background_tasks=background_tasks,
+            async_session=async_session,
+            user_id=user_id,
+            project_id=project_id,
+            http_client=http_client,
+        )
     )
 
     # Execute the CRUD method

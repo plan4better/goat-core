@@ -1,10 +1,13 @@
-from typing import Generator
+from typing import Generator, Optional
 
 from fastapi import HTTPException, Request
+from httpx import AsyncClient
 from jose import jwt
 
 from src.core.config import settings
 from src.db.session import AsyncSession, async_session, session_manager
+
+http_client: Optional[AsyncClient] = None
 
 
 async def get_db() -> Generator:
@@ -38,3 +41,21 @@ def get_user_id(request: Request):
         # This is returned if there is no Authorization header and therefore no authentication.
         scheme, _, token = settings.SAMPLE_AUTHORIZATION.partition(" ")
         return jwt.get_unverified_claims(token)["sub"]
+
+
+def get_http_client():
+    """Returns an asynchronous HTTP client, typically used for connecting to the GOAT Routing service."""
+
+    global http_client
+    if http_client is None:
+        http_client = AsyncClient()
+    return http_client
+
+
+async def close_http_client():
+    """Clean-up network resources used by the HTTP client."""
+
+    global http_client
+    if http_client is not None:
+        await http_client.aclose()
+        http_client = None

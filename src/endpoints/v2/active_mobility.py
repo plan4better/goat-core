@@ -1,16 +1,19 @@
 from fastapi import APIRouter, Body, Depends
 
+from src.core.tool import start_calculation
+from src.crud.crud_isochrone import CRUDIsochroneActiveMobility
+from src.endpoints.deps import get_http_client
 from src.schemas.active_mobility import (
     IIsochroneActiveMobility,
+)
+from src.schemas.active_mobility import (
     request_examples as active_mobility_request_examples,
 )
-from src.schemas.toolbox_base import IToolResponse
 from src.schemas.job import JobType
-from src.core.tool import start_calculation
-from src.schemas.toolbox_base import CommonToolParams
-from src.crud.crud_isochrone import CRUDIsochroneActiveMobility
+from src.schemas.toolbox_base import CommonToolParams, IToolResponse
 
 router = APIRouter()
+
 
 @router.post(
     "/isochrone",
@@ -38,4 +41,5 @@ async def compute_active_mobility_isochrone(
         background_tasks=common.background_tasks,
         project_id=common.project_id,
         params=params,
+        http_client=get_http_client(),
     )

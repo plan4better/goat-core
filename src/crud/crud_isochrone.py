@@ -1,15 +1,22 @@
+from httpx import AsyncClient
+
 from src.core.config import settings
+from src.core.job import job_init, job_log, run_background_or_immediately
 from src.core.tool import CRUDToolBase
-from src.core.job import job_log, job_init, run_background_or_immediately
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.schemas.active_mobility import (
     IIsochroneActiveMobility,
+    TravelTimeCostActiveMobility,
 )
-from src.schemas.job import JobStatusType, JobType, JobStatusIsochroneActiveMobility, JobStatusIsochronePT, JobStatusIsochroneCar
+from src.schemas.error import OutOfGeofenceError, RoutingEndpointError
+from src.schemas.job import JobStatusType
 from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
 from src.schemas.motorized_mobility import IIsochroneCar, IIsochronePT
-from src.schemas.toolbox_base import DefaultResultLayerName, IsochroneGeometryTypeMapping
-from src.schemas.error import OutOfGeofenceError
+from src.schemas.toolbox_base import (
+    DefaultResultLayerName,
+    IsochroneGeometryTypeMapping,
+)
+
 
 class CRUDIsochroneBase(CRUDToolBase):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
@@ -83,27 +90,73 @@ class CRUDIsochroneBase(CRUDToolBase):
 
 
 class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
-    def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
+    def __init__(
+        self,
+        job_id,
+        background_tasks,
+        async_session,
+        user_id,
+        project_id,
+        http_client: AsyncClient,
+    ):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
+
+        self.http_client = http_client
 
     @job_log(job_step_name="isochrone")
     async def isochrone(
         self,
         params: IIsochroneActiveMobility,
     ):
-        layer_starting_points = await self.create_or_return_layer_starting_points(
-            params=params
-        )
+        # Create layer to store isochrone starting points if required
+        await self.create_or_return_layer_starting_points(params=params)
+
+        # Create feature layer to store computed isochrone output
         layer_isochrone = IFeatureLayerToolCreate(
             name=DefaultResultLayerName.isochrone_active_mobility.value,
-            feature_layer_geometry_type=IsochroneGeometryTypeMapping[params.isochrone_type.value],
+            feature_layer_geometry_type=IsochroneGeometryTypeMapping[
+                params.isochrone_type.value
+            ],
             attribute_mapping={"integer_attr1": "travel_cost"},
             tool_type=params.tool_type.value,
         )
 
-        #TODO: Call isochrone routing endpoint
-        #TODO: Create layer using defined schemas above. Don't create the starting points if the starting points are passed as layer_id
-        #NOTE: The result_table of the layer is stored in layer.table_name
+        result_table = f"{settings.USER_DATA_SCHEMA}.{layer_isochrone.feature_layer_geometry_type.value}_{str(self.user_id).replace('-', '')}"
+        request_body = {
+            "starting_points": {
+                "latitude": params.starting_points.latitude,
+                "longitude": params.starting_points.longitude,
+            },
+            "routing_type": params.routing_type.value,
+            "travel_cost": {
+                "max_traveltime": params.travel_cost.max_traveltime,
+                "traveltime_step": params.travel_cost.traveltime_step,
+                "speed": params.travel_cost.speed,
+            }
+            if type(params.travel_cost) == TravelTimeCostActiveMobility
+            else {
+                "max_distance": params.travel_cost.max_distance,
+                "distance_step": params.travel_cost.distance_step,
+            },
+            "isochrone_type": params.isochrone_type.value,
+            "polygon_difference": params.polygon_difference,
+            "result_table": result_table,
+            "layer_id": str(layer_isochrone.id),
+        }
+
+        try:
+            # Call GOAT Routing endpoint to compute isochrone
+            result = await self.http_client.post(
+                url=f"{settings.GOAT_ROUTING_URL}/isochrone",
+                json=request_body,
+            )
+            if result.status_code != 201:
+                raise Exception(result.text)
+        except Exception as e:
+            raise RoutingEndpointError(
+                f"Error while calling the routing endpoint: {str(e)}"
+            )
+
         return {
             "status": JobStatusType.finished.value,
             "msg": "Active mobility isochrone was successfully computed.",
@@ -119,18 +172,18 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
 
 
 class CRUDIsochronePT(CRUDIsochroneBase):
-    async def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
+    async def __init__(
+        self, job_id, background_tasks, async_session, user_id, project_id
+    ):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
-    
+
     @job_log(job_step_name="isochrone")
     async def isochrone(
         self,
         params: IIsochronePT,
     ):
-        layer_starting_points = await self.create_or_return_layer_starting_points(
-            params=params
-        )
-    
+        await self.create_or_return_layer_starting_points(params=params)
+
         return {
             "status": JobStatusType.finished.value,
             "msg": "Public transport isochrone was successfully computed.",

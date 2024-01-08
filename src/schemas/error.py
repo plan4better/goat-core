@@ -1,10 +1,4 @@
-from pydantic import BaseModel
 from fastapi import HTTPException, status
-
-
-class HTTPError(BaseModel):
-    detail: str
-    status_code: int
 
 
 class LayerError(Exception):
@@ -72,8 +66,15 @@ class LayerNotFoundError(LayerError):
 
     pass
 
+
 class SQLError(Exception):
     """Base class for exceptions related to SQL."""
+
+    pass
+
+
+class RoutingEndpointError(Exception):
+    """Raised when the routing endpoint fails to compute an isochrone."""
 
     pass
 
@@ -91,6 +92,7 @@ ERROR_MAPPING = {
     ColumnTypeError: status.HTTP_422_UNPROCESSABLE_ENTITY,
     LayerNotFoundError: status.HTTP_404_NOT_FOUND,
     SQLError: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    RoutingEndpointError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 
 
