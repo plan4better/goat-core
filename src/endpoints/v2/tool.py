@@ -3,15 +3,18 @@ from fastapi import APIRouter, Body, Depends
 from src.core.tool import CRUDToolBase, start_calculation
 from src.crud.crud_data_management import CRUDJoin
 from src.crud.crud_geoanalysis import CRUDAggregatePoint, CRUDAggregatePolygon
+from src.crud.crud_geoprocessing import CRUDBuffer
 from src.schemas.error import http_error_handler
 from src.schemas.job import JobType, Msg
 from src.schemas.tool import (
     IAggregationPoint,
     IAggregationPolygon,
     IJoin,
+    IBuffer,
     request_examples_aggregation_point,
     request_examples_aggregation_polygon,
     request_examples_join,
+    request_example_buffer,
 )
 from src.schemas.toolbox_base import (
     CommonToolParams,
@@ -135,6 +138,34 @@ async def aggregate_polygons(
         job_type=JobType.aggregate_polygon,
         tool_class=CRUDAggregatePolygon,
         crud_method="aggregate_polygon_run",
+        async_session=common.async_session,
+        user_id=common.user_id,
+        background_tasks=common.background_tasks,
+        project_id=common.project_id,
+        params=params,
+    )
+
+
+@router.post(
+    "/buffer",
+    summary="Buffer",
+    response_model=IToolResponse,
+    status_code=201,
+)
+async def buffer(
+    *,
+    common: CommonToolParams = Depends(),
+    params: IBuffer = Body(
+        ...,
+        examples=request_example_buffer,
+        description="The buffer parameters.",
+    ),
+):
+    """Buffer points and compute statistics on a group by column."""
+    return await start_calculation(
+        job_type=JobType.buffer,
+        tool_class=CRUDBuffer,
+        crud_method="buffer_run",
         async_session=common.async_session,
         user_id=common.user_id,
         background_tasks=common.background_tasks,

@@ -284,6 +284,77 @@ async def test_aggregate_polygons_h3_grid_group_by(
 
 
 @pytest.mark.asyncio
+async def test_buffer(client: AsyncClient, fixture_add_basic_layer_to_project):
+    project_id = fixture_add_basic_layer_to_project["project_id"]
+    layer_project_id = fixture_add_basic_layer_to_project["layer_project_id"]
+
+    # Request buffer endpoint
+    response = await client.post(
+        f"{settings.API_V2_STR}/tool/buffer?project_id={project_id}",
+        json={
+            "source_layer_project_id": layer_project_id,
+            "max_distance": 1000,
+            "distance_step": 100,
+        },
+    )
+    response_json = response.json()
+    assert response.status_code == 201
+
+    # Check job status
+    job = await check_job_status(client, response_json["job_id"])
+    assert job["status_simple"] == "finished"
+
+
+@pytest.mark.asyncio
+async def test_buffer_union(client: AsyncClient, fixture_add_basic_layer_to_project):
+    project_id = fixture_add_basic_layer_to_project["project_id"]
+    layer_project_id = fixture_add_basic_layer_to_project["layer_project_id"]
+
+    # Request buffer endpoint
+    response = await client.post(
+        f"{settings.API_V2_STR}/tool/buffer?project_id={project_id}",
+        json={
+            "source_layer_project_id": layer_project_id,
+            "max_distance": 1000,
+            "distance_step": 100,
+            "polygon_union": True,
+        },
+    )
+    response_json = response.json()
+    assert response.status_code == 201
+
+    # Check job status
+    job = await check_job_status(client, response_json["job_id"])
+    assert job["status_simple"] == "finished"
+
+
+@pytest.mark.asyncio
+async def test_buffer_union_difference(
+    client: AsyncClient, fixture_add_basic_layer_to_project
+):
+    project_id = fixture_add_basic_layer_to_project["project_id"]
+    layer_project_id = fixture_add_basic_layer_to_project["layer_project_id"]
+
+    # Request buffer endpoint
+    response = await client.post(
+        f"{settings.API_V2_STR}/tool/buffer?project_id={project_id}",
+        json={
+            "source_layer_project_id": layer_project_id,
+            "max_distance": 1000,
+            "distance_step": 100,
+            "polygon_union": True,
+            "polygon_difference": True,
+        },
+    )
+    response_json = response.json()
+    assert response.status_code == 201
+
+    # Check job status
+    job = await check_job_status(client, response_json["job_id"])
+    assert job["status_simple"] == "finished"
+
+
+@pytest.mark.asyncio
 async def test_reference_area(
     client: AsyncClient, fixture_add_polygon_layer_to_project
 ):

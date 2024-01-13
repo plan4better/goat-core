@@ -88,7 +88,7 @@ class CRUDOevGueteklasse(CRUDToolBase):
                     pt_class integer,
                     buffer_size integer,
                     geom geometry,
-                    h3_3 smallint
+                    h3_3 integer
                 )
             """
             )

@@ -626,6 +626,39 @@ async def fixture_add_aggregate_polygon_layer_to_project(
         "project_id": project_id,
     }
 
+
+layer_types = ["point", "line", "polygon"]
+
+@pytest.fixture(params=layer_types)
+async def fixture_create_basic_layer(request, client: AsyncClient, fixture_create_user, fixture_get_home_folder):
+    layer_type = request.param
+    dir_gpkg = os.path.join(settings.TEST_DATA_DIR, "layers", "valid", layer_type, "valid.gpkg")
+    layer = await upload_and_create_layer(
+        client, dir_gpkg, fixture_get_home_folder, "feature_layer_standard"
+    )
+    return {"home_folder": fixture_get_home_folder, "layer": layer, "layer_type": layer_type}
+
+
+@pytest.fixture
+async def fixture_add_basic_layer_to_project(
+    client: AsyncClient, fixture_create_project, fixture_create_basic_layer
+):
+    layer = fixture_create_basic_layer["layer"]
+    project_id = fixture_create_project["id"]
+    # Add layers to project
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer['id']}"
+    )
+    assert response.status_code == 200
+    layers_project = response.json()
+    layer_project_id = layers_project[0]["id"]
+
+    return {
+        "layer_project_id": layer_project_id,
+        "project_id": project_id,
+        "layer_type": fixture_create_basic_layer["layer_type"]
+    }
+
 async def create_external_layer(client: AsyncClient, home_folder, layer_type):
     # Get table layer dict and add layer ID
     external_layer_dict = layer_request_examples["create_external"][layer_type]["value"]

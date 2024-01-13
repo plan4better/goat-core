@@ -253,8 +253,9 @@ class IBuffer(BaseModel):
 
     @property
     def input_layer_types(self):
-        return input_layer_type_feature_all
-
+        return {
+            "source_layer_project_id": input_layer_type_feature_all
+        }
     @property
     def tool_type(self):
         return ToolType.buffer
@@ -351,6 +352,29 @@ request_examples_aggregation_polygon = {
             "weigthed_by_intersecting_area": False,
             "column_statistics": {"operation": "mean", "field": "field_example2"},
             "source_group_by_field": ["group_by_example2"],
+        },
+    },
+}
+
+request_example_buffer = {
+    "buffer_union": {
+        "summary": "Buffer union polygons",
+        "value": {
+            "source_layer_project_id": 1,
+            "max_distance": 1000,
+            "distance_step": 100,
+            "polygon_union": True,
+            "polygon_difference": False,
+        },
+    },
+    "buffer_union_difference": {
+        "summary": "Buffer union and difference polygons",
+        "value": {
+            "source_layer_project_id": 1,
+            "max_distance": 1000,
+            "distance_step": 100,
+            "polygon_union": True,
+            "polygon_difference": True,
         },
     },
 }

@@ -1,5 +1,5 @@
 from typing import List
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import BackgroundTasks
 from pydantic import BaseModel
@@ -118,7 +118,8 @@ class CRUDToolBase:
             # Check for each feature layer of type polygon if the tool type is in MaxFeaturePolygonArea
             if layer_project.type == LayerType.feature:
                 if (
-                    layer_project.feature_layer_geometry_type == FeatureGeometryType.polygon
+                    layer_project.feature_layer_geometry_type
+                    == FeatureGeometryType.polygon
                     and params.tool_type in MaxFeaturePolygonArea.__members__
                 ):
                     # Check reference area size
@@ -406,6 +407,30 @@ class CRUDToolBase:
         await self.async_session.commit()
         return temp_polygons
 
+    async def create_distributed_line_table(
+        self,
+        layer_project: BaseModel,
+    ):
+        # Create temp table name for lines
+        table_suffix = str(self.job_id).replace("-", "")
+        temp_lines = f"temporal.lines_{get_random_string(6)}_{table_suffix}"
+
+        # Create distributed line table using sql
+        where_query_line = "WHERE " + layer_project.where_query.replace("'", "''")
+        arr_columns = ["id"] + list(layer_project.attribute_mapping.keys())
+
+        await self.async_session.execute(
+            f"""SELECT basic.create_distributed_line_table(
+                '{layer_project.table_name}',
+                '{', '.join(arr_columns)}',
+                '{where_query_line}',
+                '{temp_lines}'
+            )"""
+        )
+        # Commit changes
+        await self.async_session.commit()
+        return temp_lines
+
     async def create_distributed_point_table(
         self,
         layer_project: BaseModel,
@@ -416,10 +441,12 @@ class CRUDToolBase:
 
         # Create distributed point table using sql
         where_query_point = "WHERE " + layer_project.where_query.replace("'", "''")
+        arr_columns = ["id"] + list(layer_project.attribute_mapping.keys())
+
         await self.async_session.execute(
             f"""SELECT basic.create_distributed_point_table(
                 '{layer_project.table_name}',
-                '{', '.join(list(layer_project.attribute_mapping.keys()))}',
+                '{', '.join(arr_columns)}',
                 '{where_query_point}',
                 '{temp_points}'
             )"""
