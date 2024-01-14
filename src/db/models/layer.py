@@ -37,12 +37,14 @@ class ToolType(str, Enum):
     isochrone_pt = "isochrone_pt"
     isochrone_car = "isochrone_car"
     oev_gueteklasse = "oev_gueteklasse"
+    trip_count_station = "trip_count_station"
     join = "join"
     aggregate_point = "aggregate_point"
     aggregate_polygon = "aggregate_polygon"
     aggregate_line = "aggregate_line"
     intersect = "intersect"
     buffer = "buffer"
+    origin_destination = "origin_destination"
 
 
 class FeatureType(str, Enum):
@@ -226,6 +228,12 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     tool_type: Optional[ToolType] = Field(
         sa_column=Column(Text, nullable=True),
         description="If it is an tool layer, the tool type",
+    )
+    job_id: UUID | None = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True), ForeignKey("customer.job.id"), nullable=True
+        ),
+        description="Job ID if the layer is a tool layer",
     )
     scenario_id: UUID | None = Field(
         sa_column=Column(

@@ -42,11 +42,13 @@ class DefaultResultLayerName(str, Enum):
     isochrone_car = "Car Isochrone"
     oev_gueteklasse = "ÖV-Güteklassen"
     oev_gueteklasse_station = "ÖV-Güteklassen Station"
+    trip_count_station = "Trip Count Station"
     aggregate_point = "Aggregation Point"
     aggregate_polygon = "Aggregation Polygon"
     aggregate_line = "Aggregation Line"
     buffer = "Buffer"
-
+    origin_destination_relation = "Origin Destination Relation"
+    origin_destination_point = "Origin Destination Point"
 
 class MaxFeatureCnt(int, Enum):
     """Max feature count schema."""
@@ -58,7 +60,8 @@ class MaxFeatureCnt(int, Enum):
     aggregate_point = 1000000
     aggregate_polygon = 100000
     buffer = 10000
-
+    trip_count_station = 10000
+    origin_destination = 1000000
 
 class ToolsWithReferenceAreaCheck(str, Enum):
     """Tools with reference area check schema."""
@@ -71,6 +74,7 @@ class MaxFeaturePolygonArea(int, Enum):
 
     oev_gueteklasse = 500000
     aggregate_polygon = 100000
+    trip_count_station = 500000
 
 
 class GeofenceTable(str, Enum):
@@ -224,3 +228,35 @@ class InputLayerType(BaseModel):
             )
 
         return values
+
+input_layer_type_point = InputLayerType(
+    layer_types=[LayerType.feature],
+    feature_layer_geometry_types=[
+        FeatureGeometryType.point,
+    ],
+)
+input_layer_type_polygon = InputLayerType(
+    layer_types=[LayerType.feature],
+    feature_layer_geometry_types=[
+        FeatureGeometryType.polygon,
+    ],
+)
+input_layer_type_point_polygon = InputLayerType(
+    layer_types=[LayerType.feature],
+    feature_layer_geometry_types=[
+        FeatureGeometryType.point,
+        FeatureGeometryType.polygon,
+    ],
+)
+input_layer_table = InputLayerType(
+    layer_types=[LayerType.table],
+    feature_layer_geometry_types=None,
+)
+input_layer_type_feature_all = InputLayerType(
+    layer_types=[LayerType.feature],
+    feature_layer_geometry_types=[
+        FeatureGeometryType.point,
+        FeatureGeometryType.polygon,
+        FeatureGeometryType.line,
+    ],
+)

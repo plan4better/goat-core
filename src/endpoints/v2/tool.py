@@ -2,7 +2,7 @@ from fastapi import APIRouter, Body, Depends
 
 from src.core.tool import CRUDToolBase, start_calculation
 from src.crud.crud_data_management import CRUDJoin
-from src.crud.crud_geoanalysis import CRUDAggregatePoint, CRUDAggregatePolygon
+from src.crud.crud_geoanalysis import CRUDAggregatePoint, CRUDAggregatePolygon, CRUDOriginDestination
 from src.crud.crud_geoprocessing import CRUDBuffer
 from src.schemas.error import http_error_handler
 from src.schemas.job import JobType, Msg
@@ -11,6 +11,7 @@ from src.schemas.tool import (
     IAggregationPolygon,
     IJoin,
     IBuffer,
+    IOriginDestination,
     request_examples_aggregation_point,
     request_examples_aggregation_polygon,
     request_examples_join,
@@ -166,6 +167,32 @@ async def buffer(
         job_type=JobType.buffer,
         tool_class=CRUDBuffer,
         crud_method="buffer_run",
+        async_session=common.async_session,
+        user_id=common.user_id,
+        background_tasks=common.background_tasks,
+        project_id=common.project_id,
+        params=params,
+    )
+
+@router.post(
+    "/origin-destination",
+    summary="Origin Destination",
+    response_model=IToolResponse,
+    status_code=201,
+)
+async def origin_destination(
+    *,
+    common: CommonToolParams = Depends(),
+    params: IOriginDestination = Body(
+        ...,
+        description="The origin destination parameters.",
+    ),
+):
+    """Create origin destination matrix."""
+    return await start_calculation(
+        job_type=JobType.origin_destination,
+        tool_class=CRUDOriginDestination,
+        crud_method="origin_destination_run",
         async_session=common.async_session,
         user_id=common.user_id,
         background_tasks=common.background_tasks,

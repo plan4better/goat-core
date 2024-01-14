@@ -18,16 +18,11 @@ from src.schemas.active_mobility import (
 from src.schemas.layer import LayerType
 from src.schemas.layer import request_examples as layer_request_examples
 from src.schemas.motorized_mobility import (
-    request_example_oev_gueteklasse,
     request_examples_isochrone_car,
     request_examples_isochrone_pt,
 )
 from src.schemas.project import (
     request_examples as project_request_examples,
-)
-from src.schemas.tool import (
-    request_examples_aggregation_point,
-    request_examples_join,
 )
 from src.utils import get_user_table
 from tests.utils import (
@@ -352,7 +347,9 @@ async def fixture_create_internal_layers(
 async def fixture_create_polygon_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
-    dir_gpkg = os.path.join(settings.TEST_DATA_DIR, "layers", "tool", "zipcode.gpkg")
+    dir_gpkg = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "tool", "zipcode_polygon.gpkg"
+    )
     return await upload_and_create_layer(
         client, dir_gpkg, fixture_get_home_folder, "feature_layer_standard"
     )
@@ -413,7 +410,9 @@ async def fixture_add_large_polygon_layer_to_project(
 @pytest.fixture
 async def fixture_create_join_layers(client: AsyncClient, fixture_get_home_folder):
     dir_csv = os.path.join(settings.TEST_DATA_DIR, "layers", "tool", "events.csv")
-    dir_gpkg = os.path.join(settings.TEST_DATA_DIR, "layers", "tool", "zipcode.gpkg")
+    dir_gpkg = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "tool", "zipcode_polygon.gpkg"
+    )
     layer_csv = await upload_and_create_layer(
         client, dir_csv, fixture_get_home_folder, "table"
     )
@@ -435,7 +434,7 @@ async def fixture_create_aggregate_point_layers(
         settings.TEST_DATA_DIR, "layers", "tool", "points_with_category.gpkg"
     )
     dir_polygons = os.path.join(
-        settings.TEST_DATA_DIR, "layers", "tool", "zipcode.gpkg"
+        settings.TEST_DATA_DIR, "layers", "tool", "zipcode_polygon.gpkg"
     )
     layer_points = await upload_and_create_layer(
         client, dir_points, fixture_get_home_folder, "feature_layer_standard"
@@ -548,7 +547,7 @@ async def fixture_create_aggregate_polygon_layers(
         settings.TEST_DATA_DIR, "layers", "tool", "green_areas.gpkg"
     )
     dir_aggregation_layer = os.path.join(
-        settings.TEST_DATA_DIR, "layers", "tool", "zipcode.gpkg"
+        settings.TEST_DATA_DIR, "layers", "tool", "zipcode_polygon.gpkg"
     )
     layer_source = await upload_and_create_layer(
         client, dir_source_layer, fixture_get_home_folder, "feature_layer_standard"
@@ -561,6 +560,7 @@ async def fixture_create_aggregate_polygon_layers(
         "layer_source": layer_source,
         "layer_aggregation": layer_aggregation,
     }
+
 
 @pytest.fixture
 async def fixture_create_aggregate_polygon_layer(
@@ -576,6 +576,7 @@ async def fixture_create_aggregate_polygon_layer(
         "home_folder": fixture_get_home_folder,
         "layer_source": layer_source,
     }
+
 
 @pytest.fixture
 async def fixture_add_aggregate_polygon_layers_to_project(
@@ -606,6 +607,7 @@ async def fixture_add_aggregate_polygon_layers_to_project(
         "project_id": project_id,
     }
 
+
 @pytest.fixture
 async def fixture_add_aggregate_polygon_layer_to_project(
     client: AsyncClient, fixture_create_project, fixture_create_aggregate_polygon_layer
@@ -629,14 +631,23 @@ async def fixture_add_aggregate_polygon_layer_to_project(
 
 layer_types = ["point", "line", "polygon"]
 
+
 @pytest.fixture(params=layer_types)
-async def fixture_create_basic_layer(request, client: AsyncClient, fixture_create_user, fixture_get_home_folder):
+async def fixture_create_basic_layer(
+    request, client: AsyncClient, fixture_create_user, fixture_get_home_folder
+):
     layer_type = request.param
-    dir_gpkg = os.path.join(settings.TEST_DATA_DIR, "layers", "valid", layer_type, "valid.gpkg")
+    dir_gpkg = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "valid", layer_type, "valid.gpkg"
+    )
     layer = await upload_and_create_layer(
         client, dir_gpkg, fixture_get_home_folder, "feature_layer_standard"
     )
-    return {"home_folder": fixture_get_home_folder, "layer": layer, "layer_type": layer_type}
+    return {
+        "home_folder": fixture_get_home_folder,
+        "layer": layer,
+        "layer_type": layer_type,
+    }
 
 
 @pytest.fixture
@@ -656,8 +667,58 @@ async def fixture_add_basic_layer_to_project(
     return {
         "layer_project_id": layer_project_id,
         "project_id": project_id,
-        "layer_type": fixture_create_basic_layer["layer_type"]
+        "layer_type": fixture_create_basic_layer["layer_type"],
     }
+
+
+geometry_layers = ["zipcode_polygon.gpkg", "zipcode_point.gpkg"]
+
+
+@pytest.fixture(params=geometry_layers)
+async def fixture_add_origin_destination_layers_to_project(
+    request,
+    client: AsyncClient,
+    fixture_create_project,
+    fixture_get_home_folder,
+):
+    # Create layers
+    dir_origin_destination_matrix = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "tool", "origin_destination_matrix.csv"
+    )
+    dir_geometry_layer = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "tool", request.param
+    )
+    layer_origin_destination_matrix = await upload_and_create_layer(
+        client, dir_origin_destination_matrix, fixture_get_home_folder, "table"
+    )
+    layer_geometry_layer = await upload_and_create_layer(
+        client, dir_geometry_layer, fixture_get_home_folder, "feature_layer_standard"
+    )
+    project_id = fixture_create_project["id"]
+
+    # Add layers to project one by one and return layer_project_id
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_origin_destination_matrix['id']}"
+    )
+    assert response.status_code == 200
+    layer_project_origin_destination_matrix = response.json()
+    origin_destination_matrix_layer_project_id = (
+        layer_project_origin_destination_matrix[0]["id"]
+    )
+
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_geometry_layer['id']}"
+    )
+    assert response.status_code == 200
+    layer_project_geometry_layer = response.json()
+    geometry_layer_project_id = layer_project_geometry_layer[0]["id"]
+
+    return {
+        "origin_destination_matrix_layer_project_id": origin_destination_matrix_layer_project_id,
+        "geometry_layer_project_id": geometry_layer_project_id,
+        "project_id": project_id,
+    }
+
 
 async def create_external_layer(client: AsyncClient, home_folder, layer_type):
     # Get table layer dict and add layer ID

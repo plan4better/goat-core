@@ -9,6 +9,11 @@ from src.schemas.toolbox_base import (
     ColumnStatistic,
     ColumnStatisticsOperation,
     InputLayerType,
+    input_layer_type_feature_all,
+    input_layer_type_point,
+    input_layer_type_polygon,
+    input_layer_type_point_polygon,
+    input_layer_table,
 )
 from src.db.models.layer import LayerType
 from src.schemas.layer import FeatureGeometryType
@@ -140,28 +145,6 @@ class IAggregationBase(BaseModel):
         return v
 
 
-input_layer_type_point = InputLayerType(
-    layer_types=[LayerType.feature],
-    feature_layer_geometry_types=[
-        FeatureGeometryType.point,
-    ],
-)
-input_layer_type_polygon = InputLayerType(
-    layer_types=[LayerType.feature],
-    feature_layer_geometry_types=[
-        FeatureGeometryType.polygon,
-    ],
-)
-input_layer_type_feature_all = InputLayerType(
-    layer_types=[LayerType.feature],
-    feature_layer_geometry_types=[
-        FeatureGeometryType.point,
-        FeatureGeometryType.polygon,
-        FeatureGeometryType.line,
-    ],
-)
-
-
 class IAggregationPoint(IAggregationBase):
     """Aggregation tool schema."""
 
@@ -259,6 +242,53 @@ class IBuffer(BaseModel):
     @property
     def tool_type(self):
         return ToolType.buffer
+
+class IOriginDestination(BaseModel):
+    """Origin Destination tool schema."""
+
+    geometry_layer_project_id: int = Field(
+        ...,
+        title="Geometry layer Project ID",
+        description="The ID of the layer project that conains the origins and destinations geometries.",
+    )
+    origin_destination_matrix_layer_project_id: int = Field(
+        ...,
+        title="Origins Destinations Matrix Layer Project ID",
+        description="The ID of the layer project that conains the origins and destinations matrix.",
+    )
+    unique_id_column: str = Field(
+        ...,
+        title="Unique ID Column",
+        description="The column that contains the unique IDs in geometry layer.",
+    )
+    origin_column: str = Field(
+        ...,
+        title="Origin Column",
+        description="The column that contains the origins in the origin destination matrix.",
+    )
+    destination_column: str = Field(
+        ...,
+        title="Destination Column",
+        description="The column that contains the destinations in the origin destination matrix.",
+    )
+    weight_column: str = Field(
+        ...,
+        title="Weight Column",
+        description="The column that contains the weights in the origin destination matrix.",
+    )
+
+
+    @property
+    def input_layer_types(self):
+        return {
+            "geometry_layer_project_id": input_layer_type_point_polygon,
+            "origin_destination_matrix_layer_project_id": input_layer_table,
+        }
+
+    @property
+    def tool_type(self):
+        return ToolType.origin_destination
+
 
 
 class IToolParam(BaseModel):

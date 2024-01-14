@@ -1,6 +1,8 @@
 from datetime import datetime
 from enum import Enum
+
 from pydantic import BaseModel
+
 
 class JobType(str, Enum):
     """Job types."""
@@ -14,6 +16,8 @@ class JobType(str, Enum):
     aggregate_point = "aggregate_point"
     aggregate_polygon = "aggregate_polygon"
     buffer = "buffer"
+    trip_count_station = "trip_count_station"
+    origin_destination = "origin_destination"
 
 
 class JobStatusType(str, Enum):
@@ -88,8 +92,17 @@ class JobStatusIsochronePT(JobStatusIsochroneBase):
 class JobStatusIsochroneCar(JobStatusIsochroneBase):
     pass
 
+
 class JobStatusBuffer(BaseModel):
     buffer: JobStep = {}
+
+
+class JobStatusTripCountStation(BaseModel):
+    trip_count_station: JobStep = {}
+
+class OriginDestination(BaseModel):
+    origin_destination: JobStep = {}
+
 
 # Only add jobs here that are consisting of multiple steps
 job_mapping = {
@@ -102,4 +115,6 @@ job_mapping = {
     JobType.isochrone_pt: JobStatusIsochronePT,
     JobType.isochrone_car: JobStatusIsochroneCar,
     JobType.buffer: JobStatusBuffer,
+    JobType.trip_count_station: JobStatusTripCountStation,
+    JobType.origin_destination: OriginDestination,
 }

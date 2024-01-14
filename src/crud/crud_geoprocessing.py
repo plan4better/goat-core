@@ -27,6 +27,7 @@ class CRUDBuffer(CRUDToolBase):
             feature_layer_geometry_type=FeatureGeometryType.polygon,
             attribute_mapping={"integer_attr1": "radius_size"},
             tool_type=params.tool_type,
+            job_id=self.job_id,
         )
         # Create distributed table depending on feature layer geometry type
         function_mapping = {
@@ -97,6 +98,7 @@ class CRUDBuffer(CRUDToolBase):
             """
         # Execute query
         await self.async_session.execute(sql_combined_query)
+        await self.async_session.commit()
 
         # Create new layer
         await self.create_feature_layer_tool(
@@ -116,9 +118,3 @@ class CRUDBuffer(CRUDToolBase):
     @job_init()
     async def buffer_run(self, params: IBuffer):
         return await self.buffer(params=params)
-
-    async def buffer_fail(self):
-        # Delete orphan data
-        await self.delete_orphan_data()
-        # Delete temporary tables
-        await self.delete_temp_tables()

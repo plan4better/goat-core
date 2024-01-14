@@ -77,6 +77,17 @@ class SQLError(Exception):
 
     pass
 
+class TimeoutError(Exception):
+    """Raised when a job timouts."""
+
+    pass
+
+class JobKilledError(Exception):
+    """Raised when a job is killed."""
+
+    pass
+
+
 
 # Define the mapping between custom errors and HTTP status codes
 ERROR_MAPPING = {

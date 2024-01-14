@@ -7,15 +7,18 @@ from src.schemas.job import JobStatusType
 from src.schemas.layer import (
     FeatureGeometryType,
     IFeatureLayerToolCreate,
+    OgrPostgresType,
 )
-from src.schemas.tool import IAggregationPoint, IAggregationPolygon
+from src.schemas.tool import IAggregationPoint, IAggregationPolygon, IOriginDestination
 from src.schemas.toolbox_base import ColumnStatisticsOperation, DefaultResultLayerName
+from src.schemas.error import ColumnTypeError
 from src.utils import (
     convert_geom_measurement_field,
     get_result_column,
     get_statistics_sql,
     search_value,
 )
+
 
 class CRUDAggregateBase(CRUDToolBase):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
@@ -127,6 +130,7 @@ class CRUDAggregateBase(CRUDToolBase):
             feature_layer_geometry_type=FeatureGeometryType.polygon,
             attribute_mapping={**attribute_mapping_aggregation, **result_column},
             tool_type=params.tool_type,
+            job_id=self.job_id,
         )
 
         return {
@@ -295,12 +299,6 @@ class CRUDAggregatePoint(CRUDAggregateBase):
     @job_init()
     async def aggregate_point_run(self, params: IAggregationPoint):
         return await self.aggregate_point(params=params)
-
-    async def aggregate_point_fail(self, params: IAggregationPoint):
-        # Delete orphan data
-        await self.delete_orphan_data()
-        # Delete temporary tables
-        await self.delete_temp_tables()
 
 
 class CRUDAggregatePolygon(CRUDAggregateBase):
@@ -540,8 +538,171 @@ class CRUDAggregatePolygon(CRUDAggregateBase):
     async def aggregate_polygon_run(self, params: IAggregationPolygon):
         return await self.aggregate_polygon(params=params)
 
-    async def aggregate_polygon_fail(self, params: IAggregationPolygon):
-        # Delete orphan data
-        await self.delete_orphan_data()
-        # Delete temporary tables
-        await self.delete_temp_tables()
+
+class CRUDOriginDestination(CRUDToolBase):
+    def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
+        super().__init__(job_id, background_tasks, async_session, user_id, project_id)
+        self.result_table_relation = (
+            f"{settings.USER_DATA_SCHEMA}.line_{str(self.user_id).replace('-', '')}"
+        )
+        self.result_table_point = (
+            f"{settings.USER_DATA_SCHEMA}.point_{str(self.user_id).replace('-', '')}"
+        )
+
+    @job_log(job_step_name="origin_destination")
+    async def origin_destination(self, params: IOriginDestination):
+        # Get layers
+        layers_project = await self.get_layers_project(
+            params=params,
+        )
+        geometry_layer_project = layers_project["geometry_layer_project_id"]
+        origin_destination_matrix_layer_project = layers_project[
+            "origin_destination_matrix_layer_project_id"
+        ]
+        # Check that origin_column and destination_column are the same type
+        mapped_unique_id_column = search_value(
+            geometry_layer_project.attribute_mapping,
+            params.unique_id_column,
+        )
+        mapped_origin_column = search_value(
+            origin_destination_matrix_layer_project.attribute_mapping,
+            params.origin_column,
+        )
+        mapped_destination_column = search_value(
+            origin_destination_matrix_layer_project.attribute_mapping,
+            params.destination_column,
+        )
+        if (
+            len(
+                {
+                    mapped_unique_id_column.split("_")[0],
+                    mapped_origin_column.split("_")[0],
+                    mapped_destination_column.split("_")[0],
+                }
+            )
+            > 1
+        ):
+            raise ColumnTypeError(
+                "The unique_id, origin and destination column must be of the same type"
+            )
+
+        # Check if weight column is of type number
+        mapped_weight_column = search_value(
+            origin_destination_matrix_layer_project.attribute_mapping,
+            params.weight_column,
+        )
+        if mapped_weight_column.split("_")[0] not in [
+            OgrPostgresType.Integer,
+            OgrPostgresType.Real,
+            OgrPostgresType.Integer64,
+        ]:
+            raise ColumnTypeError(
+                f"Mapped weight field is not {OgrPostgresType.Integer}, {OgrPostgresType.Real}, {OgrPostgresType.Integer64}."
+            )
+
+        # Create new layers for relations and points
+        result_layer_point = IFeatureLayerToolCreate(
+            name=DefaultResultLayerName[params.tool_type + "_point"].value,
+            feature_layer_geometry_type=FeatureGeometryType.point,
+            attribute_mapping={
+                mapped_weight_column.split("_")[0] + "_attr1": "weight",
+            },
+            tool_type=params.tool_type,
+            job_id=self.job_id,
+        )
+
+        # Build attribute mapping for relation table
+        attribute_mapping_relation = {
+            mapped_unique_id_column.split("_")[0] + "_attr1": "origin",
+            mapped_unique_id_column.split("_")[0] + "_attr2": "destination",
+        }
+        if mapped_weight_column.split("_")[0] + "_attr1" not in attribute_mapping_relation:
+            attribute_mapping_relation[
+                mapped_weight_column.split("_")[0] + "_attr1"
+            ] = "weight"
+        else:
+            # Get attr of same name with max count
+            count_attr = 1
+            while (
+                mapped_weight_column.split("_")[0] + f"_attr{count_attr}"
+            ) in attribute_mapping_relation:
+                count_attr += 1
+            attribute_mapping_relation[
+                mapped_weight_column.split("_")[0] + f"_attr{count_attr}"
+            ] = "weight"
+
+        result_layer_relation = IFeatureLayerToolCreate(
+            name=DefaultResultLayerName[params.tool_type + "_relation"].value,
+            feature_layer_geometry_type=FeatureGeometryType.line,
+            attribute_mapping=attribute_mapping_relation,
+            tool_type=params.tool_type,
+            job_id=self.job_id,
+        )
+
+        # Create temp table for geometry layer
+        temp_geometry_layer = await self.create_temp_table_layer(
+            layer_project=geometry_layer_project,
+        )
+        await self.async_session.execute(
+            f"CREATE INDEX ON {temp_geometry_layer} ({mapped_unique_id_column});"
+        )
+        await self.async_session.commit()
+
+        # Create temp table for origin destination matrix
+        temp_origin_destination_matrix_layer = await self.create_temp_table_layer(
+            layer_project=origin_destination_matrix_layer_project,
+        )
+        await self.async_session.execute(
+            f"CREATE INDEX ON {temp_origin_destination_matrix_layer} ({mapped_origin_column}, {mapped_destination_column});"
+        )
+        await self.async_session.commit()
+
+        # Compute relations
+        select_columns = ['matrix.' + attr for attr in list(result_layer_relation.attribute_mapping.keys())]
+        select_columns = ', '.join(select_columns)
+        sql_query_relations = f"""
+            INSERT INTO {self.result_table_relation} (layer_id, geom, {', '.join(list(result_layer_relation.attribute_mapping.keys()))})
+            SELECT '{result_layer_relation.id}',
+            ST_MakeLine(ST_CENTROID((ARRAY_AGG(origin.geom))[1]), ST_CENTROID((ARRAY_AGG(destination.geom))[1])),
+            (ARRAY_AGG(matrix.{mapped_origin_column}))[1] AS origin, (ARRAY_AGG(matrix.{mapped_destination_column}))[1] AS destination,
+            SUM(matrix.{mapped_weight_column}) AS weight
+            FROM {temp_geometry_layer} origin, {temp_geometry_layer} destination, {temp_origin_destination_matrix_layer} matrix
+            WHERE origin.{mapped_unique_id_column} = matrix.{mapped_origin_column}
+            AND destination.{mapped_unique_id_column} = matrix.{mapped_destination_column}
+            GROUP BY matrix.{mapped_origin_column}, matrix.{mapped_destination_column}
+        """
+        await self.async_session.execute(sql_query_relations)
+
+        # Compute points
+        sql_query_points = f"""
+            INSERT INTO {self.result_table_point} (layer_id, geom, {', '.join(list(result_layer_point.attribute_mapping.keys()))})
+            WITH grouped AS
+            (
+                SELECT '{result_layer_point.id}', g.{mapped_unique_id_column}, SUM(m.{mapped_weight_column}) AS weight
+                FROM {temp_geometry_layer} g, {temp_origin_destination_matrix_layer} m
+                WHERE g.{mapped_unique_id_column} = m.{mapped_destination_column}
+                GROUP BY g.{mapped_unique_id_column}
+            )
+            SELECT '{result_layer_point.id}', ST_CENTROID(g.geom), gg.weight
+            FROM {temp_geometry_layer} g, grouped gg
+            WHERE g.{mapped_unique_id_column} = gg.{mapped_unique_id_column}
+        """
+        await self.async_session.execute(sql_query_points)
+
+        # Create new layer
+        await self.create_feature_layer_tool(
+            layer_in=result_layer_relation,
+        )
+        await self.create_feature_layer_tool(
+            layer_in=result_layer_point,
+        )
+
+        return {
+            "status": JobStatusType.finished.value,
+            "msg": "Origin destination pairs where successfully created.",
+        }
+
+    @run_background_or_immediately(settings)
+    @job_init()
+    async def origin_destination_run(self, params: IAggregationPolygon):
+        return await self.origin_destination(params=params)

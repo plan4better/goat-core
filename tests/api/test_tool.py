@@ -353,6 +353,30 @@ async def test_buffer_union_difference(
     job = await check_job_status(client, response_json["job_id"])
     assert job["status_simple"] == "finished"
 
+@pytest.mark.asyncio
+async def test_origin_destination_polygon(client: AsyncClient, fixture_add_origin_destination_layers_to_project):
+    origin_destination_matrix_layer_project_id = fixture_add_origin_destination_layers_to_project["origin_destination_matrix_layer_project_id"]
+    geometry_layer_project_id = fixture_add_origin_destination_layers_to_project["geometry_layer_project_id"]
+    project_id = fixture_add_origin_destination_layers_to_project["project_id"]
+
+    # Request origin destination endpoint
+    response = await client.post(
+        f"{settings.API_V2_STR}/tool/origin-destination?project_id={project_id}",
+        json={
+            "geometry_layer_project_id": geometry_layer_project_id,
+            "origin_destination_matrix_layer_project_id": origin_destination_matrix_layer_project_id,
+            "unique_id_column": "zipcode",
+            "origin_column": "origin",
+            "destination_column": "destination",
+            "weight_column": "weight",
+        },
+    )
+    response_json = response.json()
+    assert response.status_code == 201
+
+    # Check job status
+    job = await check_job_status(client, response_json["job_id"])
+    assert job["status_simple"] == "finished"
 
 @pytest.mark.asyncio
 async def test_reference_area(

@@ -72,6 +72,7 @@ class CRUDJoin(CRUDToolBase):
             feature_layer_geometry_type=target_layer_project.feature_layer_geometry_type,
             attribute_mapping=new_layer_attribute_mapping,
             tool_type=ToolType.join.value,
+            job_id=self.job_id,
         )
 
         # Update user_id in target_layer_projet to meet the user_id of the user sending the request
@@ -134,7 +135,3 @@ class CRUDJoin(CRUDToolBase):
     @job_init()
     async def join_run(self, params: IJoin):
         return await self.join(params=params)
-
-    async def join_fail(self, params: IJoin):
-        await self.delete_orphan_data()
-

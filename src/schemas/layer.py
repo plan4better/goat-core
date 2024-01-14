@@ -232,6 +232,7 @@ class IFeatureLayerToolCreate(BaseModel):
     )
     attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
     tool_type: ToolType = Field(..., description="Tool type")
+    job_id: UUID = Field(..., description="Job ID")
 
 
 class IFeatureStandardCreateAdditionalAttributes(BaseModel):

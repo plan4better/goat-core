@@ -34,6 +34,7 @@ class CRUDIsochroneBase(CRUDToolBase):
             feature_layer_geometry_type=UserDataGeomType.point.value,
             attribute_mapping={},
             tool_type=params.tool_type.value,
+            job_id=self.job_id,
         )
 
         # Check if starting points are within the geofence
@@ -99,6 +100,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
             feature_layer_geometry_type=IsochroneGeometryTypeMapping[params.isochrone_type.value],
             attribute_mapping={"integer_attr1": "travel_cost"},
             tool_type=params.tool_type.value,
+            job_id=self.job_id,
         )
 
         #TODO: Call isochrone routing endpoint

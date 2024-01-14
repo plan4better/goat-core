@@ -4,7 +4,37 @@ from src.schemas.job import JobStatusType
 import inspect
 import asyncio
 from src.utils import sanitize_error_message
+from src.schemas.error import TimeoutError, JobKilledError
 
+async def run_failure_func(instance, func, *args, **kwargs):
+    # Get failure function
+    failure_func_name = f"{func.__name__}_fail"  # Construct the failure function name
+    failure_func = getattr(
+        instance, failure_func_name, None
+    )  # Get the failure function
+    # Run failure function if exists
+    if failure_func:
+        # Merge args and kwargs
+        args_dict = vars(args[0]) if args else {}
+        args_check = {**args_dict, **kwargs}
+        # Check for valid args
+        valid_args = inspect.signature(failure_func).parameters.keys()
+        func_args = {k: v for k, v in args_check.items() if k in valid_args}
+        try:
+            await failure_func(**func_args)
+        except Exception as e:
+            print(f"Failure function {failure_func_name} failed with error: {e}")
+    else:
+        # Get the delete orphan, delete temp tables function from class
+        delete_orphan_func = getattr(instance, "delete_orphan_data", None)
+        delete_temp_tables_func = getattr(instance, "delete_temp_tables", None)
+        delete_created_layers = getattr(instance, "delete_created_layers", None)
+        # Run delete orphan function
+        await delete_orphan_func()
+        # Run delete temp tables function
+        await delete_temp_tables_func()
+        # Delete all layers created by the job
+        await delete_created_layers()
 
 def job_init():
     def decorator(func, timeout: int = 1):
@@ -34,6 +64,7 @@ def job_init():
             try:
                 result = await func(*args, **kwargs)
             except Exception as e:
+                await run_failure_func(self, func, *args, **kwargs)
                 # Update job status simple to failed
                 job = await crud_job.update(
                     db=async_session,
@@ -59,27 +90,6 @@ def job_init():
 
     return decorator
 
-
-async def run_failure_func(instance, func, *args, **kwargs):
-    # Get failure function
-    failure_func_name = f"{func.__name__}_fail"  # Construct the failure function name
-    failure_func = getattr(
-        instance, failure_func_name, None
-    )  # Get the failure function
-    # Run failure function if exists
-    if failure_func:
-        # Merge args and kwargs
-        args_dict = vars(args[0]) if args else {}
-        args_check = {**args_dict, **kwargs}
-        # Check for valid args
-        valid_args = inspect.signature(failure_func).parameters.keys()
-        func_args = {k: v for k, v in args_check.items() if k in valid_args}
-        try:
-            await failure_func(**func_args)
-        except Exception as e:
-            print(f"Failure function {failure_func_name} failed with error: {e}")
-    else:
-        print(f"Failure function {failure_func_name} does not exist.")
 
 def job_log(job_step_name: str, timeout: int = 120):
     def decorator(func):
@@ -128,7 +138,7 @@ def job_log(job_step_name: str, timeout: int = 120):
                     msg_text=msg_text,
                     job_step_name=job_step_name,
                 )
-                return {"status": JobStatusType.timeout.value, "msg": msg_text}
+                raise TimeoutError(msg_text)
             except Exception as e:
                 # Run failure function if exists
                 await run_failure_func(self, func, *args, **kwargs)
@@ -140,10 +150,7 @@ def job_log(job_step_name: str, timeout: int = 120):
                     msg_text=str(e),
                     job_step_name=job_step_name,
                 )
-                return {
-                    "status": JobStatusType.failed.value,
-                    "msg": sanitize_error_message(str(e)),
-                }
+                raise e
 
             # Check if job was killed. The job needs to be expired as it was fetching old data from cache.
             async_session.expire(job)
@@ -179,10 +186,7 @@ def job_log(job_step_name: str, timeout: int = 120):
                 JobStatusType.failed.value,
             ]:
                 await run_failure_func(self, func, *args, **kwargs)
-                return {
-                    "status": job.status_simple,
-                    "msg": job.status[job_step_name]["msg"]["text"],
-                }
+                raise JobKilledError("Job was killed.")
 
             return result
 

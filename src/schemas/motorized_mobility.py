@@ -1,14 +1,14 @@
 from enum import Enum
 from typing import List
-from uuid import UUID
 
 from pydantic import BaseModel, Field, root_validator
 
+from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import (
     IsochroneStartingPointsBase,
     PTSupportedDay,
+    input_layer_type_polygon,
 )
-from src.schemas.layer import ToolType
 
 
 class IsochroneStartingPointsMotorizedMobility(IsochroneStartingPointsBase):
@@ -112,6 +112,7 @@ class PTTimeWindow(BaseModel):
         lt=86400,
         description="(PT) To time . Number of seconds since midnight",
     )
+
     @property
     def weekday_integer(self):
         mapping = {
@@ -240,9 +241,42 @@ class IOevGueteklasse(BaseModel):
         title="Station Config",
         description="The station config of the ÖV-Güteklasse.",
     )
+
     @property
     def tool_type(self):
         return ToolType.oev_gueteklasse
+
+    @property
+    def input_layer_types(self):
+        return {"reference_area_layer_project_id": input_layer_type_polygon}
+
+    @property
+    def geofence_table(self):
+        return "basic.geofence_pt"
+
+
+class ITripCountStation(BaseModel):
+    """Model for the trip count."""
+
+    reference_area_layer_project_id: int = Field(
+        ...,
+        title="The layer project serving reference Area for the calculation.",
+        description="The reference area for the trip count.",
+    )
+    time_window: PTTimeWindow = Field(
+        ...,
+        title="Time Window",
+        description="The time window for the trip count.",
+    )
+
+    @property
+    def tool_type(self):
+        return ToolType.trip_count_station
+
+    @property
+    def input_layer_types(self):
+        return {"reference_area_layer_project_id": input_layer_type_polygon}
+
     @property
     def geofence_table(self):
         return "basic.geofence_pt"
@@ -314,7 +348,7 @@ request_examples_isochrone_car = {
 
 
 public_transport_types = {
-    "Bus": {
+    "bus": {
         3: "Bus",
         11: "Trolleybus",
         700: "Bus Service",
@@ -326,9 +360,14 @@ public_transport_types = {
         715: "Demand and Response Bus Service",
         800: "Trolleybus Service",
     },
-    "Tram": {0: "Tram, Streetcar, Light rail", 900: "Tram Service"},
-    "Rail": {
+    "tram": {0: "Tram, Streetcar, Light rail", 900: "Tram Service"},
+    "metro": {
         1: "Subway, Metro",
+        400: "Metro Service",
+        401: "Underground Service",
+        402: "Urban Railway Service",
+    },
+    "rail": {
         2: "Rail",
         100: "Railway Service",
         101: "High Speed Rail Service",
@@ -339,12 +378,9 @@ public_transport_types = {
         107: "Tourist Railway Service",
         109: "Suburban Railway",
         202: "National Coach Service",
-        400: "Metro Service",
-        401: "Underground Metro Service",
-        402: "Urban Railway Service",
         403: "All Urban Railway Services",
     },
-    "Other": {
+    "other": {
         4: "Ferry",
         6: "Aerial lift",
         7: "Funicular",

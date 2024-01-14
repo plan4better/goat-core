@@ -308,11 +308,24 @@ class CRUDToolBase:
             "layer_project": layer_project,
         }
 
+    async def check_is_number(self, data_type: str):
+        """Check if the data type is a number."""
+        if data_type not in [
+            OgrPostgresType.Integer,
+            OgrPostgresType.Real,
+            OgrPostgresType.Integer64,
+        ]:
+            raise ColumnTypeError(
+                f"Field has to be {OgrPostgresType.Integer}, {OgrPostgresType.Real}, {OgrPostgresType.Integer64}."
+            )
+
     async def check_column_statistics(
         self,
         layer_project: BaseModel,
         column_statistics_field: str,
     ):
+        """Check if the column statistics field is valid and return the mapped statistics field and the mapped statistics field type."""
+
         # Check if field is $intersected_area and geometry type is polygon
         if column_statistics_field == "$intersected_area":
             if layer_project.feature_layer_geometry_type != FeatureGeometryType.polygon:
@@ -329,18 +342,38 @@ class CRUDToolBase:
         )
         # Check if mapped statistics field is float, integer or biginteger
         mapped_statistics_field_type = mapped_statistics_field.split("_")[0]
-        if mapped_statistics_field_type not in [
-            OgrPostgresType.Integer,
-            OgrPostgresType.Real,
-            OgrPostgresType.Integer64,
-        ]:
-            raise ColumnTypeError(
-                f"Mapped statistics field is not {OgrPostgresType.Integer}, {OgrPostgresType.Real}, {OgrPostgresType.Integer64}. The operation cannot be performed on the {mapped_statistics_field_type} type."
-            )
+        await self.check_is_number(mapped_statistics_field_type)
+
         return {
             "mapped_statistics_field": mapped_statistics_field,
             "mapped_statistics_field_type": mapped_statistics_field_type,
         }
+
+    async def check_column_same_type(self, layers_project: BaseModel, columns: list[str]):
+        """Check if all columns are having the same type"""
+
+        # Check if len layers_project and columns are the same
+        if len(layers_project) != len(columns):
+            raise ValueError(
+                "The number of columns and layers are not the same."
+            )
+
+        # Populate mapped_field_type array
+        mapped_field_type = []
+        for i in range(len(layers_project)):
+            layer_project = layers_project[i]
+            column = columns[i]
+
+            # Get mapped field
+            mapped_field = search_value(layer_project.attribute_mapping, column)
+            mapped_field_type.append(mapped_field.split("_")[0])
+
+        # Check if all mapped_field_type are the same
+        if len(set(mapped_field_type)) != 1:
+            raise ColumnTypeError(
+                "The columns are not having the same type."
+            )
+
 
     async def delete_orphan_data(self):
         # Delete orphan data from user tables
@@ -380,15 +413,21 @@ class CRUDToolBase:
             WHERE x.layer_id = d.layer_id;
             """
             await self.async_session.execute(text(sql_delete_orphan_data))
+            await self.async_session.commit()
         return
+
+    async def create_temp_table_name(self, prefix: str):
+        # Create temp table name
+        table_suffix = str(self.job_id).replace("-", "")
+        temp_table = f"temporal.{prefix}_{get_random_string(6)}_{table_suffix}"
+        return temp_table
 
     async def create_distributed_polygon_table(
         self,
         layer_project: BaseModel,
     ):
         # Create table name
-        table_suffix = str(self.job_id).replace("-", "")
-        temp_polygons = f"temporal.polygons_{get_random_string(6)}_{table_suffix}"
+        temp_polygons = await self.create_temp_table_name("polygons")
 
         # Create distributed polygon table using sql
         where_query_polygon = "WHERE " + layer_project.where_query.replace("'", "''")
@@ -412,8 +451,7 @@ class CRUDToolBase:
         layer_project: BaseModel,
     ):
         # Create temp table name for lines
-        table_suffix = str(self.job_id).replace("-", "")
-        temp_lines = f"temporal.lines_{get_random_string(6)}_{table_suffix}"
+        temp_lines = await self.create_temp_table_name("lines")
 
         # Create distributed line table using sql
         where_query_line = "WHERE " + layer_project.where_query.replace("'", "''")
@@ -436,8 +474,7 @@ class CRUDToolBase:
         layer_project: BaseModel,
     ):
         # Create temp table name for points
-        table_suffix = str(self.job_id).replace("-", "")
-        temp_points = f"temporal.points_{get_random_string(6)}_{table_suffix}"
+        temp_points = await self.create_temp_table_name("points")
 
         # Create distributed point table using sql
         where_query_point = "WHERE " + layer_project.where_query.replace("'", "''")
@@ -455,6 +492,21 @@ class CRUDToolBase:
         await self.async_session.commit()
         return temp_points
 
+    async def create_temp_table_layer(self, layer_project: BaseModel):
+        """Create a temp table for the layer_project."""
+
+        temp_geometry_layer = await self.create_temp_table_name("layer")
+        where_query = "WHERE " + layer_project.where_query
+        sql_temp_geometry_layer = f"""
+            CREATE TABLE {temp_geometry_layer} AS
+            SELECT *
+            FROM {layer_project.table_name}
+            {where_query}
+        """
+        await self.async_session.execute(sql_temp_geometry_layer)
+        await self.async_session.commit()
+        return temp_geometry_layer
+
     async def delete_temp_tables(self):
         # Get all tables that end with the job id
         sql = f"""
@@ -470,3 +522,13 @@ class CRUDToolBase:
             await self.async_session.execute(
                 f"DROP TABLE IF EXISTS temporal.{table[0]}"
             )
+        await self.async_session.commit()
+
+    async def delete_created_layers(self):
+        # Delete all layers with the self.job_id
+        sql = f"""
+            DELETE FROM {settings.CUSTOMER_SCHEMA}.layer
+            WHERE job_id = '{str(self.job_id)}'
+        """
+        await self.async_session.execute(text(sql))
+        await self.async_session.commit()
