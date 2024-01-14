@@ -61,7 +61,7 @@ class MaxFeatureCnt(int, Enum):
     aggregate_polygon = 100000
     buffer = 10000
     trip_count_station = 10000
-    origin_destination = 1000000
+    origin_destination = 10000
 
 class ToolsWithReferenceAreaCheck(str, Enum):
     """Tools with reference area check schema."""
