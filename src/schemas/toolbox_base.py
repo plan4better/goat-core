@@ -1,6 +1,6 @@
 # Standard Libraries
 from enum import Enum
-from typing import List, Union
+from typing import List
 from uuid import UUID
 
 from fastapi import BackgroundTasks, Depends, Query
@@ -9,9 +9,10 @@ from fastapi import BackgroundTasks, Depends, Query
 from pydantic import BaseModel, Field, root_validator, validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.db.models.layer import LayerType
+
 # Local Packages
 from src.endpoints.deps import get_db, get_user_id
-from src.db.models.layer import LayerType
 from src.schemas.layer import FeatureGeometryType
 
 
@@ -77,12 +78,6 @@ class GeofenceTable(str, Enum):
     isochrone_car = "basic.geofence_car"
     oev_gueteklasse = "basic.geofence_pt"
 
-class IsochroneType(str, Enum):
-    """Isochrone type schema."""
-
-    polygon = "polygon"
-    network = "network"
-    rectangular_grid = "rectangular_grid"
 
 class IsochroneGeometryTypeMapping(str, Enum):
     """Isochrone geometry type mapping schema."""
@@ -90,6 +85,7 @@ class IsochroneGeometryTypeMapping(str, Enum):
     polygon = FeatureGeometryType.polygon.value
     network = FeatureGeometryType.line.value
     rectangular_grid = FeatureGeometryType.polygon.value
+
 
 class IToolResponse(BaseModel):
     """Tool response schema."""
@@ -175,8 +171,10 @@ class CommonToolParams:
         self.user_id = user_id
         self.project_id = project_id
 
+
 class InputLayerType(BaseModel):
     """Input layer type schema."""
+
     layer_types: List[LayerType] | None = Field(
         [LayerType.feature.value, LayerType.table.value],
         title="Layer Types",
@@ -188,7 +186,7 @@ class InputLayerType(BaseModel):
         description="The feature layer geometry types that are supported for the respective input layer of the tool.",
     )
 
-    @validator('layer_types', each_item=True)
+    @validator("layer_types", each_item=True)
     def validate_layer_types(cls, layer_type):
         if layer_type not in LayerType.__members__:
             raise ValueError(f"{layer_type} is not a valid LayerType")

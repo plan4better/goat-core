@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     PROJECT_NAME: Optional[str] = "GOAT Core API"
     USER_DATA_SCHEMA: Optional[str] = "user_data"
     CUSTOMER_SCHEMA: Optional[str] = "customer"
+    REGION_MAPPING_PT_TABLE: Optional[str] = "basic.region_mapping_pt"
+    ASYNC_CLIENT_DEFAULT_TIMEOUT: Optional[float] = 5.0
+    ASYNC_CLIENT_READ_TIMEOUT: Optional[float] = 10.0
 
     SENTRY_DSN: Optional[HttpUrl] = None
     POSTGRES_SERVER: str
@@ -65,6 +68,8 @@ class Settings(BaseSettings):
         )
 
     # R5 config
+    R5_WORKER_VERSION: str = "v7.0"
+    R5_VARIANT_INDEX: int = -1
     R5_HOST: str = None
     R5_MONGO_DB_URL: Optional[str] = None
 
@@ -85,7 +90,7 @@ class Settings(BaseSettings):
     @validator("R5_AUTHORIZATION", pre=True)
     def r5_authorization(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
         if v:
-            return f"Basic {v}="
+            return f"Basic {v}"
         return None
 
     # GOAT Routing config

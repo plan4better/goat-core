@@ -1,8 +1,10 @@
 from enum import Enum
 from uuid import UUID
-from pydantic import BaseModel, Field, validator, root_validator
-from src.schemas.toolbox_base import IsochroneStartingPointsBase, IsochroneType
+
+from pydantic import BaseModel, Field, root_validator, validator
+
 from src.schemas.layer import ToolType
+from src.schemas.toolbox_base import IsochroneStartingPointsBase
 
 
 class IsochroneStartingPointsActiveMobility(IsochroneStartingPointsBase):
@@ -77,6 +79,14 @@ class TravelDistanceCostActiveMobility(BaseModel):
         if v % 50 != 0:
             raise ValueError("The distance step must be divisible by 50 m.")
         return v
+
+
+class IsochroneType(str, Enum):
+    """Isochrone type schema."""
+
+    polygon = "polygon"
+    network = "network"
+    rectangular_grid = "rectangular_grid"
 
 
 class IIsochroneActiveMobility(BaseModel):

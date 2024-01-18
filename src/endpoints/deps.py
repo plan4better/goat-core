@@ -1,7 +1,7 @@
 from typing import Generator, Optional
 
 from fastapi import HTTPException, Request
-from httpx import AsyncClient
+from httpx import AsyncClient, Timeout
 from jose import jwt
 
 from src.core.config import settings
@@ -48,7 +48,12 @@ def get_http_client():
 
     global http_client
     if http_client is None:
-        http_client = AsyncClient()
+        http_client = AsyncClient(
+            timeout=Timeout(
+                settings.ASYNC_CLIENT_DEFAULT_TIMEOUT,
+                read=settings.ASYNC_CLIENT_READ_TIMEOUT,
+            )
+        )
     return http_client
 
 

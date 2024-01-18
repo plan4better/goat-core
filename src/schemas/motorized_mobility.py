@@ -1,14 +1,13 @@
 from enum import Enum
-from typing import List
-from uuid import UUID
+from typing import List, Optional
 
 from pydantic import BaseModel, Field, root_validator
 
+from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import (
     IsochroneStartingPointsBase,
     PTSupportedDay,
 )
-from src.schemas.layer import ToolType
 
 
 class IsochroneStartingPointsMotorizedMobility(IsochroneStartingPointsBase):
@@ -112,6 +111,7 @@ class PTTimeWindow(BaseModel):
         lt=86400,
         description="(PT) To time . Number of seconds since midnight",
     )
+
     @property
     def weekday_integer(self):
         mapping = {
@@ -120,6 +120,39 @@ class PTTimeWindow(BaseModel):
             "sunday": 3,
         }
         return mapping[PTSupportedDay(self.weekday).value]
+
+    @property
+    def weekday_date(self):
+        mapping = {
+            "weekday": "2023-06-12",
+            "saturday": "2023-06-17",
+            "sunday": "2023-06-18",
+        }
+        return mapping[PTSupportedDay(self.weekday).value]
+
+
+class IsochroneType(str, Enum):
+    """Isochrone type schema for public transport."""
+
+    polygon = "polygon"
+    rectangular_grid = "rectangular_grid"
+
+
+class IsochroneDecayFunctionType(Enum):
+    LOGISTIC = "logistic"
+    LINEAR = "linear"
+    EXPONENTIAL = "exponential"
+    STEP = "step"
+
+
+class IsochroneDecayFunction(BaseModel):
+    type: Optional[IsochroneDecayFunctionType] = Field(
+        IsochroneDecayFunctionType.LOGISTIC, description="Decay function type"
+    )
+    standard_deviation_minutes: Optional[int] = Field(
+        12, description="Standard deviation in minutes"
+    )
+    width_minutes: Optional[int] = Field(10, description="Width in minutes")
 
 
 class IIsochronePT(BaseModel):
@@ -145,6 +178,28 @@ class IIsochronePT(BaseModel):
         title="Time Window",
         description="The time window of the isochrone.",
     )
+    isochrone_type: IsochroneType = Field(
+        ...,
+        title="Return Type",
+        description="The return type of the isochrone.",
+    )
+
+    decay_function: IsochroneDecayFunction = Field(
+        IsochroneDecayFunction(),
+        title="Decay Function",
+        description="The decay function of the isochrone.",
+    )
+
+    # Defaults - not currently user configurable
+    walk_speed: float = 1.39
+    max_walk_time: int = 20
+    bike_speed: float = 4.166666666666667
+    max_bike_time: int = 20
+    bike_traffic_stress: int = 4
+    max_rides: int = 4
+    zoom: int = 9
+    percentiles: List[int] = [5]
+    monte_carlo_draws: int = 200
 
     @property
     def tool_type(self):
@@ -240,9 +295,11 @@ class IOevGueteklasse(BaseModel):
         title="Station Config",
         description="The station config of the ÖV-Güteklasse.",
     )
+
     @property
     def tool_type(self):
         return ToolType.oev_gueteklasse
+
     @property
     def geofence_table(self):
         return "basic.geofence_pt"

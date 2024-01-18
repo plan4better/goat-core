@@ -44,3 +44,46 @@ async def test_oev_gueteklasse(
 
     job = await check_job_status(client, response.json()["job_id"])
     assert job["status_simple"] == "finished"
+
+
+@pytest.mark.asyncio
+async def test_single_isochrone_public_transport(
+    client: AsyncClient, fixture_create_project
+):
+    project_id = fixture_create_project["id"]
+    params = {
+        "starting_points": {"latitude": [53.55390], "longitude": [10.01770]},
+        "routing_type": {
+            "mode": [
+                "bus",
+                "tram",
+                "rail",
+                "subway",
+                "ferry",
+                "cable_car",
+                "gondola",
+                "funicular",
+            ],
+            "egress_mode": "walk",
+            "access_mode": "walk",
+        },
+        "travel_cost": {
+            "max_traveltime": 60,
+            "traveltime_step": 5,
+        },
+        "time_window": {
+            "weekday": "weekday",
+            "from_time": 25200,  # 7 AM
+            "to_time": 39600,  # 9 AM
+        },
+        "isochrone_type": "polygon",
+    }
+    response = await client.post(
+        f"{settings.API_V2_STR}/motorized-mobility/pt/isochrone?project_id={project_id}",
+        json=params,
+    )
+    assert response.status_code == 201
+    # Check if job is finished
+    job = await check_job_status(client, response.json()["job_id"])
+    # Check if job is finished
+    assert job["status_simple"] == "finished"

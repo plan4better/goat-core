@@ -79,6 +79,18 @@ class RoutingEndpointError(Exception):
     pass
 
 
+class R5EndpointError(Exception):
+    """Raised when the R5 endpoint fails to compute an isochrone."""
+
+    pass
+
+
+class R5IsochroneComputeError(Exception):
+    """Raised when the isochrone data returned by R5 is invalid."""
+
+    pass
+
+
 # Define the mapping between custom errors and HTTP status codes
 ERROR_MAPPING = {
     LayerSizeError: status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -93,6 +105,8 @@ ERROR_MAPPING = {
     LayerNotFoundError: status.HTTP_404_NOT_FOUND,
     SQLError: status.HTTP_500_INTERNAL_SERVER_ERROR,
     RoutingEndpointError: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    R5EndpointError: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    R5IsochroneComputeError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 
 
