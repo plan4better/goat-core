@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class FolderBase(BaseModel):
-    name: str = Field(..., description="Folder name")
+    name: str = Field(..., description="Folder name", max_length=255)
 
 
 class FolderCreate(FolderBase):

@@ -289,7 +289,7 @@ async def create_internal_layer(
 ):
     # Get feature layer dict and add layer ID
     feature_layer_dict = layer_request_examples["create_internal"][layer_type]["value"]
-    feature_layer_dict["name"] = generate_random_string(10)
+    feature_layer_dict["name"] = generate_random_string(12)
     feature_layer_dict["dataset_id"] = dataset_id
     feature_layer_dict["folder_id"] = fixture_get_home_folder["id"]
     # Hit endpoint to create internal layer
@@ -305,11 +305,11 @@ async def create_internal_layer(
     job = await check_job_status(client, job_id)
     assert job["status_simple"] == "finished"
 
-    # Get layer
-    response = await client.get(f"{settings.API_V2_STR}/layer/{job['layer_ids'][0]}")
+    # Get layer by name
+    response = await client.get(f"{settings.API_V2_STR}/layer?search={feature_layer_dict['name']}")
     assert response.status_code == 200
-
-    return {**response.json(), "job_id": job_id}
+    layer_dict = response.json()["items"][0]
+    return {**layer_dict, "job_id": job_id}
 
 
 internal_layers = ["feature_layer_standard", "table"]
@@ -353,6 +353,19 @@ async def fixture_create_polygon_layer(
     return await upload_and_create_layer(
         client, dir_gpkg, fixture_get_home_folder, "feature_layer_standard"
     )
+
+layers = ["flikster_de.geojson"]
+@pytest.fixture(params=layers)
+async def fixture_batch_create_internal_layers(
+    request, client: AsyncClient, fixture_create_user, fixture_get_home_folder
+):
+    dir = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "batch", request.param
+    )
+    return await upload_and_create_layer(
+        client, dir, fixture_get_home_folder, "feature_layer_standard"
+    )
+
 
 
 @pytest.fixture

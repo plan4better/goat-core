@@ -4,7 +4,9 @@ from uuid import UUID
 
 from geoalchemy2 import Geometry, WKBElement
 from geoalchemy2.shape import to_shape
+import pycountry
 from pydantic import BaseModel, validator
+from pydantic import HttpUrl, EmailStr
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
@@ -56,16 +58,48 @@ class FeatureType(str, Enum):
     street_network = "street_network"
 
 
-class FeatureExportType(str, Enum):
-    """Feature layer data types."""
+class TableUploadType(str, Enum):
+    """Table data types."""
+
+    csv = "csv"
+    xlsx = "xlsx"
+
+
+# It was decided against using MIME types here because for e.g. gpkg they are commonly just generic application/octet-stream
+class FeatureUploadType(str, Enum):
+    """File upload types."""
 
     geojson = "geojson"
-    shapefile = "shapefile"
-    geopackage = "geopackage"
-    geobuf = "geobuf"
+    gpkg = "gpkg"
+    kml = "kml"
+    zip = "zip"  # Commonly used for shapefiles
+
+
+class FileUploadType(str, Enum):
+    """All allowed file upload types"""
+
+    csv = "csv"
+    xlsx = "xlsx"
+    geojson = "geojson"
+    gpkg = "gpkg"
+    kml = "kml"
+    zip = "zip"  # Commonly used for shapefiles
+
+class FeatureLayerExportType(str, Enum):
+    """Feature Layer export types."""
+
+    geojson = "geojson"
+    shp = "shp"
+    gpkg = "gpkg"
     csv = "csv"
     xlsx = "xlsx"
     kml = "kml"
+
+class TableLayerExportType(str, Enum):
+    """Table Layer export types."""
+
+    csv = "csv"
+    xlsx = "xlsx"
 
 
 class FeatureServeType(str, Enum):
@@ -105,6 +139,34 @@ class FeatureGeometryType(str, Enum):
     polygon = "polygon"
 
 
+class DataLicense(str, Enum):
+    CC_BY = "Creative Commons Attribution"
+    CC_BY_SA = "Creative Commons Attribution-ShareAlike"
+    CC_BY_ND = "Creative Commons Attribution-NoDerivs"
+    CC_BY_NC = "Creative Commons Attribution-NonCommercial"
+    CC_BY_NC_SA = "Creative Commons Attribution-NonCommercial-ShareAlike"
+    CC_BY_NC_ND = "Creative Commons Attribution-NonCommercial-NoDerivs"
+    ODC_BY = "Open Data Commons Attribution"
+    ODC_ODbL = "Open Data Commons Open Database License"
+    GPL = "GNU General Public License"
+    LGPL = "GNU Lesser General Public License"
+    APACHE = "Apache License"
+    MIT = "MIT License"
+    PROPRIETARY_PLAN4BETTER = "Proprietary - Plan4Better"
+    OTHER = "Other"
+
+
+class DataCategory(str, Enum):
+    basemap = "Basemap"
+    imagery = "Imagery"
+    boundary = "Boundary"
+    people = "People"
+    transportation = "Transportation"
+    environment = "Environment"
+    landuse = "Landuse"
+    places = "Places"
+
+
 class GeospatialAttributes(SQLModel):
     """Some general geospatial attributes."""
 
@@ -127,19 +189,129 @@ class GeospatialAttributes(SQLModel):
 class LayerBase(ContentBaseAttributes):
     """Base model for layers."""
 
-    data_source: str | None = Field(
+    # Data Quality Information
+    lineage: str | None = Field(
         sa_column=Column(Text, nullable=True),
+        max_length=500,
+        description="Descriptive information about the source of the data and its derivation",
+    )
+    positional_accuracy: str | None = Field(
+        sa_column=Column(Text, nullable=True),
+        max_length=500,
+        description="Quantitative value indicating positional accuracy",
+    )
+    attribute_accuracy: str | None = Field(
+        sa_column=Column(Text, nullable=True),
+        max_length=500,
+        description="Quantitative value indicating the accuracy of attribute data",
+    )
+    completeness: str | None = Field(
+        sa_column=Column(Text, nullable=True),
+        max_length=500,
+        description="Quantitative value indicating the completeness of the data",
+    )
+    upload_reference_system: int | None = Field(
+        sa_column=Column(Integer, nullable=True),
+        description="Description of the spatial reference systems",
+    )
+    upload_file_type: FileUploadType | None = Field(
+        sa_column=Column(Text, nullable=True),
+        description="Description of the upload file type",
+    )
+
+    # Distribution and Geographical Information
+    geographical_code: str | None = Field(
+        sa_column=Column(Text, nullable=True),
+        max_length=13,  # ISO 3166-1 alpha-2 country codes are 2 letters
+        description="Tag indicating the primary geographical area it is following the ISO 3166-1 alpha-2 standard for country codes and for continents the following values are used: Africa, Antarctica, Asia, Europe, North America, Oceania, South America, World",
+    )
+    language_code: str | None = Field(
+        sa_column=Column(Text, nullable=True),
+        max_length=2,  # ISO 639-1 language codes are 2 letters
+        description="Language of the data",
+    )
+    distributor_name: str | None = Field(
+        sa_column=Column(Text, nullable=True),
+        max_length=500,
+        description="Name of the entity distributing the data",
+    )
+    distributor_email: EmailStr | None = Field(
+        sa_column=Column(Text, nullable=True),
+        description="Contact information for the distributor",
+    )
+    distribution_url: HttpUrl | None = Field(
+        sa_column=Column(Text, nullable=True),
+        description="URL to the data distribution",
+    )
+    license: DataLicense | None = Field(
+        sa_column=Column(Text, nullable=True),
+        description="License of the data",
+    )
+    attribution: str | None = Field(
+        sa_column=Column(Text, nullable=True),
+        max_length=500,
         description="Data source of the layer",
     )
     data_reference_year: int | None = Field(
         sa_column=Column(Integer, nullable=True),
         description="Data reference year of the layer",
     )
+    data_category: DataCategory | None = Field(
+        sa_column=Column(Text, nullable=True),
+        description="Data category of the layer",
+    )
+
+    # Check if language and geographical_tag valid according to pycountry
+    @validator("language_code", pre=True, check_fields=False)
+    def language_code_valid(cls, v):
+        if v:
+            try:
+                pycountry.languages.get(alpha_2=v)
+            except KeyError:
+                raise ValueError(f"The passed language {v} is not valid.")
+        return v
+
+    @validator("geographical_code", pre=True, check_fields=False)
+    def geographical_code_valid(cls, v):
+        continents = [
+            "Africa",
+            "Antarctica",
+            "Asia",
+            "Europe",
+            "North America",
+            "Oceania",
+            "South America",
+            "World",
+        ]
+
+        if v:
+            # Try if country code if not try if any of the continent codes
+            try:
+                pycountry.countries.get(alpha_2=v)
+            except KeyError:
+                try:
+                    continents["v"]
+                except KeyError:
+                    raise ValueError(f"The passed country {v} is not valid.")
+        return v
 
 
 layer_base_example = {
-    "data_source": "data_source plan4better example",
-    "data_reference_year": 2020,
+    "lineage": "Derived from web research and ground surveys conducted in 2021 by trained professionals.",
+    "positional_accuracy": "High accuracy with an error margin of ±2 meters.",
+    "attribute_accuracy": "Attribute data verified with 90% confidence level.",
+    "completeness": "Data is 98% complete, missing data in remote areas.",
+    "upload_reference_system": 4326,
+    "upload_file_type": "geojson",
+    "geographical_code": "de",  # ISO Alpha-2 code for Germany
+    "language_code": "de",  # ISO Alpha-2 code for German
+    "distributor_name": "Plan4Better GmbH",
+    "distributor_email": "info@plan4better.de",
+    "distribution_url": "https://plan4better.de/data/samples/sample_data.geojson",
+    "license": "Creative Commons Attribution-ShareAlike",  # Assuming this is a value from the DataLicense Enum
+    "attribution": "Dataset provided by Plan4Better GmbH.",
+    "data_reference_year": 2021,
+    "data_category": "Transportation",  # Assuming this is a value from the DataCategory Enum
 }
 
 
@@ -161,7 +333,6 @@ def internal_layer_table_name(values: SQLModel | BaseModel):
     return f"{settings.USER_DATA_SCHEMA}.{feature_layer_geometry_type}_{str(values.user_id).replace('-', '')}"
 
 
-# TODO: Relation to check if opportunities_uuids exist in layers
 class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     """Layer model."""
 
@@ -207,6 +378,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         ),
         description="Geographical Extent of the layer",
     )
+
     properties: dict | None = Field(
         sa_column=Column(JSONB, nullable=True),
         description="Properties of the layer",
@@ -215,7 +387,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         sa_column=Column(JSONB, nullable=True),
         description="Other properties of the layer",
     )
-    url: str | None = Field(
+    url: HttpUrl | None = Field(
         sa_column=Column(Text, nullable=True),
         description="Layer URL for tile and imagery layers",
     )

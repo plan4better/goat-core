@@ -15,6 +15,8 @@ from openpyxl import load_workbook
 from osgeo import ogr, osr
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
+from pyproj import CRS
+from shapely import wkb
 
 # Local application imports
 from src.core.config import settings
@@ -25,13 +27,30 @@ from src.schemas.layer import (
     OgrPostgresType,
     OgrDriverType,
     SupportedOgrGeomType,
+)
+from src.db.models.layer import (
     FileUploadType,
+    TableLayerExportType,
+    FeatureLayerExportType,
+    Layer,
+    LayerType,
 )
 from src.utils import (
     async_delete_dir,
     async_scandir,
     async_run_command,
+    sanitize_error_message,
 )
+from src.schemas.error import DataOutCRSBoundsError, Ogr2OgrError
+
+
+async def delete_old_files(max_time: int):
+    """Delete old files from data directory."""
+    # Clean all old folders that are older then two hours
+    async for folder in async_scandir(settings.DATA_DIR):
+        stat_result = await aos.stat(os.path.join(settings.DATA_DIR, folder.name))
+        if stat_result.st_mtime < (time.time() - 2 * 3600):
+            await async_delete_dir(os.path.join(settings.DATA_DIR, folder.name))
 
 
 class FileUpload:
@@ -56,10 +75,7 @@ class FileUpload:
         """Save file to disk for later operations."""
 
         # Clean all old folders that are older then two hours
-        async for folder in async_scandir(settings.DATA_DIR):
-            stat_result = await aos.stat(os.path.join(settings.DATA_DIR, folder.name))
-            if stat_result.st_mtime < (time.time() - 2 * 3600):
-                await async_delete_dir(os.path.join(settings.DATA_DIR, folder.name))
+        await delete_old_files(max_time=3600)
 
         # Create folder if exist delete it
         await async_delete_dir(self.folder_path)
@@ -97,7 +113,10 @@ class OGRFileHandling:
             FileUploadType.geojson.value: self.validate_geojson,
             FileUploadType.kml.value: self.validate_kml,
         }
-        self.driver_name = OgrDriverType[self.file_ending].value
+        if self.file_ending == FileUploadType.csv.value:
+            self.driver_name = OgrDriverType[FileUploadType.xlsx.value].value
+        else:
+            self.driver_name = OgrDriverType[self.file_ending].value
 
     def validate_ogr(self, file_path: str):
         """Validate using ogr and get valid attributes."""
@@ -439,6 +458,65 @@ class OGRFileHandling:
         )
         await self.async_session.commit()
 
+    async def export_ogr2ogr(
+        self,
+        layer: Layer,
+        file_type: TableLayerExportType | FeatureLayerExportType,
+        file_name: str,
+        sql_query: str,
+        crs: str,
+    ):
+        """Export file from database."""
+
+        # Initialize OGR
+        ogr.RegisterAll()
+
+        # Prepare the ogr2ogr command
+        if self.file_ending == FileUploadType.gpkg.value:
+            layer_name = file_name
+        else:
+            layer_name = ""
+
+        # Create folder if not exists
+        await async_delete_dir(os.path.join(settings.DATA_DIR, str(self.user_id), str(layer.id)))
+        if not os.path.exists(os.path.join(settings.DATA_DIR, str(self.user_id))):
+            await aos.mkdir(os.path.join(settings.DATA_DIR, str(self.user_id)))
+        await aos.mkdir(os.path.join(settings.DATA_DIR, str(self.user_id), str(layer.id)))
+        await aos.mkdir(self.folder_path)
+
+        if layer.type == LayerType.feature.value:
+            # Define target CRS
+            target_crs = CRS(crs)
+
+            # Get the layer's extent
+            minx, miny, maxx, maxy = wkb.loads(layer.extent.desc, hex=True).bounds
+
+            # Check if the layer's extent falls within the bounds of the target CRS
+            if not (
+                target_crs.area_of_use.west <= minx <= maxx <= target_crs.area_of_use.east
+                and target_crs.area_of_use.south
+                <= miny
+                <= maxy
+                <= target_crs.area_of_use.north
+            ):
+                raise DataOutCRSBoundsError(
+                    "The data is outside the bounds of the provided CRS."
+                )
+            to_crs_flag = f"""-t_srs "{crs}" """
+        else:
+            to_crs_flag = ""
+
+        # Build CMD command
+        cmd = f"""ogr2ogr -f "{OgrDriverType[file_type.value].value}" "{self.file_path}" PG:"host={settings.POSTGRES_SERVER} dbname={settings.POSTGRES_DB} user={settings.POSTGRES_USER} password={settings.POSTGRES_PASSWORD} port={settings.POSTGRES_PORT}" -sql "{sql_query}" {to_crs_flag} -progress"""
+        try:
+            # Run as async task
+            task = asyncio.create_task(async_run_command(cmd))
+            await task
+        except Exception as e:
+            raise Ogr2OgrError(sanitize_error_message(e))
+
+        return self.file_path
+
     # @timeout(120)
     @job_log(job_step_name="migration")
     async def migrate_target_table(
@@ -470,7 +548,7 @@ class OGRFileHandling:
         # Build select and insert statement
         for i in attribute_mapping:
             data_type = attribute_mapping[i].split("_")[0]
-            select_statement += f"{i}::{data_type} as {attribute_mapping[i]}, "
+            select_statement += f""""{i}"::{data_type} as {attribute_mapping[i]}, """
             insert_statement += f"{attribute_mapping[i]}, "
         select_statement = f"""SELECT {select_statement} {select_geom} '{str(layer_id)}' FROM {temp_table_name}"""
 
@@ -493,10 +571,27 @@ class OGRFileHandling:
             "status": JobStatusType.finished.value,
         }
 
-    async def migrate_target_table_fail(self, target_table: str, layer_id: UUID):
+    async def migrate_target_table_fail(
+        self,
+        validation_result: dict,
+        attribute_mapping: dict,
+        temp_table_name: str,
+        layer_id: UUID,
+    ):
         """Delete folder if ogr2ogr upload fails."""
+
         # Delete data from user table if already inserted
-        await self.upload_ogr2ogr_fail(self.folder_path)
+        data_types = validation_result["data_types"]
+        geom_column = data_types["geometry"].get("column_name")
+
+        # Check if table has a geometry if not it is just a normal table
+        if geom_column is None:
+            target_table = f"{settings.USER_DATA_SCHEMA}.no_geometry_{str(self.user_id).replace('-', '')}"
+        else:
+            geometry_type = data_types["geometry"]["type"]
+            target_table = f"{settings.USER_DATA_SCHEMA}.{SupportedOgrGeomType[geometry_type].value}_{str(self.user_id).replace('-', '')}"
+
+        await self.upload_ogr2ogr_fail(temp_table_name)
         await self.async_session.execute(
             text(f"DELETE FROM {target_table} WHERE layer_id = '{str(layer_id)}'")
         )

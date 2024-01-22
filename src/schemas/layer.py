@@ -6,6 +6,9 @@ from uuid import UUID, uuid4
 # Third party imports
 from pydantic import BaseModel, Field, ValidationError, validator
 from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
+from pydantic import HttpUrl
+from pyproj import CRS
+from pyproj.exceptions import CRSError
 
 # Local application imports
 from src.db.models._base_class import DateTimeBase, content_base_example
@@ -22,6 +25,7 @@ from src.db.models.layer import (
     layer_base_example,
 )
 from src.schemas.job import Msg
+from src.db.models.layer import TableLayerExportType, FeatureLayerExportType
 
 
 class MaxFileSizeType(int, Enum):
@@ -33,29 +37,6 @@ class MaxFileSizeType(int, Enum):
     gpkg = 300000000
     kml = 300000000
     zip = 300000000
-
-
-class TableUploadType(str, Enum):
-    """Table data types."""
-
-    csv = "csv"
-    xlsx = "xlsx"
-
-
-# It was decided against using MIME types here because for e.g. gpkg they are commonly just generic application/octet-stream
-class FeatureUploadType(str, Enum):
-    """File upload types."""
-
-    geojson = "geojson"
-    gpkg = "gpkg"
-    kml = "kml"
-    zip = "zip"  # Commonly used for shapefiles
-
-
-FileUploadType = Enum(
-    "FileUploadType",
-    {**TableUploadType.__members__, **FeatureUploadType.__members__},
-)
 
 
 class SupportedOgrGeomType(Enum):
@@ -88,7 +69,7 @@ class OgrDriverType(str, Enum):
     """OGR driver types."""
 
     geojson = "GeoJSON"
-    csv = "XLSX"  # Using XLSX driver for CSV files as the file is converted to XLSX to keep data types
+    csv = "CSV"  # Using XLSX driver for CSV files as the file is converted to XLSX to keep data types
     xlsx = "XLSX"
     gpkg = "GPKG"
     kml = "KML"
@@ -114,9 +95,9 @@ class NumberColumnsPerType(int, Enum):
 class IFileUploadMetadata(BaseModel):
     data_types: dict = Field(..., description="Data types of the columns")
     layer_type: LayerType = Field(..., description="Layer type")
-    file_ending: str = Field(..., description="File ending")
+    file_ending: str = Field(..., description="File ending", max_length=500)
     file_size: int = Field(..., description="File size")
-    file_path: str = Field(..., description="File path")
+    file_path: str = Field(..., description="File path", max_length=500)
     dataset_id: UUID = Field(..., description="Dataset ID")
     msg: Msg = Field(..., description="Response Message")
 
@@ -171,7 +152,7 @@ class LayerReadBaseAttributes(BaseModel):
 class LayerProperties(BaseModel):
     """Base model for layer properties."""
 
-    type: str = Field(..., description="Mapbox style type")
+    type: str = Field(..., description="Mapbox style type", max_length=500)
     paint: dict = Field(..., description="Paint of the mapbox style of the layer")
 
 
@@ -226,7 +207,7 @@ class IFeatureLayerToolCreate(BaseModel):
     id: UUID = Field(
         default_factory=uuid4, description="Content ID of the layer", alias="id"
     )
-    name: str = Field(..., description="Layer name", max_length=255)
+    name: str = Field(..., description="Layer name", max_length=500)
     feature_layer_geometry_type: FeatureGeometryType = Field(
         ..., description="Feature layer geometry type"
     )
@@ -245,9 +226,8 @@ class IFeatureStandardCreateAdditionalAttributes(BaseModel):
         ..., description="Feature layer geometry type"
     )
     properties: dict = Field(..., description="Layer properties.")
-    extent: str = Field(..., description="Geographical Extent of the layer")
+    extent: str = Field(..., description="Geographical Extent of the layer", max_length=500)
     attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
-
 
 class IFeatureStandardRead(FeatureReadBaseAttributes, DateTimeBase):
     pass
@@ -334,14 +314,14 @@ class LayerOtherProperties(BaseModel):
     layers: List[str] = Field(..., description="List of layers to be displayed")
     width: int = Field(..., description="Width of the WMS image")
     height: int = Field(..., description="Height of the WMS image")
-    srs: str = Field(..., description="SRS of the WMS image")
-    legend_urls: List[str] | None = Field(None, description="Layer legend URLs")
+    srs: str = Field(..., description="SRS of the WMS image", max_length=50)
+    legend_urls: List[HttpUrl] | None = Field(None, description="Layer legend URLs")
 
 
 class ExternalImageryAttributesBase(BaseModel):
     """Base model for additional attributes imagery layer."""
 
-    url: str = Field(..., description="Layer URL")
+    url: HttpUrl = Field(..., description="Layer URL")
     data_type: ExternalImageryDataType = Field(..., description="Content data type")
     properties: dict = Field(..., description="Layer properties.")
     other_properties: LayerOtherProperties = Field(
@@ -392,12 +372,11 @@ class IExternalImageryRead(
 class IExternalImageryUpdate(LayerBase, GeospatialAttributes):
     """Model to update a imagery layer."""
 
-    url: str | None = Field(None, description="Layer URL")
-    properties: dict | None = Field(..., description="Layer properties.")
+    url: HttpUrl | None = Field(None, description="Layer URL")
+    properties: dict | None = Field(None, description="Layer properties.")
     other_properties: LayerOtherProperties | None = Field(
         None, description="Additional layer properties."
     )
-
 
 imagery_layer_update_base_example = {
     "url": "https://geodata.nationaalgeoregister.nl/luchtfoto/rgb/wms?request=GetCapabilities&service=WMS",
@@ -423,7 +402,7 @@ imagery_layer_update_base_example = {
 class ExternalVectorTileAttributesBase(BaseModel):
     """Base model for additional attributes tile layer."""
 
-    url: str = Field(..., description="Layer URL")
+    url: HttpUrl = Field(..., description="Layer URL")
     data_type: ExternalVectorTileDataType = Field(..., description="Content data type")
     properties: dict | None = Field(None, description="Layer properties.")
 
@@ -461,7 +440,7 @@ class IExternalVectorTileRead(
 class IExternalVectorTileUpdate(LayerBase, GeospatialAttributes):
     """Model to update a tile layer."""
 
-    url: str | None = Field(None, description="Layer URL")
+    url: HttpUrl | None = Field(None, description="Layer URL")
 
 
 tile_layer_update_example = {
@@ -574,6 +553,35 @@ class IValidateJobId(BaseModel):
 
     validate_job_id: UUID = Field(..., description="Upload job ID")
 
+class IInternalLayerExport(CQLQuery):
+    """Layer export input schema."""
+
+    id: UUID = Field(..., description="Layer ID")
+    file_type: FeatureLayerExportType | TableLayerExportType = Field(
+        ..., description="File type"
+    )
+    file_name: str = Field(..., description="File name of the exported file.", max_length=500)
+    crs: str | None = Field(None, description="CRS of the exported file.", max_length=20)
+
+    # Check if crs is valid
+    @validator("crs")
+    def validate_crs(cls, crs):
+        # Validate the provided CRS
+        try:
+            CRS(crs)
+        except CRSError as e:
+            raise ValidationError(f"Invalid CRS: {e}")
+        return crs
+
+    # Check that projection is EPSG:4326 for KML
+    @validator("crs")
+    def validate_crs_kml(cls, crs, values):
+        if values["file_type"] == FeatureLayerExportType.kml:
+            if crs != "EPSG:4326":
+                raise ValidationError(
+                    "KML export only supports EPSG:4326 projection."
+                )
+        return crs
 
 request_examples = {
     "get": {
@@ -597,6 +605,24 @@ request_examples = {
                 "dataset_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
                 **content_base_example,
                 **layer_base_example,
+            },
+        },
+    },
+    "export_internal": {
+        "table": {
+            "summary": "Table Layer",
+            "value": {
+                "id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
+                "file_type": "csv",
+                "file_name": "test",
+            },
+        },
+        "feature_layer_standard": {
+            "summary": "Layer Standard",
+            "value": {
+                "id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
+                "file_type": "csv",
+                "file_name": "test",
             },
         },
     },

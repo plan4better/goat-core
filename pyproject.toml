@@ -85,6 +85,7 @@ fastapi-pagination = "^0.12.6"
 gdal = "3.6.2"
 aiofiles = "^23.2.1"
 pygeofilter = "^0.2.1"
+pycountry = "^23.12.11"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -8,6 +8,7 @@ from sqlalchemy.sql import text
 from sqlmodel import SQLModel
 
 from src.core.config import settings
+from src.core.job import CRUDFailedJob
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import layer as crud_layer
 from src.crud.crud_layer_project import layer_project as crud_layer_project
@@ -75,12 +76,9 @@ async def start_calculation(
     return {"job_id": job.id}
 
 
-class CRUDToolBase:
+class CRUDToolBase(CRUDFailedJob):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
-        self.job_id = job_id
-        self.background_tasks = background_tasks
-        self.async_session = async_session
-        self.user_id = user_id
+        super().__init__(job_id, background_tasks, async_session, user_id)
         self.project_id = project_id
 
     async def get_layers_project(self, params: IToolParam):
@@ -349,14 +347,14 @@ class CRUDToolBase:
             "mapped_statistics_field_type": mapped_statistics_field_type,
         }
 
-    async def check_column_same_type(self, layers_project: BaseModel, columns: list[str]):
+    async def check_column_same_type(
+        self, layers_project: BaseModel, columns: list[str]
+    ):
         """Check if all columns are having the same type"""
 
         # Check if len layers_project and columns are the same
         if len(layers_project) != len(columns):
-            raise ValueError(
-                "The number of columns and layers are not the same."
-            )
+            raise ValueError("The number of columns and layers are not the same.")
 
         # Populate mapped_field_type array
         mapped_field_type = []
@@ -370,51 +368,7 @@ class CRUDToolBase:
 
         # Check if all mapped_field_type are the same
         if len(set(mapped_field_type)) != 1:
-            raise ColumnTypeError(
-                "The columns are not having the same type."
-            )
-
-
-    async def delete_orphan_data(self):
-        # Delete orphan data from user tables
-        user_id = self.user_id
-
-        for table in UserDataTable:
-            table_name = f"{table.value}_{str(user_id).replace('-', '')}"
-
-            # Build condition for layer filtering
-            if table == UserDataTable.no_geometry:
-                condition = f"WHERE l.type = '{LayerType.table.value}'"
-            else:
-                condition = f"WHERE l.feature_layer_geometry_type = '{table.value}'"
-
-            # Delete orphan data that don't exists in layer table and check for data not older then 30 minuts
-            sql_delete_orphan_data = f"""
-            WITH layer_ids_to_check AS (
-                SELECT DISTINCT layer_id
-                FROM {settings.USER_DATA_SCHEMA}."{table_name}"
-                WHERE created_at > CURRENT_TIMESTAMP AT TIME ZONE 'UTC' - INTERVAL '30 minutes'
-            ),
-            to_delete AS (
-                SELECT x.layer_id
-                FROM layer_ids_to_check x
-                LEFT JOIN
-                (
-                    SELECT l.id
-                    FROM {settings.CUSTOMER_SCHEMA}.layer l
-                    {condition}
-                    AND l.user_id = '{str(user_id)}'
-                ) l
-                ON x.layer_id = l.id
-                WHERE l.id IS NULL
-            )
-            DELETE FROM {settings.USER_DATA_SCHEMA}."{table_name}" x
-            USING to_delete d
-            WHERE x.layer_id = d.layer_id;
-            """
-            await self.async_session.execute(text(sql_delete_orphan_data))
-            await self.async_session.commit()
-        return
+            raise ColumnTypeError("The columns are not having the same type.")
 
     async def create_temp_table_name(self, prefix: str):
         # Create temp table name
@@ -506,29 +460,3 @@ class CRUDToolBase:
         await self.async_session.execute(sql_temp_geometry_layer)
         await self.async_session.commit()
         return temp_geometry_layer
-
-    async def delete_temp_tables(self):
-        # Get all tables that end with the job id
-        sql = f"""
-            SELECT table_name
-            FROM information_schema.tables
-            WHERE table_schema = 'temporal'
-            AND table_name LIKE '%{str(self.job_id).replace('-', '')}'
-        """
-        res = await self.async_session.execute(text(sql))
-        tables = res.fetchall()
-        # Delete all tables
-        for table in tables:
-            await self.async_session.execute(
-                f"DROP TABLE IF EXISTS temporal.{table[0]}"
-            )
-        await self.async_session.commit()
-
-    async def delete_created_layers(self):
-        # Delete all layers with the self.job_id
-        sql = f"""
-            DELETE FROM {settings.CUSTOMER_SCHEMA}.layer
-            WHERE job_id = '{str(self.job_id)}'
-        """
-        await self.async_session.execute(text(sql))
-        await self.async_session.commit()

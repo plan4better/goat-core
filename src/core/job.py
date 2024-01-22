@@ -3,8 +3,11 @@ from src.crud.crud_job import job as crud_job
 from src.schemas.job import JobStatusType
 import inspect
 import asyncio
-from src.utils import sanitize_error_message
+from sqlalchemy import text
 from src.schemas.error import TimeoutError, JobKilledError
+from src.core.config import settings
+from src.schemas.layer import LayerType, UserDataTable
+
 
 async def run_failure_func(instance, func, *args, **kwargs):
     # Get failure function
@@ -35,6 +38,7 @@ async def run_failure_func(instance, func, *args, **kwargs):
         await delete_temp_tables_func()
         # Delete all layers created by the job
         await delete_created_layers()
+
 
 def job_init():
     def decorator(func, timeout: int = 1):
@@ -214,3 +218,81 @@ def run_background_or_immediately(settings):
         return wrapper
 
     return decorator
+
+
+class CRUDFailedJob:
+    """CRUD class that bundles functions for failed jobs"""
+    def __init__(self, job_id, background_tasks, async_session, user_id):
+        self.job_id = job_id
+        self.background_tasks = background_tasks
+        self.async_session = async_session
+        self.user_id = user_id
+
+    async def delete_orphan_data(self):
+        """Delete orphan data from user tables"""
+
+        # Get user_id
+        user_id = self.user_id
+
+        for table in UserDataTable:
+            table_name = f"{table.value}_{str(user_id).replace('-', '')}"
+
+            # Build condition for layer filtering
+            if table == UserDataTable.no_geometry:
+                condition = f"WHERE l.type = '{LayerType.table.value}'"
+            else:
+                condition = f"WHERE l.feature_layer_geometry_type = '{table.value}'"
+
+            # Delete orphan data that don't exists in layer table and check for data not older then 30 minuts
+            sql_delete_orphan_data = f"""
+            WITH layer_ids_to_check AS (
+                SELECT DISTINCT layer_id
+                FROM {settings.USER_DATA_SCHEMA}."{table_name}"
+                WHERE created_at > CURRENT_TIMESTAMP AT TIME ZONE 'UTC' - INTERVAL '30 minutes'
+            ),
+            to_delete AS (
+                SELECT x.layer_id
+                FROM layer_ids_to_check x
+                LEFT JOIN
+                (
+                    SELECT l.id
+                    FROM {settings.CUSTOMER_SCHEMA}.layer l
+                    {condition}
+                    AND l.user_id = '{str(user_id)}'
+                ) l
+                ON x.layer_id = l.id
+                WHERE l.id IS NULL
+            )
+            DELETE FROM {settings.USER_DATA_SCHEMA}."{table_name}" x
+            USING to_delete d
+            WHERE x.layer_id = d.layer_id;
+            """
+            await self.async_session.execute(text(sql_delete_orphan_data))
+            await self.async_session.commit()
+        return
+
+    async def delete_temp_tables(self):
+        # Get all tables that end with the job id
+        sql = f"""
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'temporal'
+            AND table_name LIKE '%{str(self.job_id).replace('-', '')}'
+        """
+        res = await self.async_session.execute(text(sql))
+        tables = res.fetchall()
+        # Delete all tables
+        for table in tables:
+            await self.async_session.execute(
+                f"DROP TABLE IF EXISTS temporal.{table[0]}"
+            )
+        await self.async_session.commit()
+
+    async def delete_created_layers(self):
+        # Delete all layers with the self.job_id
+        sql = f"""
+            DELETE FROM {settings.CUSTOMER_SCHEMA}.layer
+            WHERE job_id = '{str(self.job_id)}'
+        """
+        await self.async_session.execute(text(sql))
+        await self.async_session.commit()

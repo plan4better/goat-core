@@ -181,7 +181,7 @@ async def test_aggregate_points_h3_grid(
         "points",
         "value",
     )
-
+    return
 
 @pytest.mark.asyncio
 async def test_aggregate_points_h3_grid_group_by(

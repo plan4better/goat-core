@@ -1237,6 +1237,23 @@ async def async_scandir(directory):
         yield entry
 
 
+async def async_zip_directory(output_filename, directory):
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, zip_directory, output_filename, directory)
+
+
+def zip_directory(output_filename, directory):
+    with zipfile.ZipFile(output_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                zipf.write(
+                    os.path.join(root, file),
+                    os.path.relpath(
+                        os.path.join(root, file), os.path.join(directory, "..")
+                    ),
+                )
+
+
 def execute_cmd(cmd):
     subprocess.run(cmd, shell=True, check=True)
 

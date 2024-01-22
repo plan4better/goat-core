@@ -30,7 +30,7 @@ class Scenario(DateTimeBase, table=True):
             server_default=text("uuid_generate_v4()"),
         )
     )
-    name: str = Field(sa_column=Column(Text, nullable=False))
+    name: str = Field(sa_column=Column(Text, nullable=False), max_length=255)
     user_id: UUID = Field(
         default=None,
         sa_column=Column(

@@ -33,7 +33,7 @@ class Folder(DateTimeBase, table=True):
         ),
         description="Folder owner ID",
     )
-    name: str = Field(sa_column=Column(Text, nullable=False), description="Folder name")
+    name: str = Field(sa_column=Column(Text, nullable=False), description="Folder name", max_length=255)
 
     # Relationships
     user: "User" = Relationship(back_populates="folders")

@@ -16,12 +16,11 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
 from sqlalchemy import and_, or_, select
-
 from src.core.config import settings
 
 # Local application imports
@@ -31,7 +30,7 @@ from src.core.content import (
     update_content_by_id,
 )
 from src.crud.crud_job import job as crud_job
-from src.crud.crud_layer import layer as crud_layer
+from src.crud.crud_layer import layer as crud_layer, CRUDLayerImport, CRUDLayerExport
 from src.db.models.layer import FeatureType, Layer, LayerType
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_user_id
@@ -40,18 +39,18 @@ from src.schemas.job import JobType
 from src.schemas.layer import (
     AreaStatisticsOperation,
     ColumnStatisticsOperation,
-    FeatureUploadType,
-    FileUploadType,
     IFileUploadMetadata,
     IInternalLayerCreate,
     ILayerExternalCreate,
+    IInternalLayerExport,
     ILayerRead,
     ILayerUpdate,
     MaxFileSizeType,
-    TableUploadType,
 )
+from src.db.models.layer import FeatureUploadType, FileUploadType, TableUploadType
 from src.schemas.layer import request_examples as layer_request_examples
 from src.utils import build_where, check_file_size
+from src.schemas.error import http_error_handler
 
 router = APIRouter()
 
@@ -140,16 +139,51 @@ async def create_layer_internal(
     )
 
     # Run the import
-    await crud_layer.import_file(
+    await CRUDLayerImport(
         background_tasks=background_tasks,
         async_session=async_session,
         user_id=user_id,
-        layer_in=layer_in,
         job_id=job.id,
+    ).import_file(
         file_metadata=file_metadata,
+        layer_in=layer_in,
     )
     return {"job_id": job.id}
 
+@router.post(
+    "/internal/{id}/export",
+    summary="Export a layer to a file",
+    response_class=FileResponse,
+    status_code=201,
+    description="Export a layer to a zip file.",
+)
+async def export_layer(
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+    id: UUID4 = Path(
+        ...,
+        description="The ID of the layer to export",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    layer_in: IInternalLayerExport = Body(
+        ...,
+        examples=layer_request_examples["export_internal"],
+        description="Layer to export",
+    ),
+):
+    # Run the export
+    crud_export = CRUDLayerExport(
+        id=id,
+        async_session=async_session,
+        user_id=user_id,
+    )
+    zip_file_path = await http_error_handler(
+        crud_export.export_file_run,
+        layer_in=layer_in,
+    )
+    # Return file
+    file_name = os.path.basename(zip_file_path)
+    return FileResponse(zip_file_path, media_type="application/zip", filename=file_name)
 
 @router.post(
     "/external",

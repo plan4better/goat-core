@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlalchemy import ForeignKey, Text, ARRAY
 from sqlalchemy.sql import func
 from uuid import UUID
+from pydantic import HttpUrl
 
 
 # class DateTimeBase(SQLModel):
@@ -60,8 +61,9 @@ class ContentBaseAttributes(SQLModel):
     tags: List[str] | None = Field(
         sa_column=Column(ARRAY(Text()), nullable=True), description="Layer tags"
     )
-    thumbnail_url: str | None = Field(
-        sa_column=Column(Text, nullable=True), description="Layer thumbnail URL", default="https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png"
+    thumbnail_url: HttpUrl | None = Field(
+        sa_column=Column(Text, nullable=True), description="Layer thumbnail URL",
+        default="https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png",
     )
 
 

@@ -87,6 +87,20 @@ class JobKilledError(Exception):
 
     pass
 
+class NoCRSError(Exception):
+    """Raised when CRS is not found."""
+
+    pass
+
+class DataOutCRSBoundsError(Exception):
+    """Raised when data is outside CRS bounds."""
+
+    pass
+
+class Ogr2OgrError(Exception):
+    """Raised when ogr2ogr fails."""
+
+    pass
 
 
 # Define the mapping between custom errors and HTTP status codes
@@ -102,6 +116,11 @@ ERROR_MAPPING = {
     ColumnTypeError: status.HTTP_422_UNPROCESSABLE_ENTITY,
     LayerNotFoundError: status.HTTP_404_NOT_FOUND,
     SQLError: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    TimeoutError: status.HTTP_408_REQUEST_TIMEOUT,
+    JobKilledError: status.HTTP_410_GONE,
+    NoCRSError: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    DataOutCRSBoundsError: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    Ogr2OgrError: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 
 

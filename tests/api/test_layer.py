@@ -1,12 +1,14 @@
 import os
+import zipfile
 from uuid import uuid4
-
 import pytest
 from httpx import AsyncClient
 
 from src.core.config import settings
 from src.schemas.layer import AreaStatisticsOperation, ColumnStatisticsOperation
 from tests.utils import get_with_wrong_id
+from src.schemas.layer import TableLayerExportType, FeatureLayerExportType
+from src.utils import delete_file, delete_dir
 
 
 @pytest.mark.asyncio
@@ -27,6 +29,143 @@ async def test_create_internal_layer(
     client: AsyncClient, fixture_create_internal_layers
 ):
     assert fixture_create_internal_layers is not None
+
+
+@pytest.mark.asyncio
+async def test_export_internal_layer(
+    client: AsyncClient, fixture_create_internal_layers
+):
+    layer = fixture_create_internal_layers
+    layer_id = layer["id"]
+
+    # Define export types based on layer type
+    if layer["type"] == "table":
+        export_types = TableLayerExportType
+    else:
+        export_types = FeatureLayerExportType
+
+    # Loop through all export types
+    for export_type in export_types:
+        # Define request body
+        body = {
+            "id": layer_id,
+            "file_type": export_type.value,
+            "file_name": "test",
+        }
+        # Add CRS in case of feature layer
+        if layer["type"] == "feature":
+            body["crs"] = "EPSG:4326"
+
+        # Call export endpoint
+        response = await client.post(
+            f"{settings.API_V2_STR}/layer/internal/{layer_id}/export",
+            json=body,
+        )
+        assert response.status_code == 200
+
+        # Check response in content and save it to /tmp as zip
+        assert response.headers["Content-Type"] == "application/zip"
+        assert response.headers["Content-Disposition"] == 'attachment; filename="test.zip"'
+        file_name = response.headers["Content-Disposition"].split("=")[1].replace('"', "")
+        file_path = f"/tmp/{file_name}"
+        unzip_dir = "/tmp/test"
+
+        # Empty /tmp folder
+        delete_file(file_path)
+        delete_dir(unzip_dir)
+
+        with open(file_path, "wb") as f:
+            f.write(response.content)
+
+        # Unzip file into a specific directory and check if it contains the expected files
+        with zipfile.ZipFile(file_path, "r") as zip_ref:
+            zip_ref.extractall("/tmp")
+
+        assert os.path.exists(f"{unzip_dir}/test.{export_type.value}")
+        assert os.path.exists(f"{unzip_dir}/metadata.txt")
+
+        # Additional checks
+        # Check if the unzipped directory is not empty
+        assert os.listdir(unzip_dir)
+        # Check if the size of the unzipped file is not zero
+        assert os.path.getsize(f"{unzip_dir}/test.{export_type.value}") > 0
+        assert os.path.getsize(f"{unzip_dir}/metadata.txt") > 0
+
+@pytest.mark.asyncio
+async def test_export_internal_layer_with_filter(
+    client: AsyncClient, fixture_create_polygon_layer
+):
+    layer = fixture_create_polygon_layer
+    layer_id = layer["id"]
+
+    # Define request body
+    body = {
+        "id": layer_id,
+        "file_type": "gpkg",
+        "file_name": "test",
+        "crs": "EPSG:4326",
+        "query": {"op": ">", "args": [{"property": "zipcode"}, "80802"]},
+    }
+
+    # Call export endpoint
+    response = await client.post(
+        f"{settings.API_V2_STR}/layer/internal/{layer_id}/export",
+        json=body,
+    )
+    assert response.status_code == 200
+
+    # Check response in content and save it to /tmp as zip
+    assert response.headers["Content-Type"] == "application/zip"
+    assert response.headers["Content-Disposition"] == 'attachment; filename="test.zip"'
+    file_name = response.headers["Content-Disposition"].split("=")[1].replace('"', "")
+    file_path = f"/tmp/{file_name}"
+    unzip_dir = "/tmp/test"
+
+    # Empty /tmp folder
+    delete_file(file_path)
+    delete_dir(unzip_dir)
+
+    with open(file_path, "wb") as f:
+        f.write(response.content)
+
+    # Unzip file into a specific directory and check if it contains the expected files
+    with zipfile.ZipFile(file_path, "r") as zip_ref:
+        zip_ref.extractall("/tmp")
+
+    assert os.path.exists(f"{unzip_dir}/test.gpkg")
+    assert os.path.exists(f"{unzip_dir}/metadata.txt")
+
+    # Additional checks
+    # Check if the unzipped directory is not empty
+    assert os.listdir(unzip_dir)
+    # Check if the size of the unzipped file is not zero
+    assert os.path.getsize(f"{unzip_dir}/test.gpkg") > 0
+    assert os.path.getsize(f"{unzip_dir}/metadata.txt") > 0
+
+#TODO: Add test that fails for export
+@pytest.mark.asyncio
+async def test_export_internal_layer_wrong_srid(
+    client: AsyncClient, fixture_create_polygon_layer
+):
+    layer = fixture_create_polygon_layer
+    layer_id = layer["id"]
+
+    # Define request body
+    body = {
+        "id": layer_id,
+        "file_type": "gpkg",
+        "file_name": "test",
+        "crs": "EPSG:32660",
+    }
+
+    # Call export endpoint
+    response = await client.post(
+        f"{settings.API_V2_STR}/layer/internal/{layer_id}/export",
+        json=body,
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == "The data is outside the bounds of the provided CRS."
+
 
 
 @pytest.mark.asyncio
@@ -117,7 +256,7 @@ async def test_get_area_statistics(
         "sum": 5813696342.208582,
         "mean": 2906848171.10429092,
         "min": 83206235.43294483,
-        "max": 5730490106.775637
+        "max": 5730490106.775637,
     }
 
     query = '{"op": ">", "args": [{"property": "id"}, "3"]}'
@@ -137,22 +276,20 @@ async def test_get_area_statistics_no_query(
 ):
     layer_id = fixture_create_internal_feature_polygon_layer["id"]
 
-    response = await client.get(
-        f"{settings.API_V2_STR}/layer/{layer_id}/area/sum"
-    )
+    response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}/area/sum")
     assert response.status_code == 200
     return
+
 
 @pytest.mark.asyncio
 async def test_get_wrong_area_statistics_wrong_geom_type(
     client: AsyncClient, fixture_create_internal_feature_layer
 ):
     layer_id = fixture_create_internal_feature_layer["id"]
-    response = await client.get(
-        f"{settings.API_V2_STR}/layer/{layer_id}/area/sum"
-    )
+    response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}/area/sum")
     assert response.status_code == 422
     return
+
 
 @pytest.mark.asyncio
 async def test_get_unique_values_layer_pagination(
@@ -286,7 +423,13 @@ async def test_get_statistics_column(
         },
         "equal_interval": {
             **base_results,
-            "breaks": [641321.1666666666, 1248551.3333333333, 1855781.5, 2463011.6666666665, 3070241.833333333],
+            "breaks": [
+                641321.1666666666,
+                1248551.3333333333,
+                1855781.5,
+                2463011.6666666665,
+                3070241.833333333,
+            ],
         },
         "heads_and_tails": {
             **base_results,
@@ -345,6 +488,14 @@ async def test_get_statistics_column_wrong_column_name(
     )
     assert response.status_code == 404
     return
+
+
+# Batch test different files
+@pytest.mark.asyncio
+async def test_batch_create_internal_layer(
+    client: AsyncClient, fixture_batch_create_internal_layers
+):
+    print(fixture_batch_create_internal_layers)
 
 
 # Some further test cases

@@ -15,7 +15,6 @@ from src.schemas.layer import (
     IFeatureToolRead,
     ITableRead,
     LayerOtherProperties,
-    LayerProperties,
 )
 from src.utils import build_where, optional
 
@@ -163,7 +162,7 @@ class IFeatureScenarioProjectUpdate(IFeatureBaseProject):
 
 
 class ITableProjectRead(LayerProjectIds, ITableRead, CQLQuery):
-    group: str = Field(None, description="Layer group name")
+    group: str = Field(None, description="Layer group name", max_length=255)
     total_count: int | None = Field(
         None, description="Total count of features in the layer"
     )
@@ -185,12 +184,12 @@ class ITableProjectRead(LayerProjectIds, ITableRead, CQLQuery):
 
 @optional
 class ITableProjectUpdate(CQLQuery):
-    name: str | None = Field(None, description="Layer name")
-    group: str | None = Field(None, description="Layer group name")
+    name: str | None = Field(None, description="Layer name", max_length=255)
+    group: str | None = Field(None, description="Layer group name", max_length=255)
 
 
 class IExternalVectorTileProjectRead(LayerProjectIds, IExternalVectorTileRead):
-    group: str = Field(None, description="Layer group name")
+    group: str = Field(None, description="Layer group name", max_length=255)
     properties: dict = Field(
         ...,
         description="Layer properties",
@@ -199,8 +198,8 @@ class IExternalVectorTileProjectRead(LayerProjectIds, IExternalVectorTileRead):
 
 @optional
 class IExternalVectorTileProjectUpdate(BaseModel):
-    name: str | None = Field(None, description="Layer name")
-    group: str | None = Field(None, description="Layer group name")
+    name: str | None = Field(None, description="Layer name", max_length=255)
+    group: str | None = Field(None, description="Layer group name", max_length=255)
     properties: dict | None = Field(
         None,
         description="Layer properties",
@@ -208,7 +207,7 @@ class IExternalVectorTileProjectUpdate(BaseModel):
 
 
 class IExternalImageryProjectRead(LayerProjectIds, IExternalImageryRead):
-    group: str = Field(None, description="Layer group name")
+    group: str = Field(None, description="Layer group name", max_length=255)
     properties: dict = Field(
         ...,
         description="Layer properties",
@@ -221,8 +220,8 @@ class IExternalImageryProjectRead(LayerProjectIds, IExternalImageryRead):
 
 @optional
 class IExternalImageryProjectUpdate(BaseModel):
-    name: str | None = Field(None, description="Layer name")
-    group: str | None = Field(None, description="Layer group name")
+    name: str | None = Field(None, description="Layer name", max_length=255)
+    group: str | None = Field(None, description="Layer group name", max_length=255)
     properties: dict | None = Field(
         None,
         description="Layer properties",

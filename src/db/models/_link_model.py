@@ -28,7 +28,7 @@ class LayerProjectLink(DateTimeBase, table=True):
         sa_column=Column(Integer, primary_key=True, autoincrement=True)
     )
     group: str | None = Field(
-        sa_column=Column(Text, nullable=True), description="Layer group name"
+        sa_column=Column(Text, nullable=True), description="Layer group name", max_length=255
     )
     layer_id: UUID = Field(
         sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.layer.id")),
@@ -41,6 +41,7 @@ class LayerProjectLink(DateTimeBase, table=True):
     name: str = Field(
         sa_column=Column(Text, nullable=False),
         description="Layer name within the project",
+        max_length=255,
     )
     properties: dict | None = Field(
         sa_column=Column(JSONB, nullable=True), description="Layer properties"

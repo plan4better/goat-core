@@ -59,7 +59,6 @@ class JobStatusFileImport(BaseModel):
     upload: JobStep = {}
     migration: JobStep = {}
 
-
 class JobStatusJoin(BaseModel):
     join: JobStep = {}
 

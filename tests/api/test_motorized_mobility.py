@@ -27,7 +27,7 @@ async def test_oev_gueteklasse(
 
     payload = {
         "time_window": {
-            "weekday": "weekday",
+            "weekday": "sunday",
             "from_time": 25200,
             "to_time": 32400,
         },
