@@ -13,7 +13,9 @@ from starlette.middleware.cors import CORSMiddleware
 
 from src.core.config import settings
 from src.db.session import r5_mongo_db_client, session_manager
+from src.endpoints.deps import close_http_client
 from src.endpoints.v2.api import router as api_router_v2
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,6 +29,7 @@ async def lifespan(app: FastAPI):
     print("Shutting down...")
     await session_manager.close()
     r5_mongo_db_client.close()
+    close_http_client()
 
 
 app = FastAPI(
@@ -35,6 +38,7 @@ app = FastAPI(
     openapi_url=f"{settings.API_V2_STR}/openapi.json",
     lifespan=lifespan,
 )
+
 
 @app.exception_handler(ValueError)
 async def value_error_exception_handler(request: Request, exc: ValueError):
@@ -46,6 +50,7 @@ async def value_error_exception_handler(request: Request, exc: ValueError):
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+
 @app.get("/api/docs", include_in_schema=False)
 async def swagger_ui_html():
     return get_swagger_ui_html(
@@ -54,6 +59,7 @@ async def swagger_ui_html():
         title=settings.PROJECT_NAME,
         swagger_ui_parameters={"persistAuthorization": True},
     )
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -101,6 +107,7 @@ async def item_already_exists_handler(request: Request, exc: IntegrityError):
             "detail": str(exc.__dict__.get("orig")),
         },
     )
+
 
 # Create data folder in case it does not exist
 if not os.path.exists(settings.DATA_DIR):

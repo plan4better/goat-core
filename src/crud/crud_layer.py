@@ -33,7 +33,7 @@ from src.schemas.layer import (
     SupportedOgrGeomType,
     UserDataGeomType,
     OgrDriverType,
-    IUniqueValue
+    IUniqueValue,
 )
 from src.schemas.style import base_properties
 from src.schemas.toolbox_base import MaxFeatureCnt
@@ -253,7 +253,9 @@ class CRUDLayer(CRUDBase):
 
         # Get extent
         sql_query = f"""
-            SELECT ST_ASTEXT(ST_MULTI(ST_ENVELOPE(ST_Extent(geom))))
+            SELECT CASE WHEN ST_MULTI(ST_ENVELOPE(ST_Extent(geom))) <> 'ST_MultiPolygon'
+            THEN ST_MULTI(ST_ENVELOPE(ST_Extent(ST_BUFFER(geom, 0.00001))))
+            ELSE ST_MULTI(ST_ENVELOPE(ST_Extent(geom))) END AS extent
             FROM {layer.table_name}
             WHERE layer_id = '{str(layer.id)}'
         """
@@ -404,7 +406,7 @@ class CRUDLayer(CRUDBase):
             items=result,
             total=total_results,
             page=page_params.page,
-            size=page_params.size
+            size=page_params.size,
         )
 
         return page
@@ -627,7 +629,9 @@ class CRUDLayerExport:
             async_session=self.async_session, id=self.id, query=layer_in.query
         )
         # Write metadata to metadata.txt file
-        with open(os.path.join(self.folder_path, layer_in.file_name, "metadata.txt"), "w") as f:
+        with open(
+            os.path.join(self.folder_path, layer_in.file_name, "metadata.txt"), "w"
+        ) as f:
             # Write some heading
             f.write("############################################################\n")
             f.write(f"Metadata for layer {layer.name}\n")
@@ -635,7 +639,9 @@ class CRUDLayerExport:
             f.write(
                 f"Exported Coordinate Reference System: EPSG {layer.upload_reference_system}\n"
             )
-            f.write(f"Exported File Type: {OgrDriverType[layer_in.file_type.value].value}\n")
+            f.write(
+                f"Exported File Type: {OgrDriverType[layer_in.file_type.value].value}\n"
+            )
             f.write("############################################################\n")
             f.write(f"Last data update: {last_data_updated_at}\n")
             f.write(f"Last metadata update: {layer.updated_at}\n")
@@ -694,7 +700,9 @@ class CRUDLayerExport:
             select_query = select_query[:-2]
 
         # Build where query
-        where_query = build_where(layer.id, layer.table_name, layer_in.query, layer.attribute_mapping)
+        where_query = build_where(
+            layer.id, layer.table_name, layer_in.query, layer.attribute_mapping
+        )
         query = build_where_clause([where_query])
         sql_query = f"""
             SELECT {select_query}
@@ -702,7 +710,11 @@ class CRUDLayerExport:
             {query}
         """
         # Build filepath
-        file_path = os.path.join(self.folder_path, layer_in.file_name, f"{layer_in.file_name}." + layer_in.file_type)
+        file_path = os.path.join(
+            self.folder_path,
+            layer_in.file_name,
+            f"{layer_in.file_name}." + layer_in.file_type,
+        )
 
         # Delete files that are older then one hour
         await delete_old_files(3600)
@@ -725,8 +737,12 @@ class CRUDLayerExport:
         await self.create_metadata_file(layer=layer, layer_in=layer_in)
 
         # Zip result folder
-        result_dir = os.path.join(settings.DATA_DIR, str(self.user_id), str(layer_in.file_name) + ".zip")
-        await async_zip_directory(result_dir, os.path.join(self.folder_path, layer_in.file_name))
+        result_dir = os.path.join(
+            settings.DATA_DIR, str(self.user_id), str(layer_in.file_name) + ".zip"
+        )
+        await async_zip_directory(
+            result_dir, os.path.join(self.folder_path, layer_in.file_name)
+        )
 
         # Delete folder
         await async_delete_dir(self.folder_path)

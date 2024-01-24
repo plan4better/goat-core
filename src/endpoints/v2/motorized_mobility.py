@@ -1,15 +1,18 @@
+from uuid import UUID, uuid4
+from fastapi import APIRouter, Body, Depends
+from src.core.tool import start_calculation
+from src.crud.crud_isochrone import CRUDIsochronePT
+from src.crud.crud_motorized_mobility import CRUDOevGueteklasse
+from src.db.session import AsyncSession
+from src.endpoints.deps import get_db, get_http_client, get_user_id
+from src.schemas.job import JobType
 from src.schemas.motorized_mobility import (
+    IIsochroneCar,
+    IIsochronePT,
     IOevGueteklasse,
     request_example_oev_gueteklasse,
-)
-from src.db.session import AsyncSession
-from fastapi import Body, Depends, APIRouter
-from src.endpoints.deps import get_db, get_user_id
-from uuid import UUID
-from src.schemas.motorized_mobility import (
-    IIsochronePT,
-    request_examples_isochrone_pt,
     request_examples_isochrone_car,
+    request_examples_isochrone_pt,
     IIsochroneCar,
     ITripCountStation,
 )
@@ -20,6 +23,7 @@ from src.schemas.toolbox_base import CommonToolParams
 from src.crud.crud_motorized_mobility import CRUDOevGueteklasse, CRUDTripCountStation
 from src.crud.crud_isochrone import CRUDIsochronePT
 from src.schemas.job import JobType
+from src.schemas.toolbox_base import CommonToolParams, IToolResponse
 
 router = APIRouter()
 
@@ -41,14 +45,15 @@ async def compute_pt_isochrone(
 ):
     """Compute isochrones for public transport."""
     return await start_calculation(
-        job_type=JobType.oev_gueteklasse,
+        job_type=JobType.isochrone_pt,
         tool_class=CRUDIsochronePT,
-        crud_method="isochrone_pt_run",
+        crud_method="run_isochrone",
         async_session=common.async_session,
         user_id=common.user_id,
         background_tasks=common.background_tasks,
         project_id=common.project_id,
         params=params,
+        http_client=get_http_client(),
     )
 
 
@@ -81,9 +86,7 @@ async def compute_car_isochrone(
 async def calculate_oev_gueteklassen(
     *,
     common: CommonToolParams = Depends(),
-    params: IOevGueteklasse = Body(
-        ..., examples=request_example_oev_gueteklasse
-    ),
+    params: IOevGueteklasse = Body(..., examples=request_example_oev_gueteklasse),
 ):
     """
     ÖV-Güteklassen (The public transport quality classes) is an indicator for access to public transport.
