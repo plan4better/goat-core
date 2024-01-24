@@ -1,7 +1,8 @@
 from typing import List
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import BackgroundTasks
+from httpx import AsyncClient
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
@@ -40,6 +41,7 @@ from src.schemas.toolbox_base import (
     MaxFeaturePolygonArea,
 )
 from src.utils import build_where_clause, get_random_string, search_value
+from src.utils import build_where_clause, search_value
 
 
 async def start_calculation(
@@ -51,6 +53,7 @@ async def start_calculation(
     background_tasks: BackgroundTasks,
     project_id: UUID,
     params: BaseModel,
+    http_client: AsyncClient = None,
 ):
     # Create job and check if user can create a new job
     job = await crud_job.check_and_create(
@@ -60,12 +63,23 @@ async def start_calculation(
     )
 
     # Init class
-    tool = tool_class(
-        job_id=job.id,
-        background_tasks=background_tasks,
-        async_session=async_session,
-        user_id=user_id,
-        project_id=project_id,
+    tool = (
+        tool_class(
+            job_id=job.id,
+            background_tasks=background_tasks,
+            async_session=async_session,
+            user_id=user_id,
+            project_id=project_id,
+        )
+        if http_client is None
+        else tool_class(
+            job_id=job.id,
+            background_tasks=background_tasks,
+            async_session=async_session,
+            user_id=user_id,
+            project_id=project_id,
+            http_client=http_client,
+        )
     )
 
     # Execute the CRUD method

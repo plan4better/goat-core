@@ -2,6 +2,7 @@ version: "3.9"
 
 networks:
   proxy:
+    name: goat
 
 services:
   api:
@@ -17,6 +18,6 @@ services:
     volumes:
       - .:/app
     ports:
-      - "5000:5000"
+      - "5001:5000"
     networks:
       proxy:

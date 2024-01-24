@@ -1367,6 +1367,7 @@ def get_statistics_sql(field, operation):
     return query
 
 
+
 def build_where(id: UUID, table_name: str, query: str | dict, attribute_mapping: dict):
     if query is None:
         return f"{table_name}.layer_id = '{str(id)}'"
