@@ -1,7 +1,7 @@
 # Standard Libraries
 import json
 import os
-from typing import List
+from typing import List, Dict
 
 # Third-party Libraries
 from fastapi import (
@@ -46,6 +46,7 @@ from src.schemas.layer import (
     ILayerRead,
     ILayerUpdate,
     MaxFileSizeType,
+    IUniqueValue,
 )
 from src.db.models.layer import FeatureUploadType, FileUploadType, TableUploadType
 from src.schemas.layer import request_examples as layer_request_examples
@@ -474,7 +475,7 @@ async def get_area_statistics(
 @router.get(
     "/{id}/unique-values/{column_name}",
     summary="Get unique values of a column",
-    response_class=JSONResponse,
+    response_model=Page[IUniqueValue],
     status_code=200,
 )
 async def get_unique_values(

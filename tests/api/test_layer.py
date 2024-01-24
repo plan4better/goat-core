@@ -303,7 +303,7 @@ async def test_get_unique_values_layer_pagination(
         f"{settings.API_V2_STR}/layer/{layer_id}/unique-values/{column}?page=1&size=5&order=descendent"
     )
     assert response.status_code == 200
-    first_five = response.json()
+    first_five = response.json()["items"]
     assert len(first_five) == 5
 
     # Request the next 5 unique values
@@ -311,22 +311,19 @@ async def test_get_unique_values_layer_pagination(
         f"{settings.API_V2_STR}/layer/{layer_id}/unique-values/{column}?page=2&size=5"
     )
     assert response.status_code == 200
-    next_five = response.json()
+    next_five = response.json()["items"]
     assert len(next_five) == 5
-
-    # Check that no value of the first five is in the next five
-    assert set(first_five).isdisjoint(next_five)
 
     # Request the first 10 unique values
     response = await client.get(
         f"{settings.API_V2_STR}/layer/{layer_id}/unique-values/{column}?page=1&size=10"
     )
     assert response.status_code == 200
-    first_ten = response.json()
+    first_ten = response.json()["items"]
     assert len(first_ten) == 10
 
     # Check that the first and next five are the same as the 10 unique values
-    assert {**first_five, **next_five} == first_ten
+    assert first_five + next_five == first_ten
 
     return
 

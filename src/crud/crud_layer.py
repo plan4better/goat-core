@@ -7,7 +7,7 @@ from datetime import datetime
 
 # Third party imports
 from fastapi import BackgroundTasks, HTTPException, UploadFile, status
-from fastapi_pagination import Params as PaginationParams
+from fastapi_pagination import Params as PaginationParams, Page, paginate
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +33,7 @@ from src.schemas.layer import (
     SupportedOgrGeomType,
     UserDataGeomType,
     OgrDriverType,
+    IUniqueValue
 )
 from src.schemas.style import base_properties
 from src.schemas.toolbox_base import MaxFeatureCnt
@@ -358,26 +359,55 @@ class CRUDLayer(CRUDBase):
         where_query = res_check["where_query"]
         # Map order
         order_mapped = {"descendent": "DESC", "ascendent": "ASC"}[order]
-        # Build query
-        sql_query = f"""
-        WITH cnt AS (
-            SELECT {column_mapped} AS {column_name}, COUNT(*) AS count
+
+        # Build count query
+        count_query = f"""
+            SELECT COUNT(*) AS total_count
+            FROM (
+                SELECT {column_mapped}
+                FROM {layer.table_name}
+                WHERE {where_query}
+                AND {column_mapped} IS NOT NULL
+                GROUP BY {column_mapped}
+            ) AS subquery
+        """
+
+        # Execute count query
+        count_result = await async_session.execute(text(count_query))
+        total_results = count_result.scalar_one()
+
+        # Build data query
+        data_query = f"""
+        SELECT *
+        FROM (
+        
+            SELECT JSONB_BUILD_OBJECT(
+                'value', {column_mapped}, 'count', COUNT(*)
+            )
             FROM {layer.table_name}
             WHERE {where_query}
             AND {column_mapped} IS NOT NULL
             GROUP BY {column_mapped}
-            ORDER BY COUNT(*)
-            {order_mapped}
-            LIMIT {page_params.size}
-            OFFSET {(page_params.page - 1) * page_params.size}
-        )
-        SELECT JSONB_OBJECT_AGG({column_name}, count) FROM cnt
+            ORDER BY COUNT(*) {order_mapped}, {column_mapped}
+        ) AS subquery
+        LIMIT {page_params.size}
+        OFFSET {(page_params.page - 1) * page_params.size}
         """
 
-        # Execute query
-        result = await async_session.execute(text(sql_query))
-        result = result.fetchall()
-        return result[0][0]
+        # Execute data query
+        data_result = await async_session.execute(text(data_query))
+        result = data_result.fetchall()
+        result = [IUniqueValue(**res[0]) for res in result]
+
+        # Create Page object
+        page = Page(
+            items=result,
+            total=total_results,
+            page=page_params.page,
+            size=page_params.size
+        )
+
+        return page
 
     async def get_area_statistics(
         self,

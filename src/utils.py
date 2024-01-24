@@ -1378,10 +1378,16 @@ def build_where(id: UUID, table_name: str, query: str | dict, attribute_mapping:
         attribute_mapping = {value: key for key, value in attribute_mapping.items()}
         # Add id to attribute mapping
         attribute_mapping["id"] = "id"
+        attribute_mapping["geometry"] = "geom"
+        attribute_mapping["geom"] = "geom"
         where = f"{table_name}.layer_id = '{str(id)}' AND "
         converted_cql = re.sub(
             r'(?<=\(|\s|,)"', f'{table_name}."', to_sql_where(ast, attribute_mapping)
         )
+        # Fixing issue with pygeofilter https://github.com/geopython/pygeofilter/pull/54
+        converted_cql = converted_cql.replace("x'", "E'\\\\x")
+        # Add SRID to ST_GeomFromWKB otherwise it will be 0 and operations won't work
+        converted_cql = re.sub(r'(ST_GeomFromWKB\((.*?)\))', r'ST_SetSRID(\1, 4326)', converted_cql)
         where = where + converted_cql
         return where
 

@@ -398,7 +398,6 @@ imagery_layer_update_base_example = {
 # VectorTile Layer DTOs
 ################################################################################
 
-
 class ExternalVectorTileAttributesBase(BaseModel):
     """Base model for additional attributes tile layer."""
 
@@ -547,6 +546,11 @@ class ILayerUpdate(BaseModel):
         )
         return layer_update_class(**kwargs)
 
+class IUniqueValue(BaseModel):
+    """Model for unique values."""
+
+    value: str = Field(..., description="Unique value")
+    count: int = Field(..., description="Number of occurrences")
 
 class IValidateJobId(BaseModel):
     """Model to import a file object."""

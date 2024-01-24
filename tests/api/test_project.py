@@ -1,8 +1,10 @@
 import pytest
 from httpx import AsyncClient
+
 from src.core.config import settings
 from src.schemas.project import initial_view_state_example
 from tests.utils import get_with_wrong_id
+
 
 @pytest.mark.asyncio
 async def test_create_project(client: AsyncClient, fixture_create_project):
@@ -41,13 +43,17 @@ async def test_get_project_wrong_id(client: AsyncClient, fixture_create_project)
 @pytest.mark.asyncio
 async def test_update_project(client: AsyncClient, fixture_create_project):
     response = await client.put(
-        f"{settings.API_V2_STR}/project/{fixture_create_project['id']}", json={"name": "test2"}
+        f"{settings.API_V2_STR}/project/{fixture_create_project['id']}",
+        json={"name": "test2"},
     )
     assert response.status_code == 200
     assert response.json()["name"] == "test2"
 
+
 @pytest.mark.asyncio
-async def test_update_project_layer_order(client: AsyncClient, fixture_create_layer_project):
+async def test_update_project_layer_order(
+    client: AsyncClient, fixture_create_layer_project
+):
     project_id = fixture_create_layer_project["project_id"]
 
     layer_project_ids = []
@@ -66,6 +72,7 @@ async def test_update_project_layer_order(client: AsyncClient, fixture_create_la
     assert response.status_code == 200
     res = response.json()
     assert res["layer_order"] == layer_project_ids
+
 
 @pytest.mark.asyncio
 async def test_delete_project(
@@ -119,7 +126,9 @@ async def test_create_layer_project(client: AsyncClient, fixture_create_layer_pr
 
 
 @pytest.mark.asyncio
-async def test_duplicate_layer_project(client: AsyncClient, fixture_create_layer_project):
+async def test_duplicate_layer_project(
+    client: AsyncClient, fixture_create_layer_project
+):
     layer_id = fixture_create_layer_project["layer_project"][0]["layer_id"]
 
     # Duplicate layer
@@ -132,7 +141,12 @@ async def test_duplicate_layer_project(client: AsyncClient, fixture_create_layer
     # Check if layer is duplicated
     for layer in res:
         if layer["id"] == layer_id:
-            assert layer["name"] == "Copy from " + fixture_create_layer_project["layer_project"][0]["name"]
+            assert (
+                layer["name"]
+                == "Copy from "
+                + fixture_create_layer_project["layer_project"][0]["name"]
+            )
+
 
 @pytest.mark.asyncio
 async def test_get_layer_project(client: AsyncClient, fixture_create_layer_project):
@@ -142,13 +156,17 @@ async def test_get_layer_project(client: AsyncClient, fixture_create_layer_proje
     )
     assert response.status_code == 200
 
+
 @pytest.mark.asyncio
 async def test_get_layers_project(client: AsyncClient, fixture_create_layer_project):
     response = await client.get(
         f"{settings.API_V2_STR}/project/{fixture_create_layer_project['project_id']}/layer",
     )
     assert response.status_code == 200
-    assert response.json()[0]["id"] == fixture_create_layer_project["layer_project"][0]["id"]
+    assert (
+        response.json()[0]["id"]
+        == fixture_create_layer_project["layer_project"][0]["id"]
+    )
 
 
 # TODO: Add test for style
@@ -169,6 +187,44 @@ async def test_update_layer_project(client: AsyncClient, fixture_create_layer_pr
     # Check if feature count is correct
     assert res["total_count"] == 26
     assert res["filtered_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_update_layer_project_with_spatial_filter(
+    client: AsyncClient, fixture_create_layer_project
+):
+    project_id = fixture_create_layer_project["project_id"]
+    layer_project_id = fixture_create_layer_project["layer_project"][0]["id"]
+    response = await client.put(
+        f"{settings.API_V2_STR}/project/{project_id}/layer/{layer_project_id}",
+        json={
+            "name": "test2",
+            "query": {
+                "op": "s_intersects",
+                "args": [
+                    {"property": "geometry"},
+                    {
+                        "coordinates": [
+                            [
+                                [11.072458, 49.467157],
+                                [11.072458, 49.471157],
+                                [11.076458, 49.471157],
+                                [11.076458, 49.467157],
+                                [11.072458, 49.467157],
+                            ]
+                        ],
+                        "type": "Polygon",
+                    },
+                ],
+            },
+        },
+    )
+    assert response.status_code == 200
+    res = response.json()
+    assert res["name"] == "test2"
+    # Check if feature count is correct
+    assert res["total_count"] == 26
+    assert res["filtered_count"] == 17
 
 
 @pytest.mark.asyncio
@@ -204,7 +260,10 @@ async def test_delete_layer_project(client: AsyncClient, fixture_create_layer_pr
     )
     assert response.status_code == 200
     assert len(response.json()) == 1
-    assert response.json()[0]["id"] == fixture_create_layer_project["layer_project"][1]["id"]
+    assert (
+        response.json()[0]["id"]
+        == fixture_create_layer_project["layer_project"][1]["id"]
+    )
 
     # Check if layer is deleted from layer order
     response = await client.get(
