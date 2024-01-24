@@ -112,6 +112,8 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
 
         self.http_client = http_client
+        self.NUM_RETRIES = 5  # Number of times to retry calling the endpoint
+        self.RETRY_DELAY = 2  # Number of seconds to wait between retries
 
     @job_log(job_step_name="isochrone")
     async def isochrone(
@@ -158,13 +160,26 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
         }
 
         try:
-            # Call GOAT Routing endpoint to compute isochrone
-            response = await self.http_client.post(
-                url=f"{settings.GOAT_ROUTING_URL}/isochrone",
-                json=request_payload,
-            )
-            if response.status_code != 201:
-                raise Exception(response.text)
+            # Call GOAT Routing endpoint multiple times for upto 20 seconds / 10 retries
+            for i in range(self.NUM_RETRIES):
+                # Call GOAT Routing endpoint to compute isochrone
+                response = await self.http_client.post(
+                    url=f"{settings.GOAT_ROUTING_URL}/isochrone",
+                    json=request_payload,
+                )
+                if response.status_code == 202:
+                    # Endpoint is still processing request, retry shortly
+                    if i == self.NUM_RETRIES - 1:
+                        raise Exception(
+                            "GOAT routing endpoint took too long to process request."
+                        )
+                    time.sleep(self.RETRY_DELAY)
+                    continue
+                elif response.status_code == 201:
+                    # Endpoint has finished processing request, break
+                    break
+                else:
+                    raise Exception(response.text)
         except Exception as e:
             raise RoutingEndpointError(
                 f"Error while calling the routing endpoint: {str(e)}"
@@ -197,7 +212,7 @@ class CRUDIsochronePT(CRUDIsochroneBase):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
 
         self.http_client = http_client
-        self.NUM_RETRIES = 10  # Number of times to retry calling the R5 endpoint
+        self.NUM_RETRIES = 10  # Number of times to retry calling the endpoint
         self.RETRY_DELAY = 2  # Number of seconds to wait between retries
 
     @job_log(job_step_name="isochrone")
