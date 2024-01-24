@@ -24,14 +24,31 @@ ENV CELERY_CREATE_DIRS 1
 ENV CELERY_RESULT_EXPIRES 120
 
 
-
 # Install system dependencies
 RUN apt-get update \
-    && apt-get -y install netcat-traditional gcc libpq-dev \
+    && apt-get -y install netcat-traditional gcc libpq-dev software-properties-common \
     && apt-get clean
+
+
+# Install pymgl runtime dependencies
+RUN apt install --fix-missing --no-install-recommends -y \
+    xvfb \
+    xauth \
+    curl \
+    libicu72 \
+    libjpeg-turbo-progs \
+    libpng16-16 \
+    libprotobuf32 \
+    libuv1 \
+    libx11-6 \
+    libegl1 \
+    libopengl0
+
 
 # Install gdal binaries
 RUN apt-get update && apt-get install -y python3-dev gdal-bin libgdal-dev
+
+
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python && \
     cd /usr/local/bin && \
