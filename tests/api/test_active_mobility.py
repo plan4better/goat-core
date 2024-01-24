@@ -11,11 +11,16 @@ from tests.utils import check_job_status
 @pytest.mark.asyncio
 async def test_single_isochrone_active_mobility_lat_lon(
     client: AsyncClient,
+    db_session: AsyncSession,
     fixture_create_project,
+    fixture_create_user,
 ):
     project_id = fixture_create_project["id"]
+    user_id = fixture_create_user["id"]
 
     # Produce isochrone request payload
+    max_traveltime = 30
+    traveltime_step = 5
     params = {
         "starting_points": {
             "latitude": [51.201582802561035],
@@ -23,8 +28,8 @@ async def test_single_isochrone_active_mobility_lat_lon(
         },
         "routing_type": "walking",
         "travel_cost": {
-            "max_traveltime": 30,
-            "traveltime_step": 5,
+            "max_traveltime": max_traveltime,
+            "traveltime_step": traveltime_step,
             "speed": 5,
         },
         "isochrone_type": "polygon",
@@ -39,6 +44,16 @@ async def test_single_isochrone_active_mobility_lat_lon(
     job = await check_job_status(client, response.json()["job_id"])
     # Check if job is finished
     assert job["status_simple"] == "finished"
+
+    # Check if the resulting isochrone was actually saved to the database
+    # And if the number of rows in the table equals the expected number of incremental polygons
+    result_table = (
+        f"{settings.USER_DATA_SCHEMA}.polygon_{str(user_id).replace('-', '')}"
+    )
+    num_rows = len(
+        (await db_session.execute(f"SELECT * FROM {result_table};")).fetchall()
+    )
+    assert num_rows == (max_traveltime / traveltime_step)
 
 
 @pytest.mark.asyncio
