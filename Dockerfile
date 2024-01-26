@@ -71,5 +71,4 @@ RUN bash -c "if [ $INSTALL_DEV == 'True' ] ; then poetry install --no-root ; els
 COPY . /app
 
 
-#CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "5000"]
 CMD bash -c "Xvfb ${DISPLAY} -screen 0 '1024x768x24' -ac +extension GLX +render -noreset -nolisten tcp & exec uvicorn src.main:app --host 0.0.0.0 --port ${UVICORN_PORT}"
