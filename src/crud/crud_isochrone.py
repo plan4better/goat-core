@@ -168,6 +168,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
                 response = await self.http_client.post(
                     url=f"{settings.GOAT_ROUTING_URL}/isochrone",
                     json=request_payload,
+                    headers={"Authorization": settings.GOAT_ROUTING_AUTHORIZATION},
                 )
                 if response.status_code == 202:
                     # Endpoint is still processing request, retry shortly
