@@ -1,10 +1,12 @@
 import io
 import json
+from typing import Dict, List, Union
+
 from pymgl import Map
-from typing import Dict, Union, List
 from shapely import from_wkt
-from src.db.models.layer import Layer
+
 from src.core.config import settings
+from src.db.models.layer import Layer
 from src.utils import async_get_with_retry
 
 
@@ -119,7 +121,7 @@ class Print:
         else:
             layer_id = layer.layer_id
 
-        collection_id = "user_data." + str(layer.layer_id).replace("-", "")
+        collection_id = "user_data." + str(layer_id).replace("-", "")
 
         # Request in recursive loop if layer was already added in geoapi if it does not fail the layer was added
         header = {"Content-Type": "application/json"}
@@ -160,7 +162,7 @@ class Print:
 
         img_bytes = map.renderPNG()
         image = io.BytesIO(img_bytes)
-    
+
         # Save image to s3 bucket using s3 client from settings
         dir = settings.THUMBNAIL_DIR_LAYER + "/" + file_name
         url = settings.ASSETS_URL + "/" + dir
@@ -170,7 +172,7 @@ class Print:
             Fileobj=image,
             Bucket=settings.AWS_S3_ASSETS_BUCKET,
             Key=dir,
-            ExtraArgs={"ContentType": f"image/png"},
+            ExtraArgs={"ContentType": "image/png"},
             Callback=None,
             Config=None,
         )
