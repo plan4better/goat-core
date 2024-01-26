@@ -5,6 +5,8 @@ WORKDIR /app/
 # Create the app user
 #RUN addgroup --system app && adduser --system --group app
 # Set environment variables for Python
+ENV DISPLAY :99
+ENV DEBIAN_FRONTEND noninteractive
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV ENVIRONMENT prod
@@ -22,6 +24,7 @@ ENV CELERYD_USER "root"
 ENV CELERYD_GROUP "root"
 ENV CELERY_CREATE_DIRS 1
 ENV CELERY_RESULT_EXPIRES 120
+ENV UVICORN_PORT 5000
 
 
 # Install system dependencies
@@ -68,4 +71,5 @@ RUN bash -c "if [ $INSTALL_DEV == 'True' ] ; then poetry install --no-root ; els
 COPY . /app
 
 
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "5000"]
+#CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "5000"]
+CMD bash -c "Xvfb ${DISPLAY} -screen 0 '1024x768x24' -ac +extension GLX +render -noreset -nolisten tcp & exec uvicorn src.main:app --host 0.0.0.0 --port ${UVICORN_PORT}"
