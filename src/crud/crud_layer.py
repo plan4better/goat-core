@@ -110,7 +110,10 @@ class CRUDLayer(CRUDBase):
 
         # Create thumbnail using print class
         file_name = str(layer.id) + "_" + str(uuid4()) + ".png"
-        thumbnail_url = await Print().create_layer_thumnnail(layer=layer_in, file_name=file_name)
+        try:
+            thumbnail_url = await Print().create_layer_thumnnail(layer=layer_in, file_name=file_name)
+        except Exception as e:
+            print(e)
 
         # Update thumbnail_url
         layer = await self.update(
