@@ -31,11 +31,11 @@ class LayerProjectLink(DateTimeBase, table=True):
         sa_column=Column(Text, nullable=True), description="Layer group name", max_length=255
     )
     layer_id: UUID = Field(
-        sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.layer.id")),
+        sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.layer.id", ondelete="CASCADE")),
         description="Layer ID",
     )
     project_id: UUID = Field(
-        sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.project.id")),
+        sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.project.id", ondelete="CASCADE")),
         description="Project ID",
     )
     name: str = Field(

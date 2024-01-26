@@ -28,6 +28,9 @@ target_metadata = SQLModel.metadata
 # ... etc.
 
 def include_object(object, name, type_, reflected, compare_to):
+    
+    if type_ == "table" and object.schema != "customer":
+        return False
     print(type_)
     if (
         type_ in ["table"]

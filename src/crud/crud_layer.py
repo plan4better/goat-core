@@ -17,6 +17,7 @@ from sqlmodel import SQLModel
 from src.core.config import settings
 from src.core.job import job_log, job_init, run_background_or_immediately, CRUDFailedJob
 from src.core.layer import FileUpload, OGRFileHandling, delete_old_files
+from src.core.print import Print
 from src.crud.base import CRUDBase
 from src.crud.crud_job import job as crud_job
 from src.db.models.layer import Layer, FeatureLayerExportType, TableLayerExportType
@@ -97,6 +98,7 @@ class CRUDLayer(CRUDBase):
             **additional_attributes,
             job_id=job_id,
         )
+
         # Update size
         layer_in.size = await self.get_feature_layer_size(
             async_session=async_session, layer=layer_in
@@ -105,6 +107,18 @@ class CRUDLayer(CRUDBase):
             db=async_session,
             obj_in=layer_in,
         )
+
+        # Create thumbnail using print class
+        file_name = str(layer.id) + "_" + str(uuid4()) + ".png"
+        thumbnail_url = await Print().create_layer_thumnnail(layer=layer_in, file_name=file_name)
+
+        # Update thumbnail_url
+        layer = await self.update(
+            db=async_session,
+            db_obj=layer,
+            obj_in={"thumbnail_url": thumbnail_url},
+        )
+
         return layer
 
     async def get_internal(self, async_session: AsyncSession, id: UUID):

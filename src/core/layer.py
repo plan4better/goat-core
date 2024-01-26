@@ -5,6 +5,7 @@ import os
 import time
 import zipfile
 from uuid import UUID
+from typing import Dict, List, Union
 
 # Third party imports
 import aiofiles
@@ -478,10 +479,14 @@ class OGRFileHandling:
             layer_name = ""
 
         # Create folder if not exists
-        await async_delete_dir(os.path.join(settings.DATA_DIR, str(self.user_id), str(layer.id)))
+        await async_delete_dir(
+            os.path.join(settings.DATA_DIR, str(self.user_id), str(layer.id))
+        )
         if not os.path.exists(os.path.join(settings.DATA_DIR, str(self.user_id))):
             await aos.mkdir(os.path.join(settings.DATA_DIR, str(self.user_id)))
-        await aos.mkdir(os.path.join(settings.DATA_DIR, str(self.user_id), str(layer.id)))
+        await aos.mkdir(
+            os.path.join(settings.DATA_DIR, str(self.user_id), str(layer.id))
+        )
         await aos.mkdir(self.folder_path)
 
         if layer.type == LayerType.feature.value:
@@ -493,7 +498,10 @@ class OGRFileHandling:
 
             # Check if the layer's extent falls within the bounds of the target CRS
             if not (
-                target_crs.area_of_use.west <= minx <= maxx <= target_crs.area_of_use.east
+                target_crs.area_of_use.west
+                <= minx
+                <= maxx
+                <= target_crs.area_of_use.east
                 and target_crs.area_of_use.south
                 <= miny
                 <= maxy
@@ -596,3 +604,5 @@ class OGRFileHandling:
             text(f"DELETE FROM {target_table} WHERE layer_id = '{str(layer_id)}'")
         )
         await self.async_session.commit()
+
+

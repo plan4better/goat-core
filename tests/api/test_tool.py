@@ -183,6 +183,7 @@ async def test_aggregate_points_h3_grid(
     )
     return
 
+
 @pytest.mark.asyncio
 async def test_aggregate_points_h3_grid_group_by(
     client: AsyncClient, fixture_add_aggregate_point_layer_to_project
@@ -353,10 +354,19 @@ async def test_buffer_union_difference(
     job = await check_job_status(client, response_json["job_id"])
     assert job["status_simple"] == "finished"
 
+
 @pytest.mark.asyncio
-async def test_origin_destination_polygon(client: AsyncClient, fixture_add_origin_destination_layers_to_project):
-    origin_destination_matrix_layer_project_id = fixture_add_origin_destination_layers_to_project["origin_destination_matrix_layer_project_id"]
-    geometry_layer_project_id = fixture_add_origin_destination_layers_to_project["geometry_layer_project_id"]
+async def test_origin_destination_polygon(
+    client: AsyncClient, fixture_add_origin_destination_layers_to_project
+):
+    origin_destination_matrix_layer_project_id = (
+        fixture_add_origin_destination_layers_to_project[
+            "origin_destination_matrix_layer_project_id"
+        ]
+    )
+    geometry_layer_project_id = fixture_add_origin_destination_layers_to_project[
+        "geometry_layer_project_id"
+    ]
     project_id = fixture_add_origin_destination_layers_to_project["project_id"]
 
     # Request origin destination endpoint
@@ -377,6 +387,7 @@ async def test_origin_destination_polygon(client: AsyncClient, fixture_add_origi
     # Check job status
     job = await check_job_status(client, response_json["job_id"])
     assert job["status_simple"] == "finished"
+
 
 @pytest.mark.asyncio
 async def test_reference_area(

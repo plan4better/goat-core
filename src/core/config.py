@@ -1,5 +1,6 @@
 from typing import Any, Dict, Optional
 
+import boto3
 from pydantic import BaseSettings, HttpUrl, PostgresDsn, validator
 
 
@@ -107,8 +108,29 @@ class Settings(BaseSettings):
     RUN_AS_BACKGROUND_TASK: Optional[bool] = False
     MAX_NUMBER_PARALLEL_JOBS: Optional[int] = 6
     TESTING: Optional[bool] = False
-
     MAX_FOLDER_COUNT: Optional[int] = 100
+
+    MAPBOX_TOKEN: Optional[str] = None
+    AWS_ACCESS_KEY_ID: str
+    AWS_SECRET_ACCESS_KEY: str
+    AWS_REGION: Optional[str] = "eu-central-1"
+    AWS_S3_ASSETS_BUCKET: Optional[str] = "plan4better-assets"
+    S3_CLIENT: Optional[Any] = None
+
+    @validator("S3_CLIENT", pre=True)
+    def assemble_s3_client(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+        if isinstance(v, str):
+            return v
+        return boto3.client(
+            "s3",
+            aws_access_key_id=values.get("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=values.get("AWS_SECRET_ACCESS_KEY"),
+            region_name=values.get("AWS_REGION"),
+        )
+
+    ASSETS_URL: Optional[str] = None
+    THUMBNAIL_DIR_LAYER: Optional[str] = "img/users/dev/thumbnails/layer"
+    THUMBNAIL_DIR_PROJECT: Optional[str] = "img/users/dev/thumbnails/layer"
 
     class Config:
         case_sensitive = True

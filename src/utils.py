@@ -44,6 +44,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 from starlette import status
 from starlette.responses import Response
+import aiohttp
 
 # Local application imports
 from src.core.config import settings
@@ -1422,3 +1423,21 @@ def build_insert_query(
         f"INSERT INTO {result_table_name} (layer_id, geom, {insert_columns})"
     )
     return insert_statement, select_columns
+
+
+async def async_get_with_retry(url: str, headers: dict, num_retries: int, retry_delay: int):
+    async with aiohttp.ClientSession() as session:
+        for i in range(num_retries):
+            async with session.get(url, headers=headers) as response:
+                if response.status != 200:
+                    # Server is still processing request, retry shortly
+                    if i == num_retries - 1:
+                        raise Exception("Server took too long to process request.")
+                    await asyncio.sleep(retry_delay)
+                    continue
+                elif response.status == 200:
+                    # Server has finished processing request, break
+                    result = await response.text()
+                    return result
+                else:
+                    raise Exception(await response.text())
