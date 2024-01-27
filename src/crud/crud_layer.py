@@ -18,7 +18,7 @@ from sqlmodel import SQLModel
 from src.core.config import settings
 from src.core.job import CRUDFailedJob, job_init, run_background_or_immediately
 from src.core.layer import FileUpload, OGRFileHandling, delete_old_files
-from src.core.print import print_map
+from src.core.print import PrintMap
 from src.crud.base import CRUDBase
 from src.db.models.layer import Layer
 from src.schemas.error import LayerNotFoundError, NoCRSError, ThumbnailComputeError
@@ -111,11 +111,11 @@ class CRUDLayer(CRUDBase):
 
         # Create thumbnail using print class
         file_name = str(layer.id) + "_" + str(uuid4()) + ".png"
-        if layer.type == LayerType.feature and settings.TEST_MODE is False:
+        if layer.type in (LayerType.feature, LayerType.table) and settings.TEST_MODE is False:
             try:
-                thumbnail_url = await print_map.create_layer_thumbnail(
-                    layer=layer_in, file_name=file_name
-                )
+                thumbnail_url = await PrintMap(
+                    async_session=async_session
+                ).create_layer_thumbnail(layer=layer_in, file_name=file_name)
             except Exception as e:
                 raise ThumbnailComputeError(sanitize_error_message(str(e)))
 
@@ -170,10 +170,10 @@ class CRUDLayer(CRUDBase):
         )
 
         # Update thumbnail. Only run outside of tests as the print class depends on geoapi as external service.
-        if layer.type == LayerType.feature and settings.TEST_MODE is False:
+        if layer.type in (LayerType.feature, LayerType.table) and settings.TEST_MODE is False:
             file_name = str(layer.id) + "_" + str(uuid4()) + ".png"
             try:
-                thumbnail_url = await print_map.create_layer_thumbnail(
+                thumbnail_url = await PrintMap(async_session=async_session).create_layer_thumbnail(
                     layer=layer, file_name=file_name
                 )
             except Exception as e:

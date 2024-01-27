@@ -34,14 +34,17 @@ from tests.utils import (
     upload_valid_files,
 )
 
+
 def set_test_mode():
     settings.RUN_AS_BACKGROUND_TASK = True
     settings.USER_DATA_SCHEMA = "test_user_data"
     settings.CUSTOMER_SCHEMA = "test_customer"
     settings.MAX_FOLDER_COUNT = 10
     settings.TEST_MODE = True
-    
+
+
 set_test_mode()
+
 
 @pytest_asyncio.fixture
 async def client():
@@ -309,7 +312,9 @@ async def create_internal_layer(
     assert job["status_simple"] == "finished"
 
     # Get layer by name
-    response = await client.get(f"{settings.API_V2_STR}/layer?search={feature_layer_dict['name']}")
+    response = await client.get(
+        f"{settings.API_V2_STR}/layer?search={feature_layer_dict['name']}"
+    )
     assert response.status_code == 200
     layer_dict = response.json()["items"][0]
     return {**layer_dict, "job_id": job_id}
@@ -357,18 +362,18 @@ async def fixture_create_polygon_layer(
         client, dir_gpkg, fixture_get_home_folder, "feature_layer_standard"
     )
 
+
 layers = ["flikster_de.geojson"]
+
+
 @pytest.fixture(params=layers)
 async def fixture_batch_create_internal_layers(
     request, client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
-    dir = os.path.join(
-        settings.TEST_DATA_DIR, "layers", "batch", request.param
-    )
+    dir = os.path.join(settings.TEST_DATA_DIR, "layers", "batch", request.param)
     return await upload_and_create_layer(
         client, dir, fixture_get_home_folder, "feature_layer_standard"
     )
-
 
 
 @pytest.fixture

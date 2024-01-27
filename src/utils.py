@@ -32,7 +32,6 @@ from src.core.config import settings
 from src.schemas.common import CQLQuery
 
 
-
 def optional(*fields):
     def dec(_cls):
         for field in fields:
@@ -211,6 +210,7 @@ def pixel_to_latitude(pixel_y, zoom):
     """
     lat_rad = math.atan(math.sinh(math.pi * (1 - (2 * pixel_y) / z_scale(zoom))))
     return lat_rad * 180 / math.pi
+
 
 @njit(cache=True)
 def pixel_x_to_web_mercator_x(x, zoom):
@@ -459,7 +459,9 @@ def build_where(id: UUID, table_name: str, query: str | dict, attribute_mapping:
         # Fixing issue with pygeofilter https://github.com/geopython/pygeofilter/pull/54
         converted_cql = converted_cql.replace("x'", "E'\\\\x")
         # Add SRID to ST_GeomFromWKB otherwise it will be 0 and operations won't work
-        converted_cql = re.sub(r'(ST_GeomFromWKB\((.*?)\))', r'ST_SetSRID(\1, 4326)', converted_cql)
+        converted_cql = re.sub(
+            r"(ST_GeomFromWKB\((.*?)\))", r"ST_SetSRID(\1, 4326)", converted_cql
+        )
         where = where + converted_cql
         return where
 
@@ -495,7 +497,9 @@ def build_insert_query(
     return insert_statement, select_columns
 
 
-async def async_get_with_retry(url: str, headers: dict, num_retries: int, retry_delay: int):
+async def async_get_with_retry(
+    url: str, headers: dict, num_retries: int, retry_delay: int
+):
     async with aiohttp.ClientSession() as session:
         for i in range(num_retries):
             async with session.get(url, headers=headers) as response:
@@ -512,6 +516,7 @@ async def async_get_with_retry(url: str, headers: dict, num_retries: int, retry_
                 else:
                     raise Exception(await response.text())
 
+
 def hex_to_rgb(hex: str) -> tuple:
-    hex = hex.lstrip('#')
-    return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4))
+    hex = hex.lstrip("#")
+    return tuple(int(hex[i : i + 2], 16) for i in (0, 2, 4))

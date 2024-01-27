@@ -655,6 +655,8 @@ request_examples = {
                 "id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
                 "file_type": "csv",
                 "file_name": "test",
+                "crs": "EPSG:3857",
+                "query": {"op": "=", "args": [{"property": "category"}, "bus_stop"]},
             },
         },
         "feature_layer_standard": {

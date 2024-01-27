@@ -2,14 +2,15 @@ import io
 import json
 from typing import Dict, List, Union
 
+import matplotlib.pyplot as plt
+import pandas as pd
 from pymgl import Map
 from shapely import from_wkt
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
-from src.db.models.layer import Layer
+from src.db.models.layer import Layer, LayerType
 from src.utils import async_get_with_retry
-# import pandas as pd
-# import matplotlib.pyplot as plt
 
 
 def rgb_to_hex(rgb: tuple) -> str:
@@ -92,12 +93,41 @@ def transform_to_mapbox_layer_style_spec(data: Dict) -> Dict:
 
 
 class PrintMap:
-    def __init__(self):
+    def __init__(self, async_session: AsyncSession):
         self.thumbnail_zoom = 13
         self.thumbnail_height = 280
         self.thumbnail_width = 674
+        self.async_session = async_session
 
-    async def create_layer_thumbnail(self, layer: Layer, file_name: str):
+    async def create_layer_thumbnail(self, layer: Layer, file_name: str) -> str:
+        """Create layer thumbnail."""
+
+        # Check layer type
+        if layer.type == LayerType.table:
+            image = await self.create_table_thumbnail(layer, file_name)
+        elif layer.type == LayerType.feature:
+            image = await self.create_feature_layer_thumbnail(layer, file_name)
+        else:
+            raise ValueError("Invalid layer type.")
+
+        # Save image to s3 bucket using s3 client from settings
+        dir = settings.THUMBNAIL_DIR_LAYER + "/" + file_name
+        url = settings.ASSETS_URL + "/" + dir
+
+        # Save to s3
+        settings.S3_CLIENT.upload_fileobj(
+            Fileobj=image,
+            Bucket=settings.AWS_S3_ASSETS_BUCKET,
+            Key=dir,
+            ExtraArgs={"ContentType": "image/png"},
+            Callback=None,
+            Config=None,
+        )
+        return url
+
+    async def create_feature_layer_thumbnail(self, layer: Layer) -> io.BytesIO:
+        """Create feature layer thumbnail."""
+
         map = Map(
             "mapbox://styles/mapbox/light-v11",
             provider="mapbox",
@@ -167,63 +197,76 @@ class PrintMap:
         img_bytes = map.renderPNG()
         image = io.BytesIO(img_bytes)
 
-        # Save image to s3 bucket using s3 client from settings
-        dir = settings.THUMBNAIL_DIR_LAYER + "/" + file_name
-        url = settings.ASSETS_URL + "/" + dir
+        return image
 
-        # Save to s3
-        settings.S3_CLIENT.upload_fileobj(
-            Fileobj=image,
-            Bucket=settings.AWS_S3_ASSETS_BUCKET,
-            Key=dir,
-            ExtraArgs={"ContentType": "image/png"},
-            Callback=None,
-            Config=None,
+    async def create_table_thumbnail(self, layer: Layer, file_name: str):
+        """Create table thumbnail."""
+
+        # Get the first 4 four columns of the attribute mapping.
+        columns = []
+        columns_mapped = []
+        for index, (key, value) in enumerate(layer.attribute_mapping.items()):
+            if index < 5:
+                columns.append(key)
+                # Limit columns name to 5 chars and add ...
+                if len(value) > 6:
+                    value = value[:6] + "..."
+                columns_mapped.append(value)
+
+        # Read four rows of the table and create a DataFrame
+        data = await self.async_session.execute(
+            f"""
+            SELECT {', '.join(columns[:4])}
+            FROM {layer.table_name}
+            LIMIT 4
+            """
         )
-        return url
+        data = data.all()
 
+        # Create a DataFrame
+        df = pd.DataFrame(data, columns=columns_mapped[:4])
 
-print_map = PrintMap()
+        # If the len of the columns exceed 4 then add a column with ...
+        if len(columns_mapped) > 4:
+            df["..."] = "..."
+
+        thumbnail_height = 280
+        thumbnail_width = 674
+
+        # Create a figure and an axes
+        fig, ax = plt.subplots(
+            figsize=(thumbnail_width / 80, thumbnail_height / 80)
+        )  # Convert pixels to inches
+
+        # Remove the axes
+        ax.axis("off")
+
+        # Create a table and add it to the axes
+        table = plt.table(
+            cellText=df.values,
+            colLabels=df.columns,
+            loc="center",
+            cellLoc="center",
+            colWidths=[1] * len(df.columns),  # Make columns of equal size
+            bbox=[0, 0, 1, 1],  # Full height and width with a small padding
+        )
+        table.auto_set_font_size(False)
+        table.set_fontsize(13)
+
+        # Set the color, font weight, and font color of the header cells
+        table_props = table.properties()
+        table_cells = table_props["children"]
+        for cell in table_cells:
+            if cell.get_text().get_text() in df.columns:
+                cell.set_facecolor("#99ADC6")
+                cell.get_text().set_weight("bold")  # Make the text bold
+                cell.get_text().set_color("white")  # Set the font color to white
+
+        # Save the file as bytes and return it
+        image = io.BytesIO()
+        fig.savefig(image, bbox_inches="tight", pad_inches=0)
+        image.seek(0)
+        return image
+
 
 # import time
-
-# begin = time.time()
-# # Create a DataFrame
-# df = pd.DataFrame({"Person": [1, 2, 3, 5], "Age": [4, 5, 6, 10], "Gender": [7, 8, 9, 2], "Income": [1, 2, 3, 11]})
-
-# thumbnail_height = 280
-# thumbnail_width = 674
-
-# # Create a figure and an axes
-# fig, ax = plt.subplots(
-#     figsize=(thumbnail_width / 80, thumbnail_height / 80)
-# )  # Convert pixels to inches
-
-# # Remove the axes
-# ax.axis("off")
-
-# # Create a table and add it to the axes
-# table = plt.table(
-#     cellText=df.values,
-#     colLabels=df.columns,
-#     loc="center",
-#     cellLoc="center",
-#     colWidths=[1]*len(df.columns),  # Make columns of equal size
-#     bbox=[0, 0, 1, 1],  # Full height and width with a small padding
-# )
-# table.auto_set_font_size(False)
-# table.set_fontsize(10)
-
-# # Set the color, font weight, and font color of the header cells
-# table_props = table.properties()
-# table_cells = table_props["children"]
-# for cell in table_cells:
-#     if cell.get_text().get_text() in df.columns:
-#         cell.set_facecolor("#99ADC6")
-#         cell.get_text().set_weight("bold")  # Make the text bold
-#         cell.get_text().set_color("white")  # Set the font color to white
-
-# # Save the figure to an image file
-# fig.savefig("df.png")
-# end = time.time()
-# print(end - begin)
