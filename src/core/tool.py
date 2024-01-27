@@ -32,7 +32,7 @@ from src.schemas.layer import (
     UserDataGeomType,
     UserDataTable,
 )
-from src.schemas.style import base_properties
+from src.schemas.style import get_base_style
 from src.schemas.tool import IToolParam
 from src.schemas.toolbox_base import (
     ColumnStatisticsOperation,
@@ -88,6 +88,36 @@ async def start_calculation(
     )
 
     return {"job_id": job.id}
+
+
+def convert_geom_measurement_field(field):
+    if field.endswith("$intersected_area"):
+        field = f"ST_AREA({field.replace('$intersected_area', 'geom')}::geography)"
+    elif field.endswith("$length"):
+        field = f"ST_LENGTH({field.replace('$length', 'geom')}::geography)"
+    return field
+
+
+def get_statistics_sql(field, operation):
+    # Check if field endswith $intersected_area
+    field = convert_geom_measurement_field(field)
+
+    if operation == ColumnStatisticsOperation.count:
+        query = f"COUNT({field})"
+    elif operation == ColumnStatisticsOperation.sum:
+        query = f"SUM({field})"
+    elif operation == ColumnStatisticsOperation.mean:
+        query = f"AVG({field})"
+    elif operation == ColumnStatisticsOperation.median:
+        query = f"PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {field})"
+    elif operation == ColumnStatisticsOperation.min:
+        query = f"MIN({field})"
+    elif operation == ColumnStatisticsOperation.max:
+        query = f"MAX({field})"
+    else:
+        raise ValueError(f"Unsupported operation {operation}")
+
+    return query
 
 
 class CRUDToolBase(CRUDFailedJob):
@@ -158,9 +188,7 @@ class CRUDToolBase(CRUDFailedJob):
         project = await crud_project.get(self.async_session, id=self.project_id)
 
         # TODO: Compute properties dynamically and create thumbnail dynamically
-        properties = base_properties["feature"]["tool"]["join"][
-            layer_in.feature_layer_geometry_type
-        ]
+        properties = get_base_style(layer_in.feature_layer_geometry_type)
         thumbnail = (
             "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png"
         )

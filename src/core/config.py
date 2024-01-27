@@ -14,6 +14,7 @@ class SyncPostgresDsn(PostgresDsn):
 
 
 class Settings(BaseSettings):
+    TEST_MODE: Optional[bool] = False
     API_V2_STR: str = "/api/v2"
     DATA_DIR: str = "/app/data"
     TEST_DATA_DIR: str = "/app/tests/data"

@@ -229,3 +229,4 @@ async def test_aggregate(
         assert response.status_code == 201
         job = await check_job_status(client, response.json()["job_id"])
         assert job["status_simple"] == "finished"
+

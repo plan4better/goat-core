@@ -7,7 +7,6 @@ from sqlmodel import SQLModel
 from src.db.models._base_class import DateTimeBase
 from src.db.models.layer import ContentBaseAttributes, internal_layer_table_name
 from src.schemas.layer import (
-    CQLQuery,
     IExternalImageryRead,
     IExternalVectorTileRead,
     IFeatureScenarioRead,
@@ -16,6 +15,7 @@ from src.schemas.layer import (
     ITableRead,
     LayerOtherProperties,
 )
+from src.schemas.common import CQLQuery
 from src.utils import build_where, optional
 
 

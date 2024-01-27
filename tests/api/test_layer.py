@@ -342,8 +342,8 @@ async def test_get_unique_values_layer_query(
     )
     assert response.status_code == 200
     values = response.json()
-    assert len(values) == 1
-    assert values["Röthensteig"] == 2
+    assert len(values["items"]) == 1
+    assert values["items"][0]["count"] == 2
     return
 
 

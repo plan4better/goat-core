@@ -1,7 +1,7 @@
 # Standard Libraries
 import json
 import os
-from typing import List, Dict
+from typing import List, Dict, Union
 
 # Third-party Libraries
 from fastapi import (
@@ -27,7 +27,6 @@ from src.core.config import settings
 from src.core.content import (
     read_content_by_id,
     read_contents_by_ids,
-    update_content_by_id,
 )
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import layer as crud_layer, CRUDLayerImport, CRUDLayerExport
@@ -47,11 +46,17 @@ from src.schemas.layer import (
     ILayerUpdate,
     MaxFileSizeType,
     IUniqueValue,
+    ITableUpdate,
+    IExternalImageryUpdate,
+    IExternalVectorTileUpdate,
+    IFeatureScenarioUpdate,
+    IFeatureStandardUpdate,
+    IFeatureToolUpdate,
 )
 from src.db.models.layer import FeatureUploadType, FileUploadType, TableUploadType
 from src.schemas.layer import request_examples as layer_request_examples
 from src.utils import build_where, check_file_size
-from src.schemas.error import http_error_handler
+from src.schemas.error import http_error_handler, HTTPErrorHandler
 
 router = APIRouter()
 
@@ -151,6 +156,7 @@ async def create_layer_internal(
     )
     return {"job_id": job.id}
 
+
 @router.post(
     "/internal/{id}/export",
     summary="Export a layer to a file",
@@ -185,6 +191,7 @@ async def export_layer(
     # Return file
     file_name = os.path.basename(zip_file_path)
     return FileResponse(zip_file_path, media_type="application/zip", filename=file_name)
+
 
 @router.post(
     "/external",
@@ -350,17 +357,23 @@ async def update_layer(
         description="The ID of the layer to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
-    layer_in: ILayerUpdate = Body(
+    layer_in: Union[
+        ITableUpdate,
+        IExternalImageryUpdate,
+        IExternalVectorTileUpdate,
+        IFeatureScenarioUpdate,
+        IFeatureStandardUpdate,
+        IFeatureToolUpdate,
+    ] = Body(
         ..., examples=layer_request_examples["update"], description="Layer to update"
     ),
 ):
-    return await update_content_by_id(
-        async_session=async_session,
-        id=id,
-        model=Layer,
-        crud_content=crud_layer,
-        content_in=layer_in,
-    )
+    with HTTPErrorHandler():
+        return await crud_layer.update(
+            async_session=async_session,
+            id=id,
+            layer_in=layer_in,
+        )
 
 
 @router.delete(
@@ -379,22 +392,11 @@ async def delete_layer(
 ):
     """Delete a layer and its data in case of an internal layer."""
 
-    layer = await crud_layer.get(async_session, id=id)
-    if layer is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Layer not found"
+    with HTTPErrorHandler():
+        await crud_layer.delete(
+            async_session=async_session,
+            id=id,
         )
-
-    # Check if internal or external layer
-    if layer.type in [LayerType.table.value, LayerType.feature.value]:
-        # Delete layer data
-        await crud_layer.delete_layer_data(async_session=async_session, layer=layer)
-
-    # Delete layer metadata
-    await crud_layer.delete(
-        db=async_session,
-        id=id,
-    )
     return
 
 
@@ -424,7 +426,9 @@ async def get_feature_count(
         async_session=async_session,
         id=id,
     )
-    where_query = build_where(layer.id, layer.table_name, query, layer.attribute_mapping)
+    where_query = build_where(
+        layer.id, layer.table_name, query, layer.attribute_mapping
+    )
     count = await crud_layer.get_feature_cnt(
         async_session=async_session,
         layer_project=layer,

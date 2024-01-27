@@ -1,6 +1,12 @@
 from fastapi import HTTPException, status
 
 
+class FeatureNotFoundError(Exception):
+    """Raised when the requested feature is not found."""
+
+    pass
+
+
 class LayerError(Exception):
     """Base class for exceptions related to layers."""
 
@@ -72,25 +78,30 @@ class SQLError(Exception):
 
     pass
 
+
 class TimeoutError(Exception):
     """Raised when a job timouts."""
 
     pass
+
 
 class JobKilledError(Exception):
     """Raised when a job is killed."""
 
     pass
 
+
 class NoCRSError(Exception):
     """Raised when CRS is not found."""
 
     pass
 
+
 class DataOutCRSBoundsError(Exception):
     """Raised when data is outside CRS bounds."""
 
     pass
+
 
 class Ogr2OgrError(Exception):
     """Raised when ogr2ogr fails."""
@@ -112,6 +123,12 @@ class R5EndpointError(Exception):
 
 class R5IsochroneComputeError(Exception):
     """Raised when the isochrone data returned by R5 is invalid."""
+
+    pass
+
+
+class ThumbnailComputeError(Exception):
+    """Raised when the thumbnail cannot be computed."""
 
     pass
 
@@ -152,3 +169,20 @@ async def http_error_handler(func, *args, **kwargs):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
             )
+
+
+class HTTPErrorHandler:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            error_status_code = ERROR_MAPPING.get(exc_type)
+            if error_status_code:
+                raise HTTPException(status_code=error_status_code, detail=str(exc_val))
+            else:
+                # Raise generic HTTP error
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=str(exc_val),
+                )

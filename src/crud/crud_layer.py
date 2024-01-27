@@ -2,12 +2,13 @@
 import asyncio
 import json
 import os
-from uuid import UUID, uuid4
 from datetime import datetime
+from uuid import UUID, uuid4
 
 # Third party imports
-from fastapi import BackgroundTasks, HTTPException, UploadFile, status
-from fastapi_pagination import Params as PaginationParams, Page, paginate
+from fastapi import HTTPException, UploadFile, status
+from fastapi_pagination import Page
+from fastapi_pagination import Params as PaginationParams
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,12 +16,12 @@ from sqlmodel import SQLModel
 
 # Local application imports
 from src.core.config import settings
-from src.core.job import job_log, job_init, run_background_or_immediately, CRUDFailedJob
+from src.core.job import CRUDFailedJob, job_init, run_background_or_immediately
 from src.core.layer import FileUpload, OGRFileHandling, delete_old_files
-from src.core.print import Print
+from src.core.print import print_map
 from src.crud.base import CRUDBase
-from src.crud.crud_job import job as crud_job
-from src.db.models.layer import Layer, FeatureLayerExportType, TableLayerExportType
+from src.db.models.layer import Layer
+from src.schemas.error import LayerNotFoundError, NoCRSError, ThumbnailComputeError
 from src.schemas.job import JobStatusType
 from src.schemas.layer import (
     ColumnStatisticsOperation,
@@ -28,24 +29,25 @@ from src.schemas.layer import (
     IFeatureStandardCreateAdditionalAttributes,
     IFileUploadMetadata,
     IInternalLayerCreate,
-    ITableCreateAdditionalAttributes,
     IInternalLayerExport,
+    ITableCreateAdditionalAttributes,
+    IUniqueValue,
     LayerType,
+    OgrDriverType,
     SupportedOgrGeomType,
     UserDataGeomType,
-    OgrDriverType,
-    IUniqueValue,
+    get_layer_schema,
+    layer_update_class,
 )
-from src.schemas.style import base_properties
+from src.schemas.style import get_base_style
 from src.schemas.toolbox_base import MaxFeatureCnt
 from src.utils import (
+    async_delete_dir,
+    async_zip_directory,
     build_where,
     build_where_clause,
     sanitize_error_message,
-    async_zip_directory,
-    async_delete_dir,
 )
-from src.schemas.error import NoCRSError, Ogr2OgrError
 
 
 class CRUDLayer(CRUDBase):
@@ -73,9 +75,9 @@ class CRUDLayer(CRUDBase):
             geom_type = SupportedOgrGeomType[
                 file_metadata["data_types"]["geometry"]["type"]
             ].value
-            additional_attributes["properties"] = base_properties["feature"][
-                "standard"
-            ][geom_type]
+            additional_attributes["properties"] = get_base_style(
+                feature_geometry_type=geom_type
+            )
             additional_attributes["type"] = LayerType.feature
             additional_attributes["feature_layer_type"] = FeatureType.standard
             additional_attributes["feature_layer_geometry_type"] = geom_type
@@ -91,7 +93,6 @@ class CRUDLayer(CRUDBase):
                 **additional_attributes
             ).dict()
 
-        # TODO: Add dynamically created thumbnail to layer.
         # Populate layer_in with additional attributes
         layer_in = Layer(
             **layer_in.dict(exclude_none=True),
@@ -110,17 +111,20 @@ class CRUDLayer(CRUDBase):
 
         # Create thumbnail using print class
         file_name = str(layer.id) + "_" + str(uuid4()) + ".png"
-        try:
-            thumbnail_url = await Print().create_layer_thumnnail(layer=layer_in, file_name=file_name)
-        except Exception as e:
-            print(e)
+        if layer.type == LayerType.feature and settings.TEST_MODE is False:
+            try:
+                thumbnail_url = await print_map.create_layer_thumbnail(
+                    layer=layer_in, file_name=file_name
+                )
+            except Exception as e:
+                raise ThumbnailComputeError(sanitize_error_message(str(e)))
 
-        # Update thumbnail_url
-        layer = await self.update(
-            db=async_session,
-            db_obj=layer,
-            obj_in={"thumbnail_url": thumbnail_url},
-        )
+            # Update thumbnail_url
+            layer = await self.update(
+                db=async_session,
+                db_obj=layer,
+                obj_in={"thumbnail_url": thumbnail_url},
+            )
 
         return layer
 
@@ -138,6 +142,91 @@ class CRUDLayer(CRUDBase):
                 detail="Layer is not a feature layer or table layer. The requested operation cannot be performed on this layer.",
             )
         return layer
+
+    async def update(
+        self,
+        async_session: AsyncSession,
+        id: UUID,
+        layer_in: SQLModel | BaseModel,
+    ):
+        # Get layer
+        layer = await self.get(async_session, id=id)
+        if layer is None:
+            raise LayerNotFoundError(f"{Layer.__name__} not found")
+        old_thumbnail_url = layer.thumbnail_url
+
+        # Get the right Layer model for update
+        schema = get_layer_schema(
+            class_mapping=layer_update_class,
+            layer_type=layer.type,
+            feature_layer_type=layer.feature_layer_type,
+        )
+
+        # Populate laye schema
+        layer_in = schema(**layer_in.dict(exclude_unset=True))
+
+        layer = await CRUDBase(Layer).update(
+            async_session, db_obj=layer, obj_in=layer_in
+        )
+
+        # Update thumbnail. Only run outside of tests as the print class depends on geoapi as external service.
+        if layer.type == LayerType.feature and settings.TEST_MODE is False:
+            file_name = str(layer.id) + "_" + str(uuid4()) + ".png"
+            try:
+                thumbnail_url = await print_map.create_layer_thumbnail(
+                    layer=layer, file_name=file_name
+                )
+            except Exception as e:
+                raise ThumbnailComputeError(sanitize_error_message(str(e)))
+
+            # Update thumbnail_url
+            layer = await CRUDBase(Layer).update(
+                db=async_session,
+                db_obj=layer,
+                obj_in={"thumbnail_url": thumbnail_url},
+            )
+        # Delete old thumbnail from s3 if the thumbnail is not a base thumbnail.
+        if (
+            old_thumbnail_url
+            and settings.THUMBNAIL_DIR_LAYER in old_thumbnail_url
+            and settings.TEST_MODE is False
+        ):
+            settings.S3_CLIENT.delete_object(
+                Bucket=settings.AWS_S3_ASSETS_BUCKET,
+                Key=old_thumbnail_url.replace(settings.ASSETS_URL + "/", ""),
+            )
+        return layer
+
+    async def delete(
+        self,
+        async_session: AsyncSession,
+        id: UUID,
+    ):
+        layer = await CRUDBase(Layer).get(async_session, id=id)
+        if layer is None:
+            raise LayerNotFoundError(f"{Layer.__name__} not found")
+
+        # Check if internal or external layer
+        if layer.type in [LayerType.table.value, LayerType.feature.value]:
+            # Delete layer data
+            await self.delete_layer_data(async_session=async_session, layer=layer)
+
+        # Delete layer metadata
+        await CRUDBase(Layer).delete(
+            db=async_session,
+            id=id,
+        )
+
+        # Delete layer thumbnail
+        if (
+            layer.thumbnail_url
+            and settings.THUMBNAIL_DIR_LAYER in layer.thumbnail_url
+            and settings.TEST_MODE is False
+        ):
+            settings.S3_CLIENT.delete_object(
+                Bucket=settings.AWS_S3_ASSETS_BUCKET,
+                Key=layer.thumbnail_url.replace(settings.ASSETS_URL + "/", ""),
+            )
 
     async def upload_file(
         self,
@@ -399,7 +488,7 @@ class CRUDLayer(CRUDBase):
         data_query = f"""
         SELECT *
         FROM (
-        
+
             SELECT JSONB_BUILD_OBJECT(
                 'value', {column_mapped}, 'count', COUNT(*)
             )
@@ -542,7 +631,7 @@ class CRUDLayer(CRUDBase):
 
         # Get last updated at timestamp
         sql_query = f"""
-            SELECT MAX(updated_at) 
+            SELECT MAX(updated_at)
             FROM {layer.table_name}
             WHERE {where_query}
         """
@@ -652,7 +741,7 @@ class CRUDLayerExport:
             # Write some heading
             f.write("############################################################\n")
             f.write(f"Metadata for layer {layer.name}\n")
-            f.write(f"############################################################\n")
+            f.write("############################################################\n")
             f.write(
                 f"Exported Coordinate Reference System: EPSG {layer.upload_reference_system}\n"
             )

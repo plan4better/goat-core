@@ -8,6 +8,8 @@ from shapely import from_wkt
 from src.core.config import settings
 from src.db.models.layer import Layer
 from src.utils import async_get_with_retry
+# import pandas as pd
+# import matplotlib.pyplot as plt
 
 
 def rgb_to_hex(rgb: tuple) -> str:
@@ -89,13 +91,13 @@ def transform_to_mapbox_layer_style_spec(data: Dict) -> Dict:
         raise ValueError(f"Invalid type: {type}")
 
 
-class Print:
+class PrintMap:
     def __init__(self):
         self.thumbnail_zoom = 13
-        self.thumbnail_height = 140 * 2
-        self.thumbnail_width = 337 * 2
+        self.thumbnail_height = 280
+        self.thumbnail_width = 674
 
-    async def create_layer_thumnnail(self, layer: Layer, file_name: str):
+    async def create_layer_thumbnail(self, layer: Layer, file_name: str):
         map = Map(
             "mapbox://styles/mapbox/light-v11",
             provider="mapbox",
@@ -105,16 +107,18 @@ class Print:
 
         # Load wkt extent using shapely and pass centroid
         geom_shape = from_wkt(layer.extent)
-        map.setCenter(geom_shape.centroid.x, geom_shape.centroid.y)
-
+        map.setBounds(
+            xmin=geom_shape.bounds[0],
+            ymin=geom_shape.bounds[1],
+            xmax=geom_shape.bounds[2],
+            ymax=geom_shape.bounds[3],
+        )
         # Set zoom and size
-        map.setZoom(self.thumbnail_zoom)
         map.setSize(self.thumbnail_width, self.thumbnail_height)
 
         # Transform layer to mapbox style
         style = transform_to_mapbox_layer_style_spec(layer.dict())
 
-        # Get collection id
         # Check if layer is of type Layer then use id else use layer_id
         if isinstance(layer, Layer):
             layer_id = layer.id
@@ -177,3 +181,49 @@ class Print:
             Config=None,
         )
         return url
+
+
+print_map = PrintMap()
+
+# import time
+
+# begin = time.time()
+# # Create a DataFrame
+# df = pd.DataFrame({"Person": [1, 2, 3, 5], "Age": [4, 5, 6, 10], "Gender": [7, 8, 9, 2], "Income": [1, 2, 3, 11]})
+
+# thumbnail_height = 280
+# thumbnail_width = 674
+
+# # Create a figure and an axes
+# fig, ax = plt.subplots(
+#     figsize=(thumbnail_width / 80, thumbnail_height / 80)
+# )  # Convert pixels to inches
+
+# # Remove the axes
+# ax.axis("off")
+
+# # Create a table and add it to the axes
+# table = plt.table(
+#     cellText=df.values,
+#     colLabels=df.columns,
+#     loc="center",
+#     cellLoc="center",
+#     colWidths=[1]*len(df.columns),  # Make columns of equal size
+#     bbox=[0, 0, 1, 1],  # Full height and width with a small padding
+# )
+# table.auto_set_font_size(False)
+# table.set_fontsize(10)
+
+# # Set the color, font weight, and font color of the header cells
+# table_props = table.properties()
+# table_cells = table_props["children"]
+# for cell in table_cells:
+#     if cell.get_text().get_text() in df.columns:
+#         cell.set_facecolor("#99ADC6")
+#         cell.get_text().set_weight("bold")  # Make the text bold
+#         cell.get_text().set_color("white")  # Set the font color to white
+
+# # Save the figure to an image file
+# fig.savefig("df.png")
+# end = time.time()
+# print(end - begin)

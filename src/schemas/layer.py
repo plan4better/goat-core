@@ -4,9 +4,7 @@ from typing import List
 from uuid import UUID, uuid4
 
 # Third party imports
-from pydantic import BaseModel, Field, ValidationError, validator
-from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
-from pydantic import HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, ValidationError, validator
 from pyproj import CRS
 from pyproj.exceptions import CRSError
 
@@ -16,16 +14,19 @@ from src.db.models.layer import (
     ExternalImageryDataType,
     ExternalVectorTileDataType,
     FeatureGeometryType,
+    FeatureLayerExportType,
     FeatureType,
     GeospatialAttributes,
     LayerBase,
     LayerType,
     ScenarioType,
+    TableLayerExportType,
     ToolType,
     layer_base_example,
 )
+from src.schemas.common import CQLQuery
 from src.schemas.job import Msg
-from src.db.models.layer import TableLayerExportType, FeatureLayerExportType
+from src.utils import optional
 
 
 class MaxFileSizeType(int, Enum):
@@ -102,23 +103,6 @@ class IFileUploadMetadata(BaseModel):
     msg: Msg = Field(..., description="Response Message")
 
 
-class CQLQuery(BaseModel):
-    """Model for CQL query."""
-
-    query: dict | None = Field(None, description="CQL query")
-
-    # Validate using cql2_json_parser(query)
-    @validator("query")
-    def validate_query(cls, v):
-        if v is None:
-            return v
-        try:
-            cql2_json_parser(v)
-        except Exception as e:
-            raise ValidationError(f"Invalid CQL query: {e}")
-        return v
-
-
 class ColumnStatisticsOperation(Enum):
     """Allowed operations on numeric columsn."""
 
@@ -136,12 +120,15 @@ class AreaStatisticsOperation(Enum):
     min = "min"
     max = "max"
 
+
 class UserDataTable(str, Enum):
     """Created user tables"""
+
     point = "point"
     line = "line"
     polygon = "polygon"
     no_geometry = "no_geometry"
+
 
 class LayerReadBaseAttributes(BaseModel):
     id: UUID = Field(..., description="Content ID of the layer", alias="id")
@@ -226,13 +213,17 @@ class IFeatureStandardCreateAdditionalAttributes(BaseModel):
         ..., description="Feature layer geometry type"
     )
     properties: dict = Field(..., description="Layer properties.")
-    extent: str = Field(..., description="Geographical Extent of the layer", max_length=500)
+    extent: str = Field(
+        ..., description="Geographical Extent of the layer", max_length=500
+    )
     attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
+
 
 class IFeatureStandardRead(FeatureReadBaseAttributes, DateTimeBase):
     pass
 
 
+@optional
 class IFeatureStandardUpdate(FeatureUpdateBase):
     pass
 
@@ -263,6 +254,7 @@ class IFeatureToolRead(
     pass
 
 
+@optional
 class IFeatureToolUpdate(FeatureUpdateBase):
     """Model to update a feature layer tool."""
 
@@ -297,6 +289,7 @@ class IFeatureScenarioRead(
     pass
 
 
+@optional
 class IFeatureScenarioUpdate(FeatureUpdateBase):
     """Model to update a feature layer scenario."""
 
@@ -369,6 +362,7 @@ class IExternalImageryRead(
     pass
 
 
+@optional
 class IExternalImageryUpdate(LayerBase, GeospatialAttributes):
     """Model to update a imagery layer."""
 
@@ -377,6 +371,7 @@ class IExternalImageryUpdate(LayerBase, GeospatialAttributes):
     other_properties: LayerOtherProperties | None = Field(
         None, description="Additional layer properties."
     )
+
 
 imagery_layer_update_base_example = {
     "url": "https://geodata.nationaalgeoregister.nl/luchtfoto/rgb/wms?request=GetCapabilities&service=WMS",
@@ -397,6 +392,7 @@ imagery_layer_update_base_example = {
 ################################################################################
 # VectorTile Layer DTOs
 ################################################################################
+
 
 class ExternalVectorTileAttributesBase(BaseModel):
     """Base model for additional attributes tile layer."""
@@ -436,6 +432,7 @@ class IExternalVectorTileRead(
     pass
 
 
+@optional
 class IExternalVectorTileUpdate(LayerBase, GeospatialAttributes):
     """Model to update a tile layer."""
 
@@ -469,6 +466,7 @@ class ITableRead(LayerBase, LayerReadBaseAttributes, DateTimeBase):
     attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
 
 
+@optional
 class ITableUpdate(LayerBase):
     """Model to update a table layer."""
 
@@ -519,6 +517,38 @@ layer_creator_class = {
 }
 
 
+layer_update_class = {
+    "internal": {
+        "table": ITableUpdate,
+        "feature": {
+            "standard": IFeatureStandardUpdate,
+            "tool": IFeatureToolUpdate,
+            "scenario": IFeatureScenarioUpdate,
+        },
+    },
+    "external": {
+        "external_imagery": IExternalImageryUpdate,
+        "external_vector_tile": IExternalVectorTileUpdate,
+    },
+}
+
+# Write function to get the correct class
+def get_layer_schema(
+    class_mapping: dict, layer_type: LayerType, feature_layer_type: FeatureType = None
+):
+    # Check if layer is external
+    if layer_type in class_mapping["external"]:
+        return class_mapping["external"][layer_type]
+    # Check if layer is internal
+    elif layer_type in class_mapping["internal"]:
+        # Check if layer is feature
+        if feature_layer_type:
+            return class_mapping["internal"][layer_type][feature_layer_type]
+        else:
+            return class_mapping["internal"][layer_type]
+    else:
+        raise ValueError(f"Layer type ({layer_type}) is invalid")
+
 class ILayerExternalCreate(BaseModel):
     def __new__(cls, *args, **kwargs):
         layer_create_class = get_layer_class(
@@ -546,16 +576,19 @@ class ILayerUpdate(BaseModel):
         )
         return layer_update_class(**kwargs)
 
+
 class IUniqueValue(BaseModel):
     """Model for unique values."""
 
     value: str = Field(..., description="Unique value")
     count: int = Field(..., description="Number of occurrences")
 
+
 class IValidateJobId(BaseModel):
     """Model to import a file object."""
 
     validate_job_id: UUID = Field(..., description="Upload job ID")
+
 
 class IInternalLayerExport(CQLQuery):
     """Layer export input schema."""
@@ -564,8 +597,12 @@ class IInternalLayerExport(CQLQuery):
     file_type: FeatureLayerExportType | TableLayerExportType = Field(
         ..., description="File type"
     )
-    file_name: str = Field(..., description="File name of the exported file.", max_length=500)
-    crs: str | None = Field(None, description="CRS of the exported file.", max_length=20)
+    file_name: str = Field(
+        ..., description="File name of the exported file.", max_length=500
+    )
+    crs: str | None = Field(
+        None, description="CRS of the exported file.", max_length=20
+    )
 
     # Check if crs is valid
     @validator("crs")
@@ -582,10 +619,9 @@ class IInternalLayerExport(CQLQuery):
     def validate_crs_kml(cls, crs, values):
         if values["file_type"] == FeatureLayerExportType.kml:
             if crs != "EPSG:4326":
-                raise ValidationError(
-                    "KML export only supports EPSG:4326 projection."
-                )
+                raise ValidationError("KML export only supports EPSG:4326 projection.")
         return crs
+
 
 request_examples = {
     "get": {

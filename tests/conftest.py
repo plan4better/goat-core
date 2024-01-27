@@ -24,7 +24,7 @@ from src.schemas.motorized_mobility import (
 from src.schemas.project import (
     request_examples as project_request_examples,
 )
-from src.utils import get_user_table
+from src.core.layer import get_user_table
 from tests.utils import (
     check_job_status,
     generate_random_string,
@@ -34,11 +34,14 @@ from tests.utils import (
     upload_valid_files,
 )
 
-settings.RUN_AS_BACKGROUND_TASK = True
-settings.USER_DATA_SCHEMA = "test_user_data"
-settings.CUSTOMER_SCHEMA = "test_customer"
-settings.MAX_FOLDER_COUNT = 10
-
+def set_test_mode():
+    settings.RUN_AS_BACKGROUND_TASK = True
+    settings.USER_DATA_SCHEMA = "test_user_data"
+    settings.CUSTOMER_SCHEMA = "test_customer"
+    settings.MAX_FOLDER_COUNT = 10
+    settings.TEST_MODE = True
+    
+set_test_mode()
 
 @pytest_asyncio.fixture
 async def client():

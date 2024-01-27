@@ -2,7 +2,7 @@ from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
 from fastapi_pagination import Page, Params
 from fastapi_pagination.ext.sqlalchemy import paginate
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy import delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -29,7 +29,9 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """
         self.model = model
 
-    def extend_statement(self, statement: select, *, extra_fields: List[Any] = []) -> select:
+    def extend_statement(
+        self, statement: select, *, extra_fields: List[Any] = []
+    ) -> select:
         for field in extra_fields:
             if (
                 hasattr(field, "property")
@@ -47,7 +49,9 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         result = await db.execute(statement)
         return result.scalars().first()
 
-    async def get_all(self, db: AsyncSession, *, extra_fields: List[Any] = []) -> List[ModelType]:
+    async def get_all(
+        self, db: AsyncSession, *, extra_fields: List[Any] = []
+    ) -> List[ModelType]:
         statement = select(self.model)
         statement = self.extend_statement(statement, extra_fields=extra_fields)
         result = await db.execute(statement)
@@ -95,7 +99,9 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         if search_text is not None:
             for key, value in search_text.items():
                 # Search for text in specified column make both input and column lowercase
-                query = query.where(func.lower(getattr(self.model, key)).contains(value.lower()))
+                query = query.where(
+                    func.lower(getattr(self.model, key)).contains(value.lower())
+                )
 
         columns = self.model.__table__.columns
         if order_by and order_by in columns:
@@ -136,7 +142,9 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             update_data = {}
             fields = []
         else:
-            raise ValueError("Obj_in must be either a dict or a Pydantic model or None.")
+            raise ValueError(
+                "Obj_in must be either a dict or a Pydantic model or None."
+            )
 
         for field in fields:
             if field in update_data:
@@ -144,6 +152,15 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         db.add(db_obj)
         await db.commit()
         await db.refresh(db_obj)
+
+        # Create a new object from the updated object to validate it in case the layer has validators.
+        if list(self.model.__get_validators__()) != []:
+            try:
+                validated_obj = self.model(**db_obj.dict())
+                for field in validated_obj.__fields__.keys():
+                    setattr(db_obj, field, getattr(validated_obj, field))
+            except ValidationError as e:
+                raise e
         return db_obj
 
     async def update_multi(
@@ -185,7 +202,9 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     async def delete(self, db: AsyncSession, *, id: int) -> ModelType:
         return await self.remove(db, id=id)
 
-    async def remove_multi(self, db: AsyncSession, *, ids: Union[int, List[int]]) -> ModelType:
+    async def remove_multi(
+        self, db: AsyncSession, *, ids: Union[int, List[int]]
+    ) -> ModelType:
         if type(ids) == int:
             ids = [ids]
         statement = delete(self.model).where(self.model.id.in_(ids))
@@ -196,7 +215,9 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         # TODO: add removed items instead.
         return ""
 
-    async def remove_multi_by_key(self, db: AsyncSession, *, key: str, values: Any) -> ModelType:
+    async def remove_multi_by_key(
+        self, db: AsyncSession, *, key: str, values: Any
+    ) -> ModelType:
         if not type(values) == list:
             values = [values]
         statement = delete(self.model).where(getattr(self.model, key).in_(values))

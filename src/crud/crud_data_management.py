@@ -2,7 +2,7 @@ from sqlalchemy import text
 
 from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
-from src.core.tool import CRUDToolBase
+from src.core.tool import CRUDToolBase, get_statistics_sql
 from src.db.models.layer import ToolType
 from src.schemas.error import ColumnTypeError
 from src.schemas.job import JobStatusType, JobType
@@ -14,10 +14,9 @@ from src.schemas.toolbox_base import DefaultResultLayerName
 from src.utils import (
     build_where_clause,
     get_result_column,
-    get_statistics_sql,
-    get_user_table,
     search_value,
 )
+from src.core.layer import get_user_table
 
 
 class CRUDJoin(CRUDToolBase):

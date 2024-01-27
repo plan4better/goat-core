@@ -18,6 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
 from pyproj import CRS
 from shapely import wkb
+from pydantic import BaseModel
+from sqlmodel import SQLModel
 
 # Local application imports
 from src.core.config import settings
@@ -52,6 +54,34 @@ async def delete_old_files(max_time: int):
         stat_result = await aos.stat(os.path.join(settings.DATA_DIR, folder.name))
         if stat_result.st_mtime < (time.time() - 2 * 3600):
             await async_delete_dir(os.path.join(settings.DATA_DIR, folder.name))
+
+def get_user_table(layer: Union[dict, SQLModel, BaseModel]):
+    """Get the table with the user data based on the layer metadata."""
+
+    # Check if layer is of type dict or SQLModel/BaseModel
+    if isinstance(layer, dict):
+        if layer["type"] == LayerType.feature.value:
+            feature_layer_geometry_type = layer["feature_layer_geometry_type"]
+        elif layer["type"] == LayerType.table.value:
+            feature_layer_geometry_type = "no_geometry"
+        else:
+            raise ValueError(f"The passed layer type {layer['type']} is not supported.")
+        user_id = layer["user_id"]
+    elif isinstance(layer, (SQLModel, BaseModel)):
+        if layer.type == LayerType.feature.value:
+            feature_layer_geometry_type = layer.feature_layer_geometry_type.value
+        elif layer.type == LayerType.table.value:
+            feature_layer_geometry_type = "no_geometry"
+        else:
+            raise ValueError(
+                f"The passed layer type {layer.type} is not supported as internal layer."
+            )
+        user_id = layer.user_id
+    else:
+        raise ValueError(f"The passed layer type {type(layer)} is not supported.")
+
+    return f"{settings.USER_DATA_SCHEMA}.{feature_layer_geometry_type}_{str(user_id).replace('-', '')}"
+
 
 
 class FileUpload:
