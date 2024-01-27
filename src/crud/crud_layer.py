@@ -147,7 +147,7 @@ class CRUDLayer(CRUDBase):
         self,
         async_session: AsyncSession,
         id: UUID,
-        layer_in: SQLModel | BaseModel,
+        layer_in: dict,
     ):
         # Get layer
         layer = await self.get(async_session, id=id)
@@ -162,8 +162,8 @@ class CRUDLayer(CRUDBase):
             feature_layer_type=layer.feature_layer_type,
         )
 
-        # Populate laye schema
-        layer_in = schema(**layer_in.dict(exclude_unset=True))
+        # Populate layer schema
+        layer_in = schema(**layer_in)
 
         layer = await CRUDBase(Layer).update(
             async_session, db_obj=layer, obj_in=layer_in
