@@ -1,7 +1,7 @@
 # Standard Libraries
 import json
 import os
-from typing import List, Dict, Union
+from typing import Any, Dict, List
 
 # Third-party Libraries
 from fastapi import (
@@ -16,11 +16,12 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
 from sqlalchemy import and_, or_, select
+
 from src.core.config import settings
 
 # Local application imports
@@ -29,34 +30,34 @@ from src.core.content import (
     read_contents_by_ids,
 )
 from src.crud.crud_job import job as crud_job
-from src.crud.crud_layer import layer as crud_layer, CRUDLayerImport, CRUDLayerExport
-from src.db.models.layer import FeatureType, Layer, LayerType
+from src.crud.crud_layer import CRUDLayerExport, CRUDLayerImport
+from src.crud.crud_layer import layer as crud_layer
+from src.db.models.layer import (
+    FeatureType,
+    FeatureUploadType,
+    FileUploadType,
+    Layer,
+    LayerType,
+    TableUploadType,
+)
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_user_id
 from src.schemas.common import ContentIdList, OrderEnum
+from src.schemas.error import HTTPErrorHandler, http_error_handler
 from src.schemas.job import JobType
 from src.schemas.layer import (
     AreaStatisticsOperation,
     ColumnStatisticsOperation,
     IFileUploadMetadata,
     IInternalLayerCreate,
-    ILayerExternalCreate,
     IInternalLayerExport,
+    ILayerExternalCreate,
     ILayerRead,
-    ILayerUpdate,
-    MaxFileSizeType,
     IUniqueValue,
-    ITableUpdate,
-    IExternalImageryUpdate,
-    IExternalVectorTileUpdate,
-    IFeatureScenarioUpdate,
-    IFeatureStandardUpdate,
-    IFeatureToolUpdate,
+    MaxFileSizeType,
 )
-from src.db.models.layer import FeatureUploadType, FileUploadType, TableUploadType
 from src.schemas.layer import request_examples as layer_request_examples
 from src.utils import build_where, check_file_size
-from src.schemas.error import http_error_handler, HTTPErrorHandler
 
 router = APIRouter()
 
@@ -274,13 +275,11 @@ async def read_layers(
     page_params: PaginationParams = Depends(),
     folder_id: UUID4 | None = Query(None, description="Folder ID"),
     user_id: UUID4 = Depends(get_user_id),
-    layer_type: List[LayerType]
-    | None = Query(
+    layer_type: List[LayerType] | None = Query(
         None,
         description="Layer type to filter by. Can be multiple. If not specified, all layer types will be returned.",
     ),
-    feature_layer_type: List[FeatureType]
-    | None = Query(
+    feature_layer_type: List[FeatureType] | None = Query(
         None,
         description="Feature layer type. Can be multiple. If not specified, all feature layer types will be returned. Can only be used if 'layer_type' contains 'feature'.",
     ),
@@ -357,14 +356,7 @@ async def update_layer(
         description="The ID of the layer to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
-    layer_in: Union[
-        ITableUpdate,
-        IExternalImageryUpdate,
-        IExternalVectorTileUpdate,
-        IFeatureScenarioUpdate,
-        IFeatureStandardUpdate,
-        IFeatureToolUpdate,
-    ] = Body(
+    layer_in: Dict[Any, Any] = Body(
         ..., examples=layer_request_examples["update"], description="Layer to update"
     ),
 ):
@@ -544,20 +536,17 @@ async def class_breaks(
         description="The column name to get the statistics from. It needs to be a number column.",
         example="name",
     ),
-    breaks: int
-    | None = Query(
+    breaks: int | None = Query(
         None,
         description="Number of class breaks to create",
         example=5,
     ),
-    query: str
-    | None = Query(
+    query: str | None = Query(
         None,
         description="CQL2-Filter in JSON format",
         example={"op": "=", "args": [{"property": "category"}, "bus_stop"]},
     ),
-    stripe_zeros: bool
-    | None = Query(
+    stripe_zeros: bool | None = Query(
         True,
         description="Stripe zeros from the column before performing the operation",
         example=True,
