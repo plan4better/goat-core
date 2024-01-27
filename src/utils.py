@@ -26,19 +26,12 @@ from rich import print as print
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 import aiohttp
-import aioboto3
 
 # Local application imports
 from src.core.config import settings
 from src.schemas.common import CQLQuery
 
 
-async def delete_s3_object(bucket: str, key: str):
-    async with aioboto3.client('s3') as s3_client:
-        await s3_client.delete_object(Bucket=bucket, Key=key)
-
-# Usage:
-# asyncio.run(delete_s3_object('my-bucket', 'my-key'))
 
 def optional(*fields):
     def dec(_cls):
