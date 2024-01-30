@@ -314,7 +314,8 @@ class PrintMap:
         map.setSize(self.thumbnail_width, self.thumbnail_height)
 
         # Sort layer_project by layer order
-        layers_project.sort(key=lambda x: project.layer_order.index(x.id))
+        if len(layers_project) > 1:
+            layers_project.sort(key=lambda x: project.layer_order.index(x.id))
 
         for layer in layers_project:
             if layer.type == LayerType.table:
