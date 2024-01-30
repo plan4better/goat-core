@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.crud.crud_layer import layer as crud_layer
 from src.db.models._link_model import LayerProjectLink
 from src.db.models.layer import Layer
+from src.db.models.project import Project
 from src.schemas.layer import LayerType, FeatureGeometryType
 from src.schemas.project import (
     layer_type_mapping_read,
@@ -20,7 +21,6 @@ from typing import Union
 
 # Local application imports
 from .base import CRUDBase
-from .crud_project import project as crud_project
 from src.schemas.error import UnsupportedLayerTypeError, LayerNotFoundError
 
 
@@ -257,7 +257,7 @@ class CRUDLayerProject(CRUDBase):
             layer_project_ids.append(layer_project.id)
 
         # Get project to update layer order
-        project = await crud_project.get(async_session, id=project_id)
+        project = await CRUDBase(Project).get(async_session, id=project_id)
         layer_order = project.layer_order
         # Add layer ids to the beginning of the list
         if layer_order is None:
@@ -266,7 +266,7 @@ class CRUDLayerProject(CRUDBase):
             layer_order = layer_project_ids + layer_order
 
         # Update project layer order
-        project = await crud_project.update(
+        project = await CRUDBase(Project).update(
             async_session,
             db_obj=project,
             obj_in={"layer_order": layer_order},

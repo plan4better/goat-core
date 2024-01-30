@@ -4,6 +4,7 @@ from src.schemas.project import InitialViewState
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from fastapi import HTTPException, status
+from src.db.models.project import Project
 
 
 class CRUDUserProject(CRUDBase):
@@ -32,6 +33,16 @@ class CRUDUserProject(CRUDBase):
             db_obj=user_project[0],
             obj_in={"initial_view_state": initial_view_state.dict()},
         )
+        # Get project
+        project = await CRUDBase(Project).get(async_session, id=project_id)
+
+        # Update project updated_at
+        await CRUDBase(Project).update(
+            async_session,
+            db_obj=project,
+            obj_in={"updated_at": user_project.updated_at},
+        )
+
         return user_project
 
 

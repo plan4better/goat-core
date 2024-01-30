@@ -95,6 +95,9 @@ class Settings(BaseSettings):
             return f"Basic {v}"
         return None
 
+    # GOAT GEOAPI config
+    GOAT_GEOAPI_HOST: str = None
+
     # GOAT Routing config
     GOAT_ROUTING_HOST: str = None
     GOAT_ROUTING_PORT: Optional[int] = 80
@@ -139,7 +142,7 @@ class Settings(BaseSettings):
 
     ASSETS_URL: Optional[str] = None
     THUMBNAIL_DIR_LAYER: Optional[str] = "img/users/dev/thumbnails/layer"
-    THUMBNAIL_DIR_PROJECT: Optional[str] = "img/users/dev/thumbnails/layer"
+    THUMBNAIL_DIR_PROJECT: Optional[str] = "img/users/dev/thumbnails/project"
 
     class Config:
         case_sensitive = True

@@ -1,6 +1,7 @@
 from uuid import UUID
+import pytz
 from fastapi_pagination import Page, Params as PaginationParams
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.content import update_content_by_id
 from src.db.models.project import Project
@@ -8,12 +9,62 @@ from src.schemas.common import OrderEnum
 from src.schemas.project import (
     IProjectBaseUpdate,
     IProjectRead,
+    IProjectCreate,
+    InitialViewState,
 )
-
+from src.crud.crud_user_project import user_project as crud_user_project
+from src.crud.crud_layer_project import layer_project as crud_layer_project
 from .base import CRUDBase
+from datetime import datetime, timedelta
+from src.core.print import PrintMap
+from src.core.config import settings
+from src.db.models._link_model import LayerProjectLink, UserProjectLink
 
 
 class CRUDProject(CRUDBase):
+    async def create(
+        self,
+        async_session: AsyncSession,
+        project_in: IProjectCreate,
+        initial_view_state: InitialViewState,
+    ) -> IProjectRead:
+        """Create project"""
+
+        # Create project
+        project = await CRUDBase(Project).create(
+            db=async_session,
+            obj_in=project_in,
+        )
+        # Create link between user and project for initial view state
+        user_project = await crud_user_project.create(
+            async_session,
+            obj_in=UserProjectLink(
+                user_id=project.user_id,
+                project_id=project.id,
+                initial_view_state=initial_view_state,
+            ),
+        )
+        # Create thumbnail
+        print_map = PrintMap(async_session)
+        thumbnail_url = await print_map.create_project_thumbnail(
+            project=project,
+            initial_view_state=user_project.initial_view_state,
+            layers_project=[],
+            file_name=str(project.id)
+            + project.updated_at.strftime("_%Y-%m-%d_%H-%M-%S-%f")[:-3]
+            + ".png",
+        )
+
+        # Update project with thumbnail url
+        project = await self.update(
+            async_session,
+            db_obj=project,
+            obj_in={"thumbnail_url": thumbnail_url},
+        )
+
+        # Doing unneeded type conversion to make sure the relations of project are not loaded
+        return IProjectRead(**project.dict())
+
     async def get_projects(
         self,
         async_session: AsyncSession,
@@ -50,6 +101,63 @@ class CRUDProject(CRUDBase):
             order=order,
         )
 
+        # Check for projects that have the thumbnail older then updated at
+        for project in projects.items:
+            old_thumbnail_url = project.thumbnail_url
+            thumbnail_updated_at = old_thumbnail_url.replace(
+                settings.ASSETS_URL
+                + "/"
+                + settings.THUMBNAIL_DIR_PROJECT
+                + "/"
+                + str(project.id)
+                + "_",
+                "",
+            ).replace(".png", "")
+            try:
+                date_to_check = datetime.strptime(
+                    thumbnail_updated_at, "%Y-%m-%d_%H-%M-%S-%f"
+                )
+            except ValueError:
+                print("Thumbnail name is not in correct format")
+                continue
+
+            if settings.TEST_MODE is False:
+                if date_to_check < project.updated_at.astimezone(pytz.UTC).replace(
+                    tzinfo=None
+                ):
+                    user_project = await crud_user_project.get_by_multi_keys(
+                        async_session,
+                        keys={"user_id": user_id, "project_id": project.id},
+                    )
+                    layers_project = await crud_layer_project.get_layers(
+                        async_session=async_session, project_id=project.id
+                    )
+                    if user_project != [] and layers_project != []:
+                        #with PrintMap(async_session) as print_map:
+                        print_map = PrintMap(async_session)
+                        thumbnail_url = await print_map.create_project_thumbnail(
+                            project=project,
+                            initial_view_state=user_project[0].initial_view_state,
+                            layers_project=layers_project,
+                            file_name=str(project.id)
+                            + project.updated_at.strftime("_%Y-%m-%d_%H-%M-%S-%f")[
+                                :-3
+                            ]
+                            + ".png",
+                        )
+                        await self.update(
+                            async_session,
+                            db_obj=project,
+                            obj_in={"thumbnail_url": thumbnail_url},
+                        )
+
+                        # Delete old thumbnail url
+                        settings.S3_CLIENT.delete_object(
+                            Bucket=settings.AWS_S3_ASSETS_BUCKET,
+                            Key=old_thumbnail_url.replace(
+                                settings.ASSETS_URL + "/", ""
+                            ),
+                        )
         return projects
 
     async def update_base(

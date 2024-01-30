@@ -51,23 +51,11 @@ async def create_project(
     """This will create an empty project with a default initial view state. The project does not contains layers or reports."""
 
     # Create project
-    project = await crud_project.create(
-        db=async_session,
-        obj_in=Project(**project_in.dict(exclude_none=True), user_id=user_id),
+    return await crud_project.create(
+        async_session=async_session,
+        project_in=Project(**project_in.dict(exclude_none=True), user_id=user_id),
+        initial_view_state=project_in.initial_view_state,
     )
-    # Create link between user and project for initial view state
-    await crud_user_project.create(
-        async_session,
-        obj_in=UserProjectLink(
-            user_id=user_id,
-            project_id=project.id,
-            initial_view_state=project_in.initial_view_state,
-        ),
-    )
-
-    # Doing unneded type conversion to make sure the relations of project are not loaded
-    return IProjectRead(**project.dict())
-
 
 @router.get(
     "/{id}",
@@ -408,6 +396,16 @@ async def update_layer_in_project(
         async_session=async_session,
         id=layer_project_id,
         layer_in=layer_in,
+    )
+    # Update the last updated at of the project
+    # Get project to update it
+    project = await crud_project.get(async_session, id=id)
+
+    # Update project updated_at
+    await crud_project.update(
+        async_session,
+        db_obj=project,
+        obj_in={"updated_at": layer_project.updated_at},
     )
 
     # Get layers in project

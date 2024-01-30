@@ -7,10 +7,16 @@ import pandas as pd
 from pymgl import Map
 from shapely import from_wkt
 from sqlalchemy.ext.asyncio import AsyncSession
+import random
+from pydantic import BaseModel
+
 
 from src.core.config import settings
 from src.db.models.layer import Layer, LayerType
 from src.utils import async_get_with_retry
+from src.schemas.colors import diverging_colors
+from src.schemas.project import InitialViewState
+from src.db.models import Project
 
 
 def rgb_to_hex(rgb: tuple) -> str:
@@ -18,12 +24,12 @@ def rgb_to_hex(rgb: tuple) -> str:
 
 
 def get_mapbox_style_color(data: Dict, type: str) -> Union[str, List]:
-    colors = data.get(f"{type}_range", {}).get("color")
-    field_name = data.get(f"{type}_field", {}).get("name")
+    colors = data["properties"].get(f"{type}_range", {}).get("colors")
+    field_name = data["properties"].get(f"{type}_field", {}).get("name")
     if (
         not field_name
         or not colors
-        or len(data.get(f"{type}_scale_breaks", {}).get("breaks", []))
+        or len(data["properties"].get(f"{type}_scale_breaks", {}).get("breaks", []))
         != len(colors) - 1
     ):
         return (
@@ -40,7 +46,10 @@ def get_mapbox_style_color(data: Dict, type: str) -> Union[str, List]:
             color_steps.append(
                 [
                     color,
-                    data.get(f"{type}_scale_breaks", {}).get("breaks", [])[index] or 0,
+                    data["properties"]
+                    .get(f"{type}_scale_breaks", {})
+                    .get("breaks", [])[index]
+                    or 0,
                 ]
             )
 
@@ -99,14 +108,22 @@ class PrintMap:
         self.thumbnail_width = 674
         self.async_session = async_session
 
+    # def __enter__(self):
+    #     self.display = Display(visible=0, size=(800, 600))
+    #     self.display.start()
+    #     return self
+
+    # def __exit__(self, exc_type, exc_val, exc_tb):
+    #     self.display.stop()
+
     async def create_layer_thumbnail(self, layer: Layer, file_name: str) -> str:
         """Create layer thumbnail."""
 
         # Check layer type
         if layer.type == LayerType.table:
-            image = await self.create_table_thumbnail(layer, file_name)
+            image = await self.create_table_thumbnail(layer)
         elif layer.type == LayerType.feature:
-            image = await self.create_feature_layer_thumbnail(layer, file_name)
+            image = await self.create_feature_layer_thumbnail(layer)
         else:
             raise ValueError("Invalid layer type.")
 
@@ -128,6 +145,7 @@ class PrintMap:
     async def create_feature_layer_thumbnail(self, layer: Layer) -> io.BytesIO:
         """Create feature layer thumbnail."""
 
+        # Define map
         map = Map(
             "mapbox://styles/mapbox/light-v11",
             provider="mapbox",
@@ -135,7 +153,7 @@ class PrintMap:
         )
         map.load()
 
-        # Load wkt extent using shapely and pass centroid
+        # Set map extent
         geom_shape = from_wkt(layer.extent)
         map.setBounds(
             xmin=geom_shape.bounds[0],
@@ -143,24 +161,19 @@ class PrintMap:
             xmax=geom_shape.bounds[2],
             ymax=geom_shape.bounds[3],
         )
-        # Set zoom and size
         map.setSize(self.thumbnail_width, self.thumbnail_height)
 
         # Transform layer to mapbox style
         style = transform_to_mapbox_layer_style_spec(layer.dict())
 
-        # Check if layer is of type Layer then use id else use layer_id
-        if isinstance(layer, Layer):
-            layer_id = layer.id
-        else:
-            layer_id = layer.layer_id
-
+        # Get collection id
+        layer_id = layer.id
         collection_id = "user_data." + str(layer_id).replace("-", "")
 
         # Request in recursive loop if layer was already added in geoapi if it does not fail the layer was added
         header = {"Content-Type": "application/json"}
         await async_get_with_retry(
-            url="https://geoapi.goat.dev.plan4better.de/collections/" + collection_id,
+            url=f"{settings.GOAT_GEOAPI_HOST}/collections/" + collection_id,
             headers=header,
             num_retries=10,
             retry_delay=1,
@@ -168,7 +181,7 @@ class PrintMap:
 
         # Add layer source
         tile_url = (
-            "https://geoapi.goat.dev.plan4better.de/collections/"
+            f"{settings.GOAT_GEOAPI_HOST}/collections/"
             + collection_id
             + "/tiles/{z}/{x}/{y}"
         )
@@ -199,13 +212,17 @@ class PrintMap:
 
         return image
 
-    async def create_table_thumbnail(self, layer: Layer, file_name: str):
+    async def create_table_thumbnail(self, layer: Layer):
         """Create table thumbnail."""
 
         # Get the first 4 four columns of the attribute mapping.
         columns = []
         columns_mapped = []
-        for index, (key, value) in enumerate(layer.attribute_mapping.items()):
+        mixed_items = list(layer.attribute_mapping.items())
+        random.shuffle(mixed_items)
+        index = 0
+        for key, value in mixed_items:
+            index += 1
             if index < 5:
                 columns.append(key)
                 # Limit columns name to 5 chars and add ...
@@ -222,20 +239,26 @@ class PrintMap:
             """
         )
         data = data.all()
+        # Add an empty row at end of each row
+        data = [list(row) for row in data]
+        data.append(["..."] * len(columns_mapped[:4]))
+
+        # Limit the length of the content of each cell to 15 chars and add ...
+        for row in data:
+            for index, cell in enumerate(row):
+                if len(str(cell)) > 15:
+                    row[index] = str(cell)[:15] + "..."
 
         # Create a DataFrame
         df = pd.DataFrame(data, columns=columns_mapped[:4])
 
         # If the len of the columns exceed 4 then add a column with ...
         if len(columns_mapped) > 4:
-            df["..."] = "..."
-
-        thumbnail_height = 280
-        thumbnail_width = 674
+            df["... "] = "..."
 
         # Create a figure and an axes
         fig, ax = plt.subplots(
-            figsize=(thumbnail_width / 80, thumbnail_height / 80)
+            figsize=(self.thumbnail_width / 80, self.thumbnail_height / 80)
         )  # Convert pixels to inches
 
         # Remove the axes
@@ -251,22 +274,116 @@ class PrintMap:
             bbox=[0, 0, 1, 1],  # Full height and width with a small padding
         )
         table.auto_set_font_size(False)
-        table.set_fontsize(13)
+        table.set_fontsize(12)
 
         # Set the color, font weight, and font color of the header cells
         table_props = table.properties()
         table_cells = table_props["children"]
+        color = "#535353"
         for cell in table_cells:
             if cell.get_text().get_text() in df.columns:
-                cell.set_facecolor("#99ADC6")
+                cell.set_facecolor(color)
+                cell.get_text().set_fontsize(16)
                 cell.get_text().set_weight("bold")  # Make the text bold
                 cell.get_text().set_color("white")  # Set the font color to white
 
         # Save the file as bytes and return it
         image = io.BytesIO()
-        fig.savefig(image, bbox_inches="tight", pad_inches=0)
+        fig.savefig(image, bbox_inches="tight", pad_inches=1)
         image.seek(0)
         return image
 
+    async def create_project_thumbnail(
+        self,
+        project: Project,
+        initial_view_state: InitialViewState,
+        layers_project: [BaseModel],
+        file_name: str,
+    ):
+        # Define map
+        map = Map(
+            "mapbox://styles/mapbox/light-v11",
+            provider="mapbox",
+            token=settings.MAPBOX_TOKEN,
+        )
+        map.load()
 
-# import time
+        # Set map extent
+        map.setCenter(initial_view_state["longitude"], initial_view_state["latitude"])
+        map.setZoom(initial_view_state["zoom"])
+        map.setSize(self.thumbnail_width, self.thumbnail_height)
+
+        # Sort layer_project by layer order
+        layers_project.sort(key=lambda x: project.layer_order.index(x.id))
+
+        for layer in layers_project:
+            if layer.type == LayerType.table:
+                continue
+
+            # Get collection id
+            layer_id = layer.layer_id
+            collection_id = "user_data." + str(layer_id).replace("-", "")
+
+            # Request in recursive loop if layer was already added in geoapi if it does not fail the layer was added
+            header = {"Content-Type": "application/json"}
+            await async_get_with_retry(
+                url=f"{settings.GOAT_GEOAPI_HOST}/collections/" + collection_id,
+                headers=header,
+                num_retries=10,
+                retry_delay=1,
+            )
+
+            # Transform style
+            style = transform_to_mapbox_layer_style_spec(layer.dict())
+
+            # Add layer source
+            tile_url = (
+                f"{settings.GOAT_GEOAPI_HOST}/collections/"
+                + collection_id
+                + "/tiles/{z}/{x}/{y}"
+            )
+            map.addSource(
+                layer.name,
+                json.dumps(
+                    {
+                        "type": "vector",
+                        "tiles": [tile_url],
+                    }
+                ),
+            )
+            # Add layer
+            map.addLayer(
+                json.dumps(
+                    {
+                        "id": layer.name,
+                        "type": style["type"],
+                        "source": layer.name,
+                        "source-layer": "default",
+                        "paint": style["paint"],
+                    }
+                )
+            )
+
+        #img_bytes = map.renderPNG()
+        try:
+            img_bytes = map.renderPNG()
+        except RuntimeError as e:
+            print("Error while rendering PNG:", e)
+            print("Map state:", map.getState())
+            raise
+        image = io.BytesIO(img_bytes)
+
+        # Save image to s3 bucket using s3 client from settings
+        dir = settings.THUMBNAIL_DIR_PROJECT + "/" + file_name
+        url = settings.ASSETS_URL + "/" + dir
+
+        # Save to s3
+        settings.S3_CLIENT.upload_fileobj(
+            Fileobj=image,
+            Bucket=settings.AWS_S3_ASSETS_BUCKET,
+            Key=dir,
+            ExtraArgs={"ContentType": "image/png"},
+            Callback=None,
+            Config=None,
+        )
+        return url

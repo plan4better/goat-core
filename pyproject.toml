@@ -90,6 +90,7 @@ aiofiles = "^23.2.1"
 pygeofilter = "^0.2.1"
 pycountry = "^23.12.11"
 pymgl = { url = "https://assets.plan4better.de/other/libs/pymgl-0.4.0-cp311-cp311-linux_x86_64.whl" }
+matplotlib = "^3.8.2"
 
 [tool.poetry.group.dev.dependencies]
 sqlalchemy-stubs = "^0.3"

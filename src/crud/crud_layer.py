@@ -120,7 +120,7 @@ class CRUDLayer(CRUDBase):
                 raise ThumbnailComputeError(sanitize_error_message(str(e)))
 
             # Update thumbnail_url
-            layer = await self.update(
+            layer = await CRUDBase(Layer).update(
                 db=async_session,
                 db_obj=layer,
                 obj_in={"thumbnail_url": thumbnail_url},
