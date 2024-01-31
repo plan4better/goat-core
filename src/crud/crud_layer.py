@@ -18,7 +18,9 @@ from sqlmodel import SQLModel
 from src.core.config import settings
 from src.core.job import CRUDFailedJob, job_init, run_background_or_immediately
 from src.core.layer import FileUpload, OGRFileHandling, delete_old_files
-from src.core.print import PrintMap
+# Import PrintMap only outside of tests
+if settings.TEST_MODE is False:
+    from src.core.print import PrintMap
 from src.crud.base import CRUDBase
 from src.db.models.layer import Layer
 from src.schemas.error import LayerNotFoundError, NoCRSError, ThumbnailComputeError
@@ -756,7 +758,8 @@ class CRUDLayerExport:
             f.write("############################################################\n")
             f.write(f"Name: {layer.name}\n")
             f.write(f"Description: {layer.description}\n")
-            f.write(f"Tags: {', '.join(layer.tags)}\n")
+            if layer.tags:
+                f.write(f"Tags: {', '.join(layer.tags)}\n")
             f.write(f"Lineage: {layer.lineage}\n")
             f.write(f"Positional Accuracy: {layer.positional_accuracy}\n")
             f.write(f"Attribute Accuracy: {layer.attribute_accuracy}\n")
