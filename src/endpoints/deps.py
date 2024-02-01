@@ -5,20 +5,14 @@ from httpx import AsyncClient, Timeout
 from jose import jwt
 
 from src.core.config import settings
-from src.db.session import AsyncSession, async_session, session_manager
+from src.db.session import session_manager
 
 http_client: Optional[AsyncClient] = None
 
 
 async def get_db() -> Generator:
-    async with async_session() as session:
-        yield session
-
-
-async def get_db_session() -> AsyncSession:
     async with session_manager.session() as session:
         yield session
-
 
 def get_user_id(request: Request):
     """Get the user ID from the JWT token or use the pre-defined user_id if running without authentication."""

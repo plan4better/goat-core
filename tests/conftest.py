@@ -1,6 +1,8 @@
 # Standard library imports
 import asyncio
 import os
+import logging
+import time
 
 # Third party imports
 import pytest
@@ -39,7 +41,7 @@ def set_test_mode():
     settings.RUN_AS_BACKGROUND_TASK = True
     settings.USER_DATA_SCHEMA = "test_user_data"
     settings.CUSTOMER_SCHEMA = "test_customer"
-    settings.MAX_FOLDER_COUNT = 10
+    settings.MAX_FOLDER_COUNT = 15
     settings.TEST_MODE = True
 
 
@@ -74,7 +76,9 @@ async def session_fixture(event_loop):
         )
         await session_manager.drop_all(connection)
         await session_manager.create_all(connection)
+        await connection.commit()
     yield
+    logging.info("Starting session_fixture finalizer")
     async with session_manager.connect() as connection:
         pass
         await connection.execute(
@@ -84,6 +88,7 @@ async def session_fixture(event_loop):
             text(f"""DROP SCHEMA IF EXISTS {settings.USER_DATA_SCHEMA} CASCADE""")
         )
     await session_manager.close()
+    logging.info("Finished session_fixture finalizer")
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -109,7 +114,6 @@ async def fixture_create_user(client: AsyncClient):
     yield user
     # Teardown: Delete the user after the test
     await client.delete(f"{settings.API_V2_STR}/user")
-
 
 @pytest.fixture
 async def fixture_create_folder(client: AsyncClient, fixture_create_user):
@@ -137,6 +141,7 @@ async def fixture_create_exceed_folders(client: AsyncClient, fixture_create_user
 
     # Setup: Create multiple folders
     cnt = 0
+    folder_ids = []
     for name in folder_names:
         cnt += 1
         # Request to create a folder
@@ -147,6 +152,12 @@ async def fixture_create_exceed_folders(client: AsyncClient, fixture_create_user
             assert response.status_code == 429  # Too Many Requests
         else:
             assert response.status_code == 201
+            folder_ids.append(response.json()["id"])
+
+    yield
+    # Delete the folders after the test
+    for id in folder_ids:
+        await client.delete(f"{settings.API_V2_STR}/folder/{id}")
 
 
 @pytest.fixture
@@ -291,16 +302,21 @@ async def fixture_upload_file_invalid(
 
 
 async def create_internal_layer(
-    client: AsyncClient, dataset_id, fixture_get_home_folder, layer_type
+    client: AsyncClient, dataset_id, fixture_get_home_folder, layer_type, project_id=None
 ):
     # Get feature layer dict and add layer ID
     feature_layer_dict = layer_request_examples["create_internal"][layer_type]["value"]
     feature_layer_dict["name"] = generate_random_string(12)
     feature_layer_dict["dataset_id"] = dataset_id
     feature_layer_dict["folder_id"] = fixture_get_home_folder["id"]
-    # Hit endpoint to create internal layer
+
+    # Hit endpoint to create internal layer and add optional project_id
+    if project_id:
+        url = f"{settings.API_V2_STR}/layer/internal?project_id={project_id}"
+    else:
+        url = f"{settings.API_V2_STR}/layer/internal"
     response = await client.post(
-        f"{settings.API_V2_STR}/layer/internal", json=feature_layer_dict
+        url, json=feature_layer_dict
     )
     assert response.status_code == 201
 
@@ -350,6 +366,19 @@ async def fixture_create_internal_layers(
         )
     return layer
 
+@pytest.fixture
+async def fixture_create_internal_layer_in_project(
+    client: AsyncClient, fixture_create_project, fixture_get_home_folder
+):
+    metadata = await upload_valid_file(client, "point")
+    layer = await create_internal_layer(
+        client,
+        metadata["dataset_id"],
+        fixture_get_home_folder,
+        "feature_layer_standard",
+        fixture_create_project["id"],
+    )
+    return layer
 
 @pytest.fixture
 async def fixture_create_polygon_layer(

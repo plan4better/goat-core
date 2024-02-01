@@ -15,7 +15,6 @@ from src.schemas.common import OrderEnum
 from src.schemas.job import JobStatusType, JobType, MsgType, job_mapping
 from src.utils import sanitize_error_message
 
-
 class CRUDJob(CRUDBase):
     async def check_and_create(
         self,
@@ -59,6 +58,8 @@ class CRUDJob(CRUDBase):
         )
         if project_id:
             job.project_id = project_id
+
+        # Create job
         job = await self.create(db=async_session, obj_in=job)
         return job
 

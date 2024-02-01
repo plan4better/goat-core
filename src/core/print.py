@@ -14,7 +14,6 @@ from pydantic import BaseModel
 from src.core.config import settings
 from src.db.models.layer import Layer, LayerType
 from src.utils import async_get_with_retry
-from src.schemas.colors import diverging_colors
 from src.schemas.project import InitialViewState
 from src.db.models import Project
 
@@ -107,14 +106,6 @@ class PrintMap:
         self.thumbnail_height = 280
         self.thumbnail_width = 674
         self.async_session = async_session
-
-    # def __enter__(self):
-    #     self.display = Display(visible=0, size=(800, 600))
-    #     self.display.start()
-    #     return self
-
-    # def __exit__(self, exc_type, exc_val, exc_tb):
-    #     self.display.stop()
 
     async def create_layer_thumbnail(self, layer: Layer, file_name: str) -> str:
         """Create layer thumbnail."""

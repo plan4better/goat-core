@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Body, Depends
-
 from src.core.tool import CRUDToolBase, start_calculation
 from src.crud.crud_data_management import CRUDJoin
 from src.crud.crud_geoanalysis import CRUDAggregatePoint, CRUDAggregatePolygon, CRUDOriginDestination

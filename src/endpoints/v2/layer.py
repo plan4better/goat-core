@@ -1,7 +1,7 @@
 # Standard Libraries
 import json
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 # Third-party Libraries
 from fastapi import (
@@ -21,8 +21,8 @@ from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
 from sqlalchemy import and_, or_, select
-
 from src.core.config import settings
+from uuid import UUID
 
 # Local application imports
 from src.core.content import (
@@ -71,7 +71,7 @@ router = APIRouter()
 async def file_upload(
     *,
     async_session: AsyncSession = Depends(get_db),
-    user_id: UUID4 = Depends(get_user_id),
+    user_id: UUID = Depends(get_user_id),
     file: UploadFile | None = File(None, description="File to upload. "),
 ):
     """
@@ -119,7 +119,8 @@ async def file_upload(
 async def create_layer_internal(
     background_tasks: BackgroundTasks,
     async_session: AsyncSession = Depends(get_db),
-    user_id: UUID4 = Depends(get_user_id),
+    user_id: UUID = Depends(get_user_id),
+    project_id: Optional[UUID] = None,
     layer_in: IInternalLayerCreate = Body(
         ...,
         examples=layer_request_examples["create_internal"],
@@ -143,6 +144,7 @@ async def create_layer_internal(
         async_session=async_session,
         user_id=user_id,
         job_type=JobType.file_import,
+        project_id=project_id,
     )
 
     # Run the import

@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from starlette.middleware.cors import CORSMiddleware
 
 from src.core.config import settings
-from src.db.session import r5_mongo_db_client, session_manager
+from src.db.session import session_manager
 from src.endpoints.deps import close_http_client
 from src.endpoints.v2.api import router as api_router_v2
 
@@ -28,7 +28,6 @@ async def lifespan(app: FastAPI):
     yield
     print("Shutting down...")
     await session_manager.close()
-    r5_mongo_db_client.close()
     close_http_client()
 
 

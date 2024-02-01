@@ -41,7 +41,6 @@ from src.schemas.toolbox_base import (
     MaxFeaturePolygonArea,
 )
 from src.utils import build_where_clause, get_random_string, search_value
-from src.utils import build_where_clause, search_value
 
 
 async def start_calculation(
@@ -60,6 +59,7 @@ async def start_calculation(
         async_session=async_session,
         user_id=user_id,
         job_type=job_type,
+        project_id=project_id,
     )
 
     # Init class

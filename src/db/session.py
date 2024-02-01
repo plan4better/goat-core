@@ -1,9 +1,6 @@
 import contextlib
 from typing import AsyncIterator
-
-from motor.motor_asyncio import AsyncIOMotorClient
-from sqlalchemy.engine import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -12,39 +9,22 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-
-from src.core.config import settings
-
-engine = create_async_engine(settings.ASYNC_SQLALCHEMY_DATABASE_URI, pool_pre_ping=True)
-legacy_engine = create_engine(settings.SQLALCHEMY_DATABASE_URI, future=False)
-r5_mongo_db_client = AsyncIOMotorClient(str(settings.R5_MONGO_DB_URL))
-
-sync_session = sessionmaker(
-    bind=legacy_engine,
-    class_=Session,
-    autocommit=False,
-    autoflush=False,
-    expire_on_commit=False,
-)
-
-async_session = sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    autocommit=False,
-    autoflush=False,
-    expire_on_commit=False,
-)
-
-
 class DatabaseSessionManager:
     def __init__(self):
         self._engine: AsyncEngine | None = None
         self._session_maker: sessionmaker | None = None
 
     def init(self, host: str):
-        self._engine = create_async_engine(host, isolation_level="AUTOCOMMIT")
+        self._engine = create_async_engine(
+            host,
+            isolation_level="AUTOCOMMIT",
+        )
         self._session_maker = sessionmaker(
-            bind=self._engine, autocommit=False, autoflush=False, expire_on_commit=False, class_=AsyncSession
+            bind=self._engine,
+            autocommit=False,
+            autoflush=False,
+            expire_on_commit=False,
+            class_=AsyncSession,
         )
 
     @contextlib.asynccontextmanager

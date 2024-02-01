@@ -1,7 +1,7 @@
 from uuid import UUID
 import pytz
 from fastapi_pagination import Page, Params as PaginationParams
-from sqlalchemy import and_, select, or_
+from sqlalchemy import and_, select, update, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.content import update_content_by_id
 from src.db.models.project import Project
@@ -14,12 +14,13 @@ from src.schemas.project import (
 )
 from src.crud.crud_user_project import user_project as crud_user_project
 from src.crud.crud_layer_project import layer_project as crud_layer_project
-from .base import CRUDBase
+from src.crud.base import CRUDBase
 from datetime import datetime, timedelta
-from src.core.print import PrintMap
 from src.core.config import settings
 from src.db.models._link_model import LayerProjectLink, UserProjectLink
-
+# Import PrintMap only if not in test mode
+if settings.TEST_MODE is False:
+    from src.core.print import PrintMap
 
 class CRUDProject(CRUDBase):
     async def create(
@@ -102,6 +103,7 @@ class CRUDProject(CRUDBase):
         )
 
         # Check for projects that have the thumbnail older then updated at
+        cnt = 0
         for project in projects.items:
             old_thumbnail_url = project.thumbnail_url
             thumbnail_updated_at = old_thumbnail_url.replace(
@@ -133,23 +135,28 @@ class CRUDProject(CRUDBase):
                         async_session=async_session, project_id=project.id
                     )
                     if user_project != [] and layers_project != []:
-                        #with PrintMap(async_session) as print_map:
+                        # Create thumbnail
                         print_map = PrintMap(async_session)
                         thumbnail_url = await print_map.create_project_thumbnail(
                             project=project,
                             initial_view_state=user_project[0].initial_view_state,
                             layers_project=layers_project,
                             file_name=str(project.id)
-                            + project.updated_at.strftime("_%Y-%m-%d_%H-%M-%S-%f")[
-                                :-3
-                            ]
+                            + project.updated_at.strftime("_%Y-%m-%d_%H-%M-%S-%f")
                             + ".png",
                         )
-                        await self.update(
-                            async_session,
-                            db_obj=project,
-                            obj_in={"thumbnail_url": thumbnail_url},
+                        # Update project with thumbnail url by passing the model to avoid the table to get a new updated at
+                        await async_session.execute(
+                            text(
+                                """UPDATE customer.project
+                                SET thumbnail_url = :thumbnail_url WHERE id = :id""",
+                            ),
+                            {"thumbnail_url": thumbnail_url, "id": project.id},
                         )
+                        await async_session.commit()
+
+                        # Update returned project
+                        projects.items[cnt].thumbnail_url = thumbnail_url
 
                         # Delete old thumbnail url
                         settings.S3_CLIENT.delete_object(
@@ -158,6 +165,7 @@ class CRUDProject(CRUDBase):
                                 settings.ASSETS_URL + "/", ""
                             ),
                         )
+            cnt += 1
         return projects
 
     async def update_base(

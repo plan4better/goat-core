@@ -30,6 +30,12 @@ async def test_create_internal_layer(
 ):
     assert fixture_create_internal_layers is not None
 
+@pytest.mark.asyncio
+async def test_create_internal_layer_in_project(
+    client: AsyncClient, fixture_create_internal_layer_in_project
+):
+    assert fixture_create_internal_layer_in_project is not None
+
 
 @pytest.mark.asyncio
 async def test_export_internal_layer(
