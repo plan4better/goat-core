@@ -46,22 +46,23 @@ class CRUDProject(CRUDBase):
             ),
         )
         # Create thumbnail
-        print_map = PrintMap(async_session)
-        thumbnail_url = await print_map.create_project_thumbnail(
-            project=project,
-            initial_view_state=user_project.initial_view_state,
-            layers_project=[],
-            file_name=str(project.id)
-            + project.updated_at.strftime("_%Y-%m-%d_%H-%M-%S-%f")[:-3]
-            + ".png",
-        )
+        if settings.TEST_MODE is False:
+            print_map = PrintMap(async_session)
+            thumbnail_url = await print_map.create_project_thumbnail(
+                project=project,
+                initial_view_state=user_project.initial_view_state,
+                layers_project=[],
+                file_name=str(project.id)
+                + project.updated_at.strftime("_%Y-%m-%d_%H-%M-%S-%f")[:-3]
+                + ".png",
+            )
 
-        # Update project with thumbnail url
-        project = await self.update(
-            async_session,
-            db_obj=project,
-            obj_in={"thumbnail_url": thumbnail_url},
-        )
+            # Update project with thumbnail url
+            project = await self.update(
+                async_session,
+                db_obj=project,
+                obj_in={"thumbnail_url": thumbnail_url},
+            )
 
         # Doing unneeded type conversion to make sure the relations of project are not loaded
         return IProjectRead(**project.dict())
