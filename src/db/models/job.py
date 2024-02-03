@@ -35,7 +35,7 @@ class Job(DateTimeBase, table=True):
         description="User ID of the user who created the job",
     )
     project_id: UUID | None = Field(
-        sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.project.id"), nullable=True),
+        sa_column=Column(UUID_PG(as_uuid=True), nullable=True),
         description="Project ID of the project the job belongs to",
     )
     type: JobType = Field(sa_column=Column(Text, nullable=False), description="Type of the job")
@@ -64,4 +64,3 @@ class Job(DateTimeBase, table=True):
 
     # Relationships
     user: "User" = Relationship(back_populates="jobs")
-    project: "Project" = Relationship(back_populates="jobs")

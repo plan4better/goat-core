@@ -68,8 +68,5 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
     layer_projects: List["LayerProjectLink"] = Relationship(
         back_populates="project", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
-    jobs: List["Job"] = Relationship(
-        back_populates="project"
-    )
 
 UniqueConstraint(Project.__table__.c.folder_id, Project.__table__.c.name)

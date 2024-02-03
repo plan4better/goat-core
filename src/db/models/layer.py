@@ -378,7 +378,6 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         ),
         description="Geographical Extent of the layer",
     )
-
     properties: dict | None = Field(
         sa_column=Column(JSONB, nullable=True),
         description="Properties of the layer",
@@ -403,7 +402,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     )
     job_id: UUID | None = Field(
         sa_column=Column(
-            UUID_PG(as_uuid=True), ForeignKey("customer.job.id"), nullable=True
+            UUID_PG(as_uuid=True), nullable=True
         ),
         description="Job ID if the layer is a tool layer",
     )
