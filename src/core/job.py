@@ -1,3 +1,4 @@
+import logging
 from functools import wraps
 from src.crud.crud_job import job as crud_job
 from src.schemas.job import JobStatusType
@@ -8,6 +9,13 @@ from src.schemas.error import TimeoutError, JobKilledError
 from src.core.config import settings
 from src.schemas.layer import LayerType, UserDataTable
 
+# Create a logger object for background tasks
+background_logger = logging.getLogger("Background task")
+background_logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = logging.Formatter('\033[92m%(levelname)s\033[0m: %(asctime)s %(name)s %(message)s')
+handler.setFormatter(formatter)
+background_logger.addHandler(handler)
 
 async def run_failure_func(instance, func, *args, **kwargs):
     # Get failure function
@@ -55,7 +63,7 @@ def job_init():
                 job_id = kwargs["job_id"]
             else:
                 job_id = self.job_id
-
+            background_logger.info(f"Job {str(job_id)} started.")
             # Get job id
             job = await crud_job.get(db=async_session, id=job_id)
             job = await crud_job.update(
@@ -88,6 +96,7 @@ def job_init():
                     db_obj=job,
                     obj_in={"status_simple": JobStatusType.finished.value},
                 )
+            background_logger.info(f"Job {job_id} finished.")
             return result
 
         return wrapper
@@ -99,6 +108,7 @@ def job_log(job_step_name: str, timeout: int = 120):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
+
             # Get async_session
             self = args[0] if args else None
             # Check if job_id and async_session are provided in kwards else search them in the class
@@ -125,7 +135,9 @@ def job_log(job_step_name: str, timeout: int = 120):
             # Exit if job is killed before starting
             if job.status_simple == JobStatusType.killed.value:
                 await run_failure_func(self, func, **kwargs)
-                return {"status": JobStatusType.killed.value, "msg": "Job was killed."}
+                msg_text = "Job was killed."
+                background_logger.error(msg_text)
+                return {"status": JobStatusType.killed.value, "msg": msg_text}
 
             # Execute function
             try:
@@ -142,6 +154,7 @@ def job_log(job_step_name: str, timeout: int = 120):
                     msg_text=msg_text,
                     job_step_name=job_step_name,
                 )
+                background_logger.error(msg_text)
                 raise TimeoutError(msg_text)
             except Exception as e:
                 # Run failure function if exists
@@ -154,6 +167,7 @@ def job_log(job_step_name: str, timeout: int = 120):
                     msg_text=str(e),
                     job_step_name=job_step_name,
                 )
+                background_logger.error(f"Job failed with error: {e}")
                 raise e
 
             # Check if job was killed. The job needs to be expired as it was fetching old data from cache.
@@ -190,8 +204,11 @@ def job_log(job_step_name: str, timeout: int = 120):
                 JobStatusType.failed.value,
             ]:
                 await run_failure_func(self, func, *args, **kwargs)
-                raise JobKilledError("Job was killed.")
+                msg_txt = "Job was killed"
+                print(msg_txt)
+                raise JobKilledError(msg_txt)
 
+            background_logger.info(f"Job step {job_step_name} finished successfully.")
             return result
 
         return wrapper

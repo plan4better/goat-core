@@ -58,6 +58,8 @@ class JobStep(BaseModel):
 class JobStatusFileImport(BaseModel):
     upload: JobStep = {}
     migration: JobStep = {}
+    internal_layer_create: JobStep = {}
+
 
 class JobStatusJoin(BaseModel):
     join: JobStep = {}
@@ -98,6 +100,7 @@ class JobStatusBuffer(BaseModel):
 
 class JobStatusTripCountStation(BaseModel):
     trip_count_station: JobStep = {}
+
 
 class OriginDestination(BaseModel):
     origin_destination: JobStep = {}

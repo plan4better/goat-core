@@ -16,15 +16,16 @@ from sqlmodel import SQLModel
 
 # Local application imports
 from src.core.config import settings
-from src.core.job import CRUDFailedJob, job_init, run_background_or_immediately
+from src.core.job import CRUDFailedJob, job_init, run_background_or_immediately, job_log
 from src.core.layer import FileUpload, OGRFileHandling, delete_old_files
+
 # Import PrintMap only outside of tests
 if settings.TEST_MODE is False:
     from src.core.print import PrintMap
 from src.crud.base import CRUDBase
 from src.db.models.layer import Layer
 from src.schemas.error import LayerNotFoundError, NoCRSError, ThumbnailComputeError
-from src.schemas.job import JobStatusType
+from src.schemas.job import JobStatusType, Msg, MsgType
 from src.schemas.layer import (
     ColumnStatisticsOperation,
     FeatureType,
@@ -55,6 +56,7 @@ from src.utils import (
 class CRUDLayer(CRUDBase):
     """CRUD class for Layer."""
 
+    @job_log(job_step_name="internal_layer_create")
     async def create_internal(
         self,
         async_session: AsyncSession,
@@ -113,13 +115,21 @@ class CRUDLayer(CRUDBase):
 
         # Create thumbnail using print class
         file_name = str(layer.id) + "_" + str(uuid4()) + ".png"
-        if layer.type in (LayerType.feature, LayerType.table) and settings.TEST_MODE is False:
+        if (
+            layer.type in (LayerType.feature, LayerType.table)
+            and settings.TEST_MODE is False
+        ):
             try:
                 thumbnail_url = await PrintMap(
                     async_session=async_session
                 ).create_layer_thumbnail(layer=layer_in, file_name=file_name)
             except Exception as e:
-                raise ThumbnailComputeError(sanitize_error_message(str(e)))
+                msg_text = "Failed to create thumbnail."
+                print(msg_text)
+                return {
+                    "msg": Msg(type=MsgType.warning, text=msg_text),
+                    "status": JobStatusType.finished.value,
+                }
 
             # Update thumbnail_url
             layer = await CRUDBase(Layer).update(
@@ -128,7 +138,10 @@ class CRUDLayer(CRUDBase):
                 obj_in={"thumbnail_url": thumbnail_url},
             )
 
-        return layer
+        return {
+            "msg": "Layer successfully created.",
+            "status": JobStatusType.finished.value,
+        }
 
     async def get_internal(self, async_session: AsyncSession, id: UUID):
         """Gets a layer and make sure it is a internal layer."""
@@ -172,12 +185,15 @@ class CRUDLayer(CRUDBase):
         )
 
         # Update thumbnail. Only run outside of tests as the print class depends on geoapi as external service.
-        if layer.type in (LayerType.feature, LayerType.table) and settings.TEST_MODE is False:
+        if (
+            layer.type in (LayerType.feature, LayerType.table)
+            and settings.TEST_MODE is False
+        ):
             file_name = str(layer.id) + "_" + str(uuid4()) + ".png"
             try:
-                thumbnail_url = await PrintMap(async_session=async_session).create_layer_thumbnail(
-                    layer=layer, file_name=file_name
-                )
+                thumbnail_url = await PrintMap(
+                    async_session=async_session
+                ).create_layer_thumbnail(layer=layer, file_name=file_name)
             except Exception as e:
                 raise ThumbnailComputeError(sanitize_error_message(str(e)))
 
@@ -650,6 +666,9 @@ class CRUDLayerImport(CRUDFailedJob):
 
     def __init__(self, job_id, background_tasks, async_session, user_id):
         super().__init__(job_id, background_tasks, async_session, user_id)
+        self.temp_table_name = (
+            f'{settings.USER_DATA_SCHEMA}."{str(self.job_id).replace("-", "")}"'
+        )
 
     @run_background_or_immediately(settings)
     @job_init()
@@ -674,43 +693,25 @@ class CRUDLayerImport(CRUDFailedJob):
             for field_name in field_names:
                 if field_name == "id":
                     continue
-                attribute_mapping[field_name] = field_type + "_attr" + str(cnt)
+                attribute_mapping[field_type + "_attr" + str(cnt)] = field_name
                 cnt += 1
 
-        temp_table_name = (
-            f'{settings.USER_DATA_SCHEMA}."{str(self.job_id).replace("-", "")}"'
-        )
 
+        # Upload file to temporary table using ogr2ogr
         result = await ogr_file_upload.upload_ogr2ogr(
-            temp_table_name=temp_table_name,
+            temp_table_name=self.temp_table_name,
             job_id=self.job_id,
         )
-        if result["status"] in [
-            JobStatusType.failed.value,
-            JobStatusType.timeout.value,
-            JobStatusType.killed.value,
-        ]:
-            return result
-
         # Migrate temporary table to target table
         result = await ogr_file_upload.migrate_target_table(
             validation_result=file_metadata,
             attribute_mapping=attribute_mapping,
-            temp_table_name=temp_table_name,
+            temp_table_name=self.temp_table_name,
             layer_id=layer_in.id,
             job_id=self.job_id,
         )
-        if result["status"] in [
-            JobStatusType.failed.value,
-            JobStatusType.timeout.value,
-            JobStatusType.killed.value,
-        ]:
-            await self.async_session.rollback()
-            return result
-
-        # Create layer
-        attribute_mapping = {value: key for key, value in attribute_mapping.items()}
-        await CRUDLayer(Layer).create_internal(
+        # Create layer metadata and thumbnail
+        result = await CRUDLayer(Layer).create_internal(
             async_session=self.async_session,
             user_id=self.user_id,
             layer_in=layer_in,
@@ -718,6 +719,7 @@ class CRUDLayerImport(CRUDFailedJob):
             attribute_mapping=attribute_mapping,
             job_id=self.job_id,
         )
+
         return result
 
 

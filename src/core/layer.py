@@ -585,9 +585,9 @@ class OGRFileHandling:
 
         # Build select and insert statement
         for i in attribute_mapping:
-            data_type = attribute_mapping[i].split("_")[0]
-            select_statement += f""""{i}"::{data_type} as {attribute_mapping[i]}, """
-            insert_statement += f"{attribute_mapping[i]}, "
+            data_type = i.split("_")[0]
+            select_statement += f""""{attribute_mapping[i]}"::{data_type} as {i}, """
+            insert_statement += f"{i}, "
         select_statement = f"""SELECT {select_statement} {select_geom} '{str(layer_id)}' FROM {temp_table_name}"""
 
         # Insert data in target table

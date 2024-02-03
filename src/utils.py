@@ -506,7 +506,7 @@ async def async_get_with_retry(
                 if response.status != 200:
                     # Server is still processing request, retry shortly
                     if i == num_retries - 1:
-                        raise Exception("Server took too long to process request.")
+                        raise Exception("GEOAPI-Server took too long to process request. It can be that the layer is not properly processed yet.")
                     await asyncio.sleep(retry_delay)
                     continue
                 elif response.status == 200:
