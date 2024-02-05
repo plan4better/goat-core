@@ -160,6 +160,19 @@ class IsochroneStartingPointsBase(BaseModel):
 
         return values
 
+def check_starting_points(max_count):
+    @root_validator(pre=True, allow_reuse=True)
+    def _validator(cls, values):
+        lat = values.get("latitude")
+        long = values.get("longitude")
+
+        if lat and long:
+            if len(lat) > max_count:
+                raise ValueError(f"The maximum number of starting points is {max_count}.")
+            if len(long) > max_count:
+                raise ValueError(f"The maximum number of starting points is {max_count}.")
+        return values
+    return _validator
 
 class PTSupportedDay(str, Enum):
     """PT supported days schema."""

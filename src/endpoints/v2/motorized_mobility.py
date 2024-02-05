@@ -13,17 +13,14 @@ from src.schemas.motorized_mobility import (
     request_example_oev_gueteklasse,
     request_examples_isochrone_car,
     request_examples_isochrone_pt,
-    IIsochroneCar,
+    request_example_nearby_station_access,
     ITripCountStation,
+    INearbyStationAccess,
 )
 from src.schemas.toolbox_base import IToolResponse
-from uuid import uuid4
-from src.core.tool import start_calculation
 from src.schemas.toolbox_base import CommonToolParams
-from src.crud.crud_motorized_mobility import CRUDOevGueteklasse, CRUDTripCountStation
-from src.crud.crud_isochrone import CRUDIsochronePT
-from src.schemas.job import JobType
-from src.schemas.toolbox_base import CommonToolParams, IToolResponse
+from src.crud.crud_motorized_mobility import CRUDTripCountStation, CRUDNearbyStationAccess
+
 
 router = APIRouter()
 
@@ -124,6 +121,33 @@ async def calculate_trip_count_station(
         job_type=JobType.trip_count_station,
         tool_class=CRUDTripCountStation,
         crud_method="trip_count_run",
+        async_session=common.async_session,
+        user_id=common.user_id,
+        background_tasks=common.background_tasks,
+        project_id=common.project_id,
+        params=params,
+    )
+
+@router.post(
+    "/nearby-station-access",
+    summary="Get public transport stops and their trips that are accessible by walking/cycling.",
+    response_model=IToolResponse,
+    status_code=201,
+)
+async def nearby_station_access(
+    *,
+    common: CommonToolParams = Depends(),
+    params: INearbyStationAccess = Body(
+        ...,
+        examples=request_example_nearby_station_access,
+        description="The isochrone parameters.",
+    ),
+):
+    """Get public transport stops and their trips that are accessible by walking/cycling."""
+    return await start_calculation(
+        job_type=JobType.nearby_station_access,
+        tool_class=CRUDNearbyStationAccess,
+        crud_method="nearby_station_access_run",
         async_session=common.async_session,
         user_id=common.user_id,
         background_tasks=common.background_tasks,

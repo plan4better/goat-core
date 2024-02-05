@@ -8,6 +8,7 @@ from src.schemas.motorized_mobility import (
     IOevGueteklasse,
     ITripCountStation,
     public_transport_types,
+    INearbyStationAccess,
 )
 from src.utils import build_where_clause
 from src.db.models.layer import ToolType
@@ -302,9 +303,7 @@ class CRUDTripCountStation(CRUDToolBase):
             ) s, LATERAL basic.summarize_trip_count(trip_cnt, '{json.dumps(flat_mode_mapping)}'::JSONB) summarized
         """
         where_query = build_where_clause([layer_project.where_query])
-        await self.async_session.execute(
-            sql_query, {"where_query": where_query}
-        )
+        await self.async_session.execute(sql_query, {"where_query": where_query})
         await self.async_session.commit()
 
         # Create result layer
@@ -318,3 +317,31 @@ class CRUDTripCountStation(CRUDToolBase):
     @job_init()
     async def trip_count_run(self, params: ITripCountStation):
         return await self.trip_count(params=params)
+
+
+class CRUDNearbyStationAccess(CRUDToolBase):
+    """CRUD for Nearby Station Access."""
+
+    def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
+        super().__init__(job_id, background_tasks, async_session, user_id, project_id)
+        self.result_table = (
+            f"{settings.USER_DATA_SCHEMA}.point_{str(self.user_id).replace('-', '')}"
+        )
+
+    @job_log(job_step_name="nearby_station_access")
+    async def nearby_station_access(self, params: INearbyStationAccess):
+        #TODO: Get starting points. In case it is a existing layer get the coordinates from the layer.
+        #TODO: Compute isochrone with the respective settings.
+        #TODO: Get trip counts for the respective isochrone polygons
+        #TODO: Save two layers: Starting point and stations with the following attributes (stop_name, mode, frequency (in minutes), line name)
+        #TODO: Return the job id.
+        #TO BE DISCUSSED: For the tests we should consider mocking the isochrone request as otherswise it is very hard to test the isochrone in isolation.
+        return {
+            "status": JobStatusType.finished.value,
+            "msg": "Nearby station access created.",
+        }
+
+    @run_background_or_immediately(settings)
+    @job_init()
+    async def nearby_station_access_run(self, params: INearbyStationAccess):
+        return await self.nearby_station_access(params=params)

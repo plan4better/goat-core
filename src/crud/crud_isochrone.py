@@ -40,6 +40,7 @@ class CRUDIsochroneBase(CRUDToolBase):
     ):
         # Check if starting points are a layer
         if params.starting_points.layer_project_id:
+            #TODO: Use method from CRUDToolBase
             layer = await crud_layer_project.get(
                 db=self.async_session, id=params.starting_points.layer_project_id
             )
@@ -205,10 +206,6 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
     @job_init()
     async def run_isochrone(self, params: IIsochroneActiveMobility):
         return await self.isochrone(params=params)
-
-    async def join_fail(self, params: IIsochroneActiveMobility):
-        await self.delete_orphan_data()
-
 
 class CRUDIsochronePT(CRUDIsochroneBase):
     def __init__(
@@ -423,6 +420,3 @@ class CRUDIsochronePT(CRUDIsochroneBase):
     @job_init()
     async def run_isochrone(self, params: IIsochronePT):
         return await self.isochrone(params=params)
-
-    async def join_fail(self, params: IIsochronePT):
-        await self.delete_orphan_data()

@@ -4,24 +4,14 @@ from uuid import UUID
 from pydantic import BaseModel, Field, root_validator, validator
 
 from src.schemas.layer import ToolType
-from src.schemas.toolbox_base import IsochroneStartingPointsBase
+from src.schemas.toolbox_base import IsochroneStartingPointsBase, check_starting_points
 
 
 class IsochroneStartingPointsActiveMobility(IsochroneStartingPointsBase):
     """Model for the active mobility isochrone starting points."""
 
     # Check that the starting points for active mobility are below 1000
-    @root_validator(pre=True)
-    def check_starting_points(cls, values):
-        lat = values.get("latitude")
-        long = values.get("longitude")
-
-        if lat and long:
-            if len(lat) > 1000:
-                raise ValueError("The maximum number of starting points is 1000.")
-            if len(long) > 1000:
-                raise ValueError("The maximum number of starting points is 1000.")
-        return values
+    check_starting_points = check_starting_points(1000)
 
 
 class RoutingActiveMobilityType(str, Enum):

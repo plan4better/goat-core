@@ -18,6 +18,7 @@ class JobType(str, Enum):
     buffer = "buffer"
     trip_count_station = "trip_count_station"
     origin_destination = "origin_destination"
+    nearby_station_access = "nearby_station_access"
 
 
 class JobStatusType(str, Enum):
@@ -105,6 +106,9 @@ class JobStatusTripCountStation(BaseModel):
 class OriginDestination(BaseModel):
     origin_destination: JobStep = {}
 
+class NearbyStationAccess(BaseModel):
+    nearby_station_access: JobStep = {}
+
 
 # Only add jobs here that are consisting of multiple steps
 job_mapping = {
@@ -119,4 +123,5 @@ job_mapping = {
     JobType.buffer: JobStatusBuffer,
     JobType.trip_count_station: JobStatusTripCountStation,
     JobType.origin_destination: OriginDestination,
+    JobType.nearby_station_access: NearbyStationAccess,
 }

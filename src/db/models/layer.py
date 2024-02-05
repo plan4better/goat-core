@@ -47,6 +47,7 @@ class ToolType(str, Enum):
     intersect = "intersect"
     buffer = "buffer"
     origin_destination = "origin_destination"
+    nearby_station_access = "nearby_station_access"
 
 
 class FeatureType(str, Enum):

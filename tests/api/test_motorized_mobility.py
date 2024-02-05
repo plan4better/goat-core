@@ -75,6 +75,7 @@ async def test_trip_count_station(
     # Check if job is finished
     assert job["status_simple"] == "finished"
 
+
 async def test_single_isochrone_public_transport(
     client: AsyncClient, fixture_create_project
 ):
@@ -108,6 +109,27 @@ async def test_single_isochrone_public_transport(
     }
     response = await client.post(
         f"{settings.API_V2_STR}/motorized-mobility/pt/isochrone?project_id={project_id}",
+        json=params,
+    )
+    assert response.status_code == 201
+    # Check if job is finished
+    job = await check_job_status(client, response.json()["job_id"])
+    # Check if job is finished
+    assert job["status_simple"] == "finished"
+
+
+async def test_nearby_station_access(client: AsyncClient, fixture_create_project):
+    project_id = fixture_create_project["id"]
+    params = {
+        "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
+        "access_mode": "walking",
+        "speed": 5,
+        "max_traveltime": 10,
+        "mode": ["bus", "tram", "rail", "subway"],
+        "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
+    }
+    response = await client.post(
+        f"{settings.API_V2_STR}/motorized-mobility/nearby-station-access?project_id={project_id}",
         json=params,
     )
     assert response.status_code == 201

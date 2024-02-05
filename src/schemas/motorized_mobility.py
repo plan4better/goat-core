@@ -1,35 +1,23 @@
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, root_validator
-
+from pydantic import BaseModel, Field
 from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import (
     IsochroneStartingPointsBase,
     PTSupportedDay,
     input_layer_type_polygon,
+    input_layer_type_point,
+    check_starting_points,
 )
+from src.schemas.active_mobility import RoutingActiveMobilityType
 
 
 class IsochroneStartingPointsMotorizedMobility(IsochroneStartingPointsBase):
     """Model for the active mobility isochrone starting points."""
 
-    # Check that the starting points for motorized mobility are below 20
-    @root_validator(pre=True)
-    def check_starting_points(cls, values):
-        lat = values.get("latitude")
-        long = values.get("longitude")
-        max_points = 20
-        if lat and long:
-            if len(lat) > max_points:
-                raise ValueError(
-                    f"The maximum number of starting points is {max_points}."
-                )
-            if len(long) > max_points:
-                raise ValueError(
-                    f"The maximum number of starting points is {max_points}."
-                )
-        return values
+    # Check that the starting points for motorized mobility is 1
+    check_starting_points = check_starting_points(1)
 
 
 class RoutingPTMode(str, Enum):
@@ -211,6 +199,10 @@ class IIsochronePT(BaseModel):
         mode = ToolType.isochrone_pt.value.replace("isochrone_", "")
         return f"basic.geofence_{mode}"
 
+    @property
+    def input_layer_types(self):
+        return {"layer_project_id": input_layer_type_point}
+
 
 class RoutingCarType(str, Enum):
     """Routing car type schema."""
@@ -245,6 +237,10 @@ class IIsochroneCar(BaseModel):
     def geofence_table(self):
         mode = ToolType.isochrone_car.value.value.replace("isochrone_", "")
         return f"basic.geofence_{mode}"
+
+    @property
+    def input_layer_types(self):
+        return {"layer_project_id": input_layer_type_point}
 
 
 class CountLimitPerTool(int, Enum):
@@ -337,12 +333,67 @@ class ITripCountStation(BaseModel):
         return "basic.geofence_pt"
 
 
+class IStartingPointNearbyStation(IsochroneStartingPointsBase):
+    """Model for the starting points of the nearby station endpoint."""
+
+    check_starting_points = check_starting_points(1)
+
+
+class INearbyStationAccess(BaseModel):
+    """Model for the nearby station endpoint."""
+
+    starting_points: IStartingPointNearbyStation = Field(
+        ...,
+        title="Starting Points",
+        description="The starting point for the nearby station calculation.",
+    )
+    access_mode: RoutingActiveMobilityType = Field(
+        ...,
+        title="Access Mode",
+        description="The access mode of the active mobility.",
+    )
+    speed: int = Field(
+        ...,
+        title="Speed",
+        description="The speed in km/h.",
+        ge=1,
+        le=25,
+    )
+    max_traveltime: int = Field(
+        ...,
+        title="Max Travel Time",
+        description="The maximum travel time in minutes.",
+        ge=1,
+        le=15,
+    )
+    mode: List[RoutingPTMode] = Field(
+        ...,
+        title="Mode",
+        description="The mode of the public transport.",
+    )
+    time_window: PTTimeWindow = Field(
+        ...,
+        title="Time Window",
+        description="The time window of the isochrone.",
+    )
+    @property
+    def tool_type(self):
+        return ToolType.nearby_station_access
+
+    @property
+    def input_layer_types(self):
+        return {"layer_project_id": input_layer_type_point}
+
+    @property
+    def geofence_table(self):
+        return "basic.geofence_pt"
+
 request_examples_isochrone_pt = {
     # 1. Isochrone for public transport with all modes
     "all_modes_pt": {
         "summary": "Isochrone using all PT modes",
         "value": {
-            "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
+            "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
             "routing_type": {
                 "mode": [
                     "bus",
@@ -361,7 +412,7 @@ request_examples_isochrone_pt = {
     "exclude_bus_mode_pt": {
         "summary": "Isochrone excluding bus mode",
         "value": {
-            "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
+            "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
             "routing_type": {
                 "mode": [
                     "tram",
@@ -382,7 +433,7 @@ request_examples_isochrone_car = {
     "single_point_car": {
         "summary": "Isochrone for a single starting point using car",
         "value": {
-            "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
+            "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
             "routing_type": "car_peak",
             "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
         },
@@ -392,13 +443,27 @@ request_examples_isochrone_car = {
         "summary": "Isochrone for multiple starting points using car",
         "value": {
             "starting_points": {
-                "latitude": [13.4050, 13.4150, 13.4250],
-                "longitude": [52.5200, 52.5250, 52.5300],
+                "latitude": [52.5200, 52.5250, 52.5300],
+                "longitude": [13.4050, 13.4150, 13.4250],
             },
             "routing_type": "car_peak",
             "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
         },
     },
+}
+
+request_example_nearby_station_access = {
+    "single_point_nearby_station": {
+        "summary": "Nearby station for a single starting point",
+        "value": {
+            "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
+            "access_mode": "walk",
+            "speed": 5,
+            "max_traveltime": 10,
+            "mode": ["bus", "tram", "rail", "subway"],
+            "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
+        },
+    }
 }
 
 
