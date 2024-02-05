@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
     yield
     print("Shutting down...")
     await session_manager.close()
-    close_http_client()
+    await close_http_client()
 
 
 app = FastAPI(
