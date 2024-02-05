@@ -342,7 +342,7 @@ request_examples_isochrone_pt = {
     "all_modes_pt": {
         "summary": "Isochrone using all PT modes",
         "value": {
-            "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
+            "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
             "routing_type": {
                 "mode": [
                     "bus",
@@ -355,13 +355,14 @@ request_examples_isochrone_pt = {
             },
             "travel_cost": {"max_traveltime": 40, "traveltime_step": 10},
             "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
+            "isochrone_type": "polygon",
         },
     },
     # 2. Isochrone for public transport excluding bus mode
     "exclude_bus_mode_pt": {
         "summary": "Isochrone excluding bus mode",
         "value": {
-            "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
+            "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
             "routing_type": {
                 "mode": [
                     "tram",
@@ -373,6 +374,7 @@ request_examples_isochrone_pt = {
             },
             "travel_cost": {"max_traveltime": 35, "traveltime_step": 5},
             "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
+            "isochrone_type": "polygon",
         },
     },
 }
@@ -382,7 +384,7 @@ request_examples_isochrone_car = {
     "single_point_car": {
         "summary": "Isochrone for a single starting point using car",
         "value": {
-            "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
+            "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
             "routing_type": "car_peak",
             "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
         },
@@ -392,8 +394,8 @@ request_examples_isochrone_car = {
         "summary": "Isochrone for multiple starting points using car",
         "value": {
             "starting_points": {
-                "latitude": [13.4050, 13.4150, 13.4250],
-                "longitude": [52.5200, 52.5250, 52.5300],
+                "latitude": [52.5200, 52.5250, 52.5300],
+                "longitude": [13.4050, 13.4150, 13.4250],
             },
             "routing_type": "car_peak",
             "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},

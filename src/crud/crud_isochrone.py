@@ -266,6 +266,7 @@ class CRUDIsochronePT(CRUDIsochroneBase):
             ],
             attribute_mapping={"integer_attr1": "travel_cost"},
             tool_type=params.tool_type.value,
+            job_id=self.job_id,
         )
         result_table = f"{settings.USER_DATA_SCHEMA}.{layer_isochrone.feature_layer_geometry_type.value}_{str(self.user_id).replace('-', '')}"
 
