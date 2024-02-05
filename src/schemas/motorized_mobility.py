@@ -406,6 +406,7 @@ request_examples_isochrone_pt = {
             },
             "travel_cost": {"max_traveltime": 40, "traveltime_step": 10},
             "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
+            "isochrone_type": "polygon",
         },
     },
     # 2. Isochrone for public transport excluding bus mode
@@ -424,6 +425,7 @@ request_examples_isochrone_pt = {
             },
             "travel_cost": {"max_traveltime": 35, "traveltime_step": 5},
             "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
+            "isochrone_type": "polygon",
         },
     },
 }

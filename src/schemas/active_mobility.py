@@ -130,31 +130,35 @@ request_examples = {
         "single_point_walking": {
             "summary": "Single point isochrone walking",
             "value": {
-                "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
+                "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
                 "routing_type": "walking",
                 "travel_cost": {
                     "max_traveltime": 30,
                     "traveltime_step": 10,
                     "speed": 5,
                 },
+                "isochrone_type": "polygon",
+                "polygon_difference": True,
             },
         },
         "single_point_cycling": {
             "summary": "Single point isochrone cycling",
             "value": {
-                "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
+                "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
                 "routing_type": "bicycle",
                 "travel_cost": {
                     "max_traveltime": 15,
                     "traveltime_step": 5,
                     "speed": 15,
                 },
+                "isochrone_type": "polygon",
+                "polygon_difference": True,
             },
         },
         "single_point_walking_scenario": {
             "summary": "Single point isochrone walking",
             "value": {
-                "starting_points": {"latitude": [13.4050], "longitude": [52.5200]},
+                "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
                 "routing_type": "walking",
                 "travel_cost": {
                     "max_traveltime": 30,
@@ -162,6 +166,8 @@ request_examples = {
                     "speed": 5,
                 },
                 "scenario_id": "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
+                "isochrone_type": "polygon",
+                "polygon_difference": True,
             },
         },
         "multi_point_walking": {
@@ -169,18 +175,6 @@ request_examples = {
             "value": {
                 "starting_points": {
                     "latitude": [
-                        13.4050,
-                        13.4060,
-                        13.4070,
-                        13.4080,
-                        13.4090,
-                        13.4100,
-                        13.4110,
-                        13.4120,
-                        13.4130,
-                        13.4140,
-                    ],
-                    "longitude": [
                         52.5200,
                         52.5210,
                         52.5220,
@@ -191,6 +185,18 @@ request_examples = {
                         52.5270,
                         52.5280,
                         52.5290,
+                    ],
+                    "longitude": [
+                        13.4050,
+                        13.4060,
+                        13.4070,
+                        13.4080,
+                        13.4090,
+                        13.4100,
+                        13.4110,
+                        13.4120,
+                        13.4130,
+                        13.4140,
                     ],
                 },
                 "routing_type": "walking",
@@ -206,18 +212,6 @@ request_examples = {
             "value": {
                 "starting_points": {
                     "latitude": [
-                        13.4050,
-                        13.4060,
-                        13.4070,
-                        13.4080,
-                        13.4090,
-                        13.4100,
-                        13.4110,
-                        13.4120,
-                        13.4130,
-                        13.4140,
-                    ],
-                    "longitude": [
                         52.5200,
                         52.5210,
                         52.5220,
@@ -228,6 +222,18 @@ request_examples = {
                         52.5270,
                         52.5280,
                         52.5290,
+                    ],
+                    "longitude": [
+                        13.4050,
+                        13.4060,
+                        13.4070,
+                        13.4080,
+                        13.4090,
+                        13.4100,
+                        13.4110,
+                        13.4120,
+                        13.4130,
+                        13.4140,
                     ],
                 },
                 "routing_type": "bicycle",

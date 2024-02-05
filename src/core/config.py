@@ -108,8 +108,8 @@ class Settings(BaseSettings):
     MAX_FOLDER_COUNT: Optional[int] = 100
 
     MAPBOX_TOKEN: Optional[str] = None
-    AWS_ACCESS_KEY_ID: str
-    AWS_SECRET_ACCESS_KEY: str
+    AWS_ACCESS_KEY_ID: Optional[str] = None
+    AWS_SECRET_ACCESS_KEY: Optional[str] = None
     AWS_REGION: Optional[str] = "eu-central-1"
     AWS_S3_ASSETS_BUCKET: Optional[str] = "plan4better-assets"
     S3_CLIENT: Optional[Any] = None
