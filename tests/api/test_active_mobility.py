@@ -7,6 +7,36 @@ from src.core.config import settings
 from src.db.session import AsyncSession
 from tests.utils import check_job_status
 
+@pytest.mark.asyncio
+async def test_single_isochrone_active_mobility_layer(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_add_aggregate_point_layer_to_project,
+):
+    project_id = fixture_add_aggregate_point_layer_to_project["project_id"]
+    layer_project_id = fixture_add_aggregate_point_layer_to_project["source_layer_project_id"]
+
+    # Produce isochrone request payload
+    params = {
+        "starting_points":{"layer_project_id":layer_project_id},
+        "routing_type": "walking",
+        "travel_cost": {
+            "max_traveltime": 30,
+            "traveltime_step": 5,
+            "speed": 5,
+        },
+        "isochrone_type": "polygon",
+        "polygon_difference": True,
+    }
+    response = await client.post(
+        f"{settings.API_V2_STR}/active-mobility/isochrone?project_id={project_id}",
+        json=params,
+    )
+    assert response.status_code == 201
+    # Check if job is finished
+    job = await check_job_status(client, response.json()["job_id"])
+    # Check if job is finished
+    assert job["status_simple"] == "finished"
 
 @pytest.mark.asyncio
 async def test_single_isochrone_active_mobility_lat_lon(
