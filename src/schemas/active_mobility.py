@@ -1,10 +1,10 @@
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, Field, root_validator, validator
+from pydantic import BaseModel, Field, validator
 
 from src.schemas.layer import ToolType
-from src.schemas.toolbox_base import IsochroneStartingPointsBase, check_starting_points
+from src.schemas.toolbox_base import IsochroneStartingPointsBase, check_starting_points, input_layer_type_point
 
 
 class IsochroneStartingPointsActiveMobility(IsochroneStartingPointsBase):
@@ -123,6 +123,10 @@ class IIsochroneActiveMobility(BaseModel):
     def geofence_table(self):
         mode = ToolType.isochrone_active_mobility.value.replace("isochrone_", "")
         return f"basic.geofence_{mode}"
+
+    @property
+    def input_layer_types(self):
+        return {"layer_project_id": input_layer_type_point}
 
 
 request_examples = {

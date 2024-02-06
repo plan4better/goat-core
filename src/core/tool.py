@@ -1,5 +1,5 @@
 from typing import List
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import BackgroundTasks
 from httpx import AsyncClient
@@ -129,7 +129,11 @@ class CRUDToolBase(CRUDFailedJob):
         # Get all params that have the name layer_project_id and build a dict using the variable name as key
         layer_project_ids = {}
         for key, value in params.dict().items():
-            if key.endswith("_layer_project_id") and value is not None:
+            if isinstance(value, dict):
+                for sub_key, sub_value in value.items():
+                    if sub_key.endswith("layer_project_id") and sub_value is not None:
+                        layer_project_ids[sub_key] = sub_value
+            elif key.endswith("layer_project_id") and value is not None:
                 layer_project_ids[key] = value
 
         # Get all layers_project
