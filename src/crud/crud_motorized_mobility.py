@@ -233,9 +233,11 @@ class CRUDOevGueteklasse(CRUDToolBase):
         # Create result layers
         await self.create_feature_layer_tool(
             layer_in=station_category_layer,
+            params=params,
         )
         await self.create_feature_layer_tool(
             layer_in=buffer_layer,
+            params=params,
         )
         return {
             "status": JobStatusType.finished.value,
@@ -307,7 +309,7 @@ class CRUDTripCountStation(CRUDToolBase):
         await self.async_session.commit()
 
         # Create result layer
-        await self.create_feature_layer_tool(layer_in=result_layer)
+        await self.create_feature_layer_tool(layer_in=result_layer, params=params)
         return {
             "status": JobStatusType.finished.value,
             "msg": "Trip count created.",

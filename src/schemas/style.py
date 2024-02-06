@@ -70,7 +70,25 @@ def get_tool_style(
         index_color_range
     ]
     color = hex_to_rgb(random.choice(random_color_range["colors"]))
-    if feature_geometry_type == FeatureGeometryType.polygon:
+    
+    if feature_geometry_type == FeatureGeometryType.point:
+        return {
+            "color": color,
+            "filled": True,
+            "radius": 5,
+            "opacity": 1,
+            "stroked": False,
+            "max_zoom": 22,
+            "min_zoom": 1,
+            "visibility": True,
+            "color_field": color_field,
+            "color_range": random_color_range,
+            "color_scale": "quantile",
+            "fixed_radius": False,
+            "radius_range": [0, 10],
+            "radius_scale": "linear",
+        }
+    elif feature_geometry_type == FeatureGeometryType.polygon:
         return {
             "color": color,
             "filled": True,
@@ -90,7 +108,25 @@ def get_tool_style(
             "stroke_width_range": [0, 10],
             "stroke_width_scale": "linear",
         }
-
+    elif feature_geometry_type == FeatureGeometryType.line:
+        return {
+            "color": color,
+            "filled": True,
+            "opacity": 1,
+            "stroked": True,
+            "max_zoom": 22,
+            "min_zoom": 1,
+            "visibility": True,
+            "color_field": color_field,
+            "color_range": random_color_range,
+            "color_scale": "quantile",
+            "stroke_color": color,
+            "stroke_width": 10,
+            "stroke_color_range": random_color_range,
+            "stroke_color_scale": "quantile",
+            "stroke_width_range": [0, 10],
+            "stroke_width_scale": "linear",
+        }
 
 base_properties = {
     "tool": {

@@ -136,36 +136,39 @@ class CRUDProject(CRUDBase):
                         async_session=async_session, project_id=project.id
                     )
                     if user_project != [] and layers_project != []:
-                        # Create thumbnail
-                        print_map = PrintMap(async_session)
-                        thumbnail_url = await print_map.create_project_thumbnail(
-                            project=project,
-                            initial_view_state=user_project[0].initial_view_state,
-                            layers_project=layers_project,
-                            file_name=str(project.id)
-                            + project.updated_at.strftime("_%Y-%m-%d_%H-%M-%S-%f")
-                            + ".png",
-                        )
-                        # Update project with thumbnail url by passing the model to avoid the table to get a new updated at
-                        await async_session.execute(
-                            text(
-                                """UPDATE customer.project
-                                SET thumbnail_url = :thumbnail_url WHERE id = :id""",
-                            ),
-                            {"thumbnail_url": thumbnail_url, "id": project.id},
-                        )
-                        await async_session.commit()
+                        try:
+                            # Create thumbnail
+                            print_map = PrintMap(async_session)
+                            thumbnail_url = await print_map.create_project_thumbnail(
+                                project=project,
+                                initial_view_state=user_project[0].initial_view_state,
+                                layers_project=layers_project,
+                                file_name=str(project.id)
+                                + project.updated_at.strftime("_%Y-%m-%d_%H-%M-%S-%f")
+                                + ".png",
+                            )
+                            # Update project with thumbnail url by passing the model to avoid the table to get a new updated at
+                            await async_session.execute(
+                                text(
+                                    """UPDATE customer.project
+                                    SET thumbnail_url = :thumbnail_url WHERE id = :id""",
+                                ),
+                                {"thumbnail_url": thumbnail_url, "id": project.id},
+                            )
+                            await async_session.commit()
 
-                        # Update returned project
-                        projects.items[cnt].thumbnail_url = thumbnail_url
+                            # Update returned project
+                            projects.items[cnt].thumbnail_url = thumbnail_url
 
-                        # Delete old thumbnail url
-                        settings.S3_CLIENT.delete_object(
-                            Bucket=settings.AWS_S3_ASSETS_BUCKET,
-                            Key=old_thumbnail_url.replace(
-                                settings.ASSETS_URL + "/", ""
-                            ),
-                        )
+                            # Delete old thumbnail url
+                            settings.S3_CLIENT.delete_object(
+                                Bucket=settings.AWS_S3_ASSETS_BUCKET,
+                                Key=old_thumbnail_url.replace(
+                                    settings.ASSETS_URL + "/", ""
+                                ),
+                            )
+                        except Exception as e:
+                            print(f"Error updating thumbnail: {e}")
             cnt += 1
         return projects
 

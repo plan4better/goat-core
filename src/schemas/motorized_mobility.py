@@ -11,7 +11,7 @@ from src.schemas.toolbox_base import (
     check_starting_points,
 )
 from src.schemas.active_mobility import RoutingActiveMobilityType
-
+from src.schemas.colors import ColorRangeType
 
 class IsochroneStartingPointsMotorizedMobility(IsochroneStartingPointsBase):
     """Model for the active mobility isochrone starting points."""
@@ -332,6 +332,13 @@ class ITripCountStation(BaseModel):
     def geofence_table(self):
         return "basic.geofence_pt"
 
+    @property
+    def properties_base(self):
+        return {
+            "color_range_type": ColorRangeType.sequential,
+            "color_field": {"name": "total", "type": "number"},
+            "color_scale": "quantile",
+        }
 
 class IStartingPointNearbyStation(IsochroneStartingPointsBase):
     """Model for the starting points of the nearby station endpoint."""

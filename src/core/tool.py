@@ -2,6 +2,7 @@ from typing import List
 from uuid import UUID
 
 from fastapi import BackgroundTasks
+from fastapi_pagination import Params as PaginationParams
 from httpx import AsyncClient
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,6 +41,7 @@ from src.schemas.toolbox_base import (
     MaxFeatureCnt,
     MaxFeaturePolygonArea,
 )
+from src.schemas.common import OrderEnum
 from src.utils import build_where_clause, get_random_string, search_value
 
 
@@ -233,8 +235,24 @@ class CRUDToolBase(CRUDFailedJob):
 
         # Create style for layer
         # Request scale breaks in case of color_scale
-        if "properties_base" in params:
+        if hasattr(params, 'properties_base'):
             if params.properties_base.get("color_scale"):
+                # Check if number of breaks is given or if it should be computed
+                if params.properties_base.get("breaks") is None:
+                    # Check if layer has max nine unique values in color_field
+                    unique_values = await crud_layer.get_unique_values(
+                        async_session=self.async_session,
+                        id=layer.id,
+                        column_name=params.properties_base["color_field"]["name"],
+                        order=OrderEnum.descendent.value,
+                        query=None,
+                        page_params=PaginationParams(page=1, size=9)
+                    )
+                    # Get len propertes as breaks
+                    breaks = len(unique_values.items)
+                else:
+                    breaks = params.properties_base["breaks"]
+
                 # Get unique unique scale breaks
                 operation = params.properties_base.get("color_scale")
                 # Get scale breaks
@@ -244,7 +262,7 @@ class CRUDToolBase(CRUDFailedJob):
                     operation=ComputeBreakOperation(operation),
                     column_name=params.properties_base["color_field"]["name"],
                     stripe_zeros=True,
-                    breaks=params.properties_base["breaks"],
+                    breaks=breaks,
                     query=None,
                 )
                 # Get properties
