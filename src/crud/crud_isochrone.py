@@ -5,7 +5,6 @@ from httpx import AsyncClient
 from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
 from src.core.tool import CRUDToolBase
-from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.jsoline import generate_jsolines
 from src.schemas.active_mobility import (
     IIsochroneActiveMobility,
@@ -40,10 +39,7 @@ class CRUDIsochroneBase(CRUDToolBase):
     ):
         # Check if starting points are a layer
         if params.starting_points.layer_project_id:
-            #TODO: Use method from CRUDToolBase
-            layer = await crud_layer_project.get(
-                db=self.async_session, id=params.starting_points.layer_project_id
-            )
+            layer = await self.get_layers_project(params)
             return layer
 
         # Create layer object
@@ -127,6 +123,18 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
         # Create layer to store isochrone starting points if required
         layer_starting_points = await self.create_or_return_layer_starting_points(params=params)
 
+        # Fetch starting points from previously created layer if required
+        if params.starting_points.layer_project_id:
+            sql = f"""
+                SELECT ST_X(geom) AS lon, ST_Y(geom) AS lat
+                FROM {layer_starting_points["layer_project_id"].table_name}
+                WHERE {layer_starting_points["layer_project_id"].where_query};
+            """
+            starting_points = (await self.async_session.execute(sql)).fetchall()
+            starting_points = [dict(x) for x in starting_points]
+            params.starting_points.latitude = [x["lat"] for x in starting_points]
+            params.starting_points.longitude = [x["lon"] for x in starting_points]
+
         # Create feature layer to store computed isochrone output
         layer_isochrone = IFeatureLayerToolCreate(
             name=DefaultResultLayerName.isochrone_active_mobility.value,
@@ -191,7 +199,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
 
         # Create new layers
         await self.create_feature_layer_tool(
-            layer_in=layer_starting_points,
+            layer_in=layer_starting_points["layer_project_id"],
         )
         await self.create_feature_layer_tool(
             layer_in=layer_isochrone,
@@ -253,7 +261,19 @@ class CRUDIsochronePT(CRUDIsochroneBase):
         """Compute public transport isochrone using R5 routing endpoint."""
 
         # Create layer to store isochrone starting points if required
-        await self.create_or_return_layer_starting_points(params=params)
+        layer_starting_points = await self.create_or_return_layer_starting_points(params=params)
+
+        # Fetch starting points from previously created layer if required
+        if params.starting_points.layer_project_id:
+            sql = f"""
+                SELECT ST_X(geom) AS lon, ST_Y(geom) AS lat
+                FROM {layer_starting_points["layer_project_id"].table_name}
+                WHERE {layer_starting_points["layer_project_id"].where_query};
+            """
+            starting_points = (await self.async_session.execute(sql)).fetchall()
+            starting_points = [dict(x) for x in starting_points]
+            params.starting_points.latitude = [x["lat"] for x in starting_points]
+            params.starting_points.longitude = [x["lon"] for x in starting_points]
 
         # Create feature layer to store computed isochrone output
         layer_isochrone = IFeatureLayerToolCreate(
@@ -409,7 +429,13 @@ class CRUDIsochronePT(CRUDIsochroneBase):
                     f"Error while saving R5 isochrone result to database: {str(e)}"
                 )
 
-            # Create starting point layer and isochrone layer
+            # Create new layers
+            await self.create_feature_layer_tool(
+                layer_in=layer_starting_points["layer_project_id"],
+            )
+            await self.create_feature_layer_tool(
+                layer_in=layer_isochrone,
+            )
 
 
         return {

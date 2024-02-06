@@ -1,14 +1,12 @@
 from typing import List
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import BackgroundTasks
 from httpx import AsyncClient
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql import text
 from sqlmodel import SQLModel
 
-from src.core.config import settings
 from src.core.job import CRUDFailedJob
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import layer as crud_layer
@@ -30,7 +28,6 @@ from src.schemas.layer import (
     IFeatureLayerToolCreate,
     OgrPostgresType,
     UserDataGeomType,
-    UserDataTable,
 )
 from src.schemas.style import get_base_style
 from src.schemas.tool import IToolParam
@@ -129,7 +126,11 @@ class CRUDToolBase(CRUDFailedJob):
         # Get all params that have the name layer_project_id and build a dict using the variable name as key
         layer_project_ids = {}
         for key, value in params.dict().items():
-            if key.endswith("_layer_project_id") and value is not None:
+            if isinstance(value, dict):
+                for sub_key, sub_value in value.items():
+                    if sub_key.endswith("layer_project_id") and sub_value is not None:
+                        layer_project_ids[sub_key] = sub_value
+            elif key.endswith("layer_project_id") and value is not None:
                 layer_project_ids[key] = value
 
         # Get all layers_project
