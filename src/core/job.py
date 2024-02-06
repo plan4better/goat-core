@@ -143,6 +143,8 @@ def job_log(job_step_name: str, timeout: int = 120):
             try:
                 result = await asyncio.wait_for(func(*args, **kwargs), timeout)
             except asyncio.TimeoutError:
+                 # Roll back the transaction
+                await async_session.rollback()
                 # Handle the timeout here. For example, you can raise a custom exception or log it.
                 await run_failure_func(self, func, *args, **kwargs)
                 # Update job status to indicate timeout
@@ -157,6 +159,8 @@ def job_log(job_step_name: str, timeout: int = 120):
                 background_logger.error(msg_text)
                 raise TimeoutError(msg_text)
             except Exception as e:
+                # Roll back the transaction
+                await async_session.rollback()
                 # Run failure function if exists
                 await run_failure_func(self, func, *args, **kwargs)
                 # Update job status simple to failed
@@ -203,6 +207,9 @@ def job_log(job_step_name: str, timeout: int = 120):
                 JobStatusType.killed.value,
                 JobStatusType.failed.value,
             ]:
+                # Roll back the transaction
+                await async_session.rollback()
+                # Run failure function if exists
                 await run_failure_func(self, func, *args, **kwargs)
                 msg_txt = "Job was killed"
                 print(msg_txt)

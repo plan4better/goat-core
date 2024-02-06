@@ -22,8 +22,14 @@ class CRUDUser(CRUDBase):
                 # Create table
                 if table_type.value == "no_geometry":
                     geom_column = ""
+                    additional_columns = ""
                 else:
                     geom_column = "geom GEOMETRY,"
+                    additional_columns = f"""
+                        ,cluster_keep boolean,
+                        h3_3 bigint NULL,
+                        h3_group h3index NULL
+                    """
 
                 sql_create_table = f"""
                 CREATE TABLE {settings.USER_DATA_SCHEMA}."{table_name}" (
@@ -42,20 +48,38 @@ class CRUDUser(CRUDBase):
                     {', '.join([f'boolean_attr{i+1} BOOLEAN' for i in range(NumberColumnsPerType.boolean.value)])},
                     updated_at timestamptz NOT NULL DEFAULT to_char((CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text), 'YYYY-MM-DD"T"HH24:MI:SSOF'::text)::timestamp with time zone,
 	                created_at timestamptz NOT NULL DEFAULT to_char((CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text), 'YYYY-MM-DD"T"HH24:MI:SSOF'::text)::timestamp with time zone
+                    {additional_columns}
                 );
                 """
                 await async_session.execute(text(sql_create_table))
+
                 # Create GIST Index
                 if table_type != "no_geometry":
+                    # Create Trigger
+                    sql_create_trigger = f"""CREATE TRIGGER trigger_{settings.USER_DATA_SCHEMA}_{table_name}
+                        BEFORE INSERT OR UPDATE ON {settings.USER_DATA_SCHEMA}."{table_name}"
+                        FOR EACH ROW EXECUTE FUNCTION basic.set_user_data_h3();
+                    """
+                    await async_session.execute(text(sql_create_trigger))
                     await async_session.execute(
                         text(
-                            f"""CREATE INDEX ON {settings.USER_DATA_SCHEMA}."{table_name}" USING GIST(geom);"""
+                            f"""CREATE INDEX ON {settings.USER_DATA_SCHEMA}."{table_name}" USING GIST(layer_id, geom);"""
+                        )
+                    )
+                    await async_session.execute(
+                        text(
+                            f"""CREATE INDEX ON {settings.USER_DATA_SCHEMA}."{table_name}" (layer_id, h3_group);"""
+                        )
+                    )
+                    await async_session.execute(
+                        text(
+                            f"""CREATE INDEX ON {settings.USER_DATA_SCHEMA}."{table_name}" (layer_id, cluster_keep);"""
                         )
                     )
                 # Create Index on ID
                 await async_session.execute(
                     text(
-                        f"""CREATE INDEX ON {settings.USER_DATA_SCHEMA}."{table_name}" (id);"""
+                        f"""CREATE INDEX ON {settings.USER_DATA_SCHEMA}."{table_name}" (layer_id, id);"""
                     )
                 )
 

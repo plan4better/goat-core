@@ -492,15 +492,6 @@ async def test_get_statistics_column_wrong_column_name(
     assert response.status_code == 404
     return
 
-
-# Batch test different files
-@pytest.mark.asyncio
-async def test_batch_create_internal_layer(
-    client: AsyncClient, fixture_batch_create_internal_layers
-):
-    print(fixture_batch_create_internal_layers)
-
-
 # Some further test cases
 """Valid File Import
 Use an invalid job ID for import

@@ -635,4 +635,3 @@ class OGRFileHandling:
         )
         await self.async_session.commit()
 
-

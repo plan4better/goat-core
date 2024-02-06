@@ -132,6 +132,15 @@ class ThumbnailComputeError(Exception):
 
     pass
 
+class OperationNotSupportedError(Exception):
+    """Raised when the operation is not supported."""
+
+    pass
+
+class ColumnNotFoundError(Exception):
+    """Raised when the column is not found."""
+
+    pass
 
 # Define the mapping between custom errors and HTTP status codes
 ERROR_MAPPING = {
@@ -154,6 +163,8 @@ ERROR_MAPPING = {
     RoutingEndpointError: status.HTTP_500_INTERNAL_SERVER_ERROR,
     R5EndpointError: status.HTTP_500_INTERNAL_SERVER_ERROR,
     R5IsochroneComputeError: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    OperationNotSupportedError: status.HTTP_422_UNPROCESSABLE_ENTITY,
+    ColumnNotFoundError: status.HTTP_404_NOT_FOUND,
 }
 
 

@@ -81,16 +81,16 @@ class OgrDriverType(str, Enum):
 class NumberColumnsPerType(int, Enum):
     """Number of columns per type."""
 
-    integer = 15
+    integer = 25
     bigint = 5
-    float = 10
-    text = 20
+    float = 25
+    text = 25
     timestamp = 3
     arrfloat = 3
     arrint = 3
     arrtext = 3
-    jsonb = 3
-    boolean = 3
+    jsonb = 10
+    boolean = 10
 
 
 class IFileUploadMetadata(BaseModel):
@@ -103,8 +103,8 @@ class IFileUploadMetadata(BaseModel):
     msg: Msg = Field(..., description="Response Message")
 
 
-class ColumnStatisticsOperation(Enum):
-    """Allowed operations on numeric columsn."""
+class ComputeBreakOperation(Enum):
+    """Allowed operations on numeric columns."""
 
     quantile = "quantile"
     standard_deviation = "standard_deviation"
@@ -532,6 +532,7 @@ layer_update_class = {
     },
 }
 
+
 # Write function to get the correct class
 def get_layer_schema(
     class_mapping: dict, layer_type: LayerType, feature_layer_type: FeatureType = None
@@ -548,6 +549,7 @@ def get_layer_schema(
             return class_mapping["internal"][layer_type]
     else:
         raise ValueError(f"Layer type ({layer_type}) is invalid")
+
 
 class ILayerExternalCreate(BaseModel):
     def __new__(cls, *args, **kwargs):

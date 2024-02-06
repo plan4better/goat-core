@@ -1,3 +1,12 @@
+from enum import Enum
+
+class ColorRangeType(Enum):
+    sequential = "sequential"
+    diverging = "diverging"
+    qualitative = "qualitative"
+    single_hue = "single_hue"
+
+
 data_viz_colors = {
     "aqua": "#12939A",
     "tumbleweed": "#DDB27C",
@@ -27,25 +36,25 @@ qualitative_colors = {
     "Set2": [
         {
             "name": "Set2 1",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#66c2a5", "#fc8d62", "#8da0cb"],
         },
         {
             "name": "Set2 2",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3"],
         },
         {
             "name": "Set2 3",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854"],
         },
         {
             "name": "Set2 4",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#66c2a5",
@@ -58,7 +67,7 @@ qualitative_colors = {
         },
         {
             "name": "Set2 5",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#66c2a5",
@@ -72,7 +81,7 @@ qualitative_colors = {
         },
         {
             "name": "Set2 6",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#66c2a5",
@@ -89,25 +98,25 @@ qualitative_colors = {
     "Accent": [
         {
             "name": "Accent 1",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#7fc97f", "#beaed4", "#fdc086"],
         },
         {
             "name": "Accent 2",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#7fc97f", "#beaed4", "#fdc086", "#ffff99"],
         },
         {
             "name": "Accent 3",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#7fc97f", "#beaed4", "#fdc086", "#ffff99", "#386cb0"],
         },
         {
             "name": "Accent 4",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#7fc97f",
@@ -120,7 +129,7 @@ qualitative_colors = {
         },
         {
             "name": "Accent 5",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#7fc97f",
@@ -134,7 +143,7 @@ qualitative_colors = {
         },
         {
             "name": "Accent 6",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#7fc97f",
@@ -151,25 +160,25 @@ qualitative_colors = {
     "Set1": [
         {
             "name": "Set1 1",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#e41a1c", "#377eb8", "#4daf4a"],
         },
         {
             "name": "Set1 2",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3"],
         },
         {
             "name": "Set1 3",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00"],
         },
         {
             "name": "Set1 4",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#e41a1c",
@@ -182,7 +191,7 @@ qualitative_colors = {
         },
         {
             "name": "Set1 5",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#e41a1c",
@@ -196,7 +205,7 @@ qualitative_colors = {
         },
         {
             "name": "Set1 6",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#e41a1c",
@@ -211,7 +220,7 @@ qualitative_colors = {
         },
         {
             "name": "Set1 7",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#e41a1c",
@@ -229,25 +238,25 @@ qualitative_colors = {
     "Set3": [
         {
             "name": "Set3 1",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#8dd3c7", "#ffffb3", "#bebada"],
         },
         {
             "name": "Set3 2",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#8dd3c7", "#ffffb3", "#bebada", "#fb8072"],
         },
         {
             "name": "Set3 3",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#8dd3c7", "#ffffb3", "#bebada", "#fb8072", "#80b1d3"],
         },
         {
             "name": "Set3 4",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#8dd3c7",
@@ -260,7 +269,7 @@ qualitative_colors = {
         },
         {
             "name": "Set3 5",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#8dd3c7",
@@ -274,7 +283,7 @@ qualitative_colors = {
         },
         {
             "name": "Set3 6",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#8dd3c7",
@@ -289,7 +298,7 @@ qualitative_colors = {
         },
         {
             "name": "Set3 7",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#8dd3c7",
@@ -305,7 +314,7 @@ qualitative_colors = {
         },
         {
             "name": "Set3 8",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#8dd3c7",
@@ -322,7 +331,7 @@ qualitative_colors = {
         },
         {
             "name": "Set3 9",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#8dd3c7",
@@ -340,7 +349,7 @@ qualitative_colors = {
         },
         {
             "name": "Set3 10",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#8dd3c7",
@@ -361,25 +370,25 @@ qualitative_colors = {
     "Dark2": [
         {
             "name": "Dark2 1",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#1b9e77", "#d95f02", "#7570b3"],
         },
         {
             "name": "Dark2 2",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#1b9e77", "#d95f02", "#7570b3", "#e7298a"],
         },
         {
             "name": "Dark2 3",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e"],
         },
         {
             "name": "Dark2 4",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#1b9e77",
@@ -392,7 +401,7 @@ qualitative_colors = {
         },
         {
             "name": "Dark2 5",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#1b9e77",
@@ -406,7 +415,7 @@ qualitative_colors = {
         },
         {
             "name": "Dark2 6",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#1b9e77",
@@ -423,25 +432,25 @@ qualitative_colors = {
     "Paired": [
         {
             "name": "Paired 1",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#a6cee3", "#1f78b4", "#b2df8a"],
         },
         {
             "name": "Paired 2",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c"],
         },
         {
             "name": "Paired 3",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99"],
         },
         {
             "name": "Paired 4",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#a6cee3",
@@ -454,7 +463,7 @@ qualitative_colors = {
         },
         {
             "name": "Paired 5",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#a6cee3",
@@ -468,7 +477,7 @@ qualitative_colors = {
         },
         {
             "name": "Paired 6",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#a6cee3",
@@ -483,7 +492,7 @@ qualitative_colors = {
         },
         {
             "name": "Paired 7",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#a6cee3",
@@ -499,7 +508,7 @@ qualitative_colors = {
         },
         {
             "name": "Paired 8",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#a6cee3",
@@ -516,7 +525,7 @@ qualitative_colors = {
         },
         {
             "name": "Paired 9",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#a6cee3",
@@ -534,7 +543,7 @@ qualitative_colors = {
         },
         {
             "name": "Paired 10",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#a6cee3",
@@ -555,25 +564,25 @@ qualitative_colors = {
     "Pastel2": [
         {
             "name": "Pastel2 1",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#b3e2cd", "#fdcdac", "#cbd5e8"],
         },
         {
             "name": "Pastel2 2",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#b3e2cd", "#fdcdac", "#cbd5e8", "#f4cae4"],
         },
         {
             "name": "Pastel2 3",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#b3e2cd", "#fdcdac", "#cbd5e8", "#f4cae4", "#e6f5c9"],
         },
         {
             "name": "Pastel2 4",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#b3e2cd",
@@ -586,7 +595,7 @@ qualitative_colors = {
         },
         {
             "name": "Pastel2 5",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#b3e2cd",
@@ -600,7 +609,7 @@ qualitative_colors = {
         },
         {
             "name": "Pastel2 6",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#b3e2cd",
@@ -617,25 +626,25 @@ qualitative_colors = {
     "Pastel1": [
         {
             "name": "Pastel1 1",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#fbb4ae", "#b3cde3", "#ccebc5"],
         },
         {
             "name": "Pastel1 2",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#fbb4ae", "#b3cde3", "#ccebc5", "#decbe4"],
         },
         {
             "name": "Pastel1 3",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": ["#fbb4ae", "#b3cde3", "#ccebc5", "#decbe4", "#fed9a6"],
         },
         {
             "name": "Pastel1 4",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#fbb4ae",
@@ -648,7 +657,7 @@ qualitative_colors = {
         },
         {
             "name": "Pastel1 5",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#fbb4ae",
@@ -662,7 +671,7 @@ qualitative_colors = {
         },
         {
             "name": "Pastel1 6",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#fbb4ae",
@@ -677,7 +686,7 @@ qualitative_colors = {
         },
         {
             "name": "Pastel1 7",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Colorbrewer",
             "colors": [
                 "#fbb4ae",
@@ -695,61 +704,61 @@ qualitative_colors = {
     "uber_qualitative": [
         {
             "name": "Uber Viz Qualitative 0",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Uber",
             "colors": qua_colors[:3],
         },
         {
             "name": "Uber Viz Qualitative 0.5",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Uber",
             "colors": qua_colors[:4],
         },
         {
             "name": "Uber Viz Qualitative 1",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Uber",
             "colors": qua_colors[:5],
         },
         {
             "name": "Uber Viz Qualitative 1.2",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Uber",
             "colors": qua_colors[:6],
         },
         {
             "name": "Uber Viz Qualitative 1.4",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Uber",
             "colors": qua_colors[:7],
         },
         {
             "name": "Uber Viz Qualitative 1.6",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Uber",
             "colors": qua_colors[:8],
         },
         {
             "name": "Uber Viz Qualitative 1.8",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Uber",
             "colors": qua_colors[:9],
         },
         {
             "name": "Uber Viz Qualitative 2",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Uber",
             "colors": qua_colors[:10],
         },
         {
             "name": "Uber Viz Qualitative 3",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Uber",
             "colors": qua_colors[:15],
         },
         {
             "name": "Uber Viz Qualitative 4",
-            "type": "QUA",
+            "type": "qualitative",
             "category": "Uber",
             "colors": qua_colors[:20],
         },
@@ -761,25 +770,25 @@ single_hue_colors = {
     "Oranges": [
         {
             "name": "Oranges 1",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#fee6ce", "#fdae6b", "#e6550d"],
         },
         {
             "name": "Oranges 2",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#feedde", "#fdbe85", "#fd8d3c", "#d94701"],
         },
         {
             "name": "Oranges 3",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#feedde", "#fdbe85", "#fd8d3c", "#e6550d", "#a63603"],
         },
         {
             "name": "Oranges 4",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#feedde",
@@ -792,7 +801,7 @@ single_hue_colors = {
         },
         {
             "name": "Oranges 5",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#feedde",
@@ -806,7 +815,7 @@ single_hue_colors = {
         },
         {
             "name": "Oranges 6",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#fff5eb",
@@ -821,7 +830,7 @@ single_hue_colors = {
         },
         {
             "name": "Oranges 7",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#fff5eb",
@@ -839,25 +848,25 @@ single_hue_colors = {
     "Greens": [
         {
             "name": "Greens 1",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#e5f5e0", "#a1d99b", "#31a354"],
         },
         {
             "name": "Greens 2",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#edf8e9", "#bae4b3", "#74c476", "#238b45"],
         },
         {
             "name": "Greens 3",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#edf8e9", "#bae4b3", "#74c476", "#31a354", "#006d2c"],
         },
         {
             "name": "Greens 4",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#edf8e9",
@@ -870,7 +879,7 @@ single_hue_colors = {
         },
         {
             "name": "Greens 5",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#edf8e9",
@@ -884,7 +893,7 @@ single_hue_colors = {
         },
         {
             "name": "Greens 6",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#f7fcf5",
@@ -899,7 +908,7 @@ single_hue_colors = {
         },
         {
             "name": "Greens 7",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#f7fcf5",
@@ -917,25 +926,25 @@ single_hue_colors = {
     "Purples": [
         {
             "name": "Purples 1",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#efedf5", "#bcbddc", "#756bb1"],
         },
         {
             "name": "Purples 2",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#f2f0f7", "#cbc9e2", "#9e9ac8", "#6a51a3"],
         },
         {
             "name": "Purples 3",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#f2f0f7", "#cbc9e2", "#9e9ac8", "#756bb1", "#54278f"],
         },
         {
             "name": "Purples 4",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#f2f0f7",
@@ -948,7 +957,7 @@ single_hue_colors = {
         },
         {
             "name": "Purples 5",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#f2f0f7",
@@ -962,7 +971,7 @@ single_hue_colors = {
         },
         {
             "name": "Purples 6",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#fcfbfd",
@@ -977,7 +986,7 @@ single_hue_colors = {
         },
         {
             "name": "Purples 7",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#fcfbfd",
@@ -995,25 +1004,25 @@ single_hue_colors = {
     "Blues": [
         {
             "name": "Blues 1",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#deebf7", "#9ecae1", "#3182bd"],
         },
         {
             "name": "Blues 2",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#eff3ff", "#bdd7e7", "#6baed6", "#2171b5"],
         },
         {
             "name": "Blues 3",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#eff3ff", "#bdd7e7", "#6baed6", "#3182bd", "#08519c"],
         },
         {
             "name": "Blues 4",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#eff3ff",
@@ -1026,7 +1035,7 @@ single_hue_colors = {
         },
         {
             "name": "Blues 5",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#eff3ff",
@@ -1040,7 +1049,7 @@ single_hue_colors = {
         },
         {
             "name": "Blues 6",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#f7fbff",
@@ -1055,7 +1064,7 @@ single_hue_colors = {
         },
         {
             "name": "Blues 7",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#f7fbff",
@@ -1073,25 +1082,25 @@ single_hue_colors = {
     "Greys": [
         {
             "name": "Greys 1",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#f0f0f0", "#bdbdbd", "#636363"],
         },
         {
             "name": "Greys 2",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#f7f7f7", "#cccccc", "#969696", "#525252"],
         },
         {
             "name": "Greys 3",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#f7f7f7", "#cccccc", "#969696", "#636363", "#252525"],
         },
         {
             "name": "Greys 4",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#f7f7f7",
@@ -1104,7 +1113,7 @@ single_hue_colors = {
         },
         {
             "name": "Greys 5",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#f7f7f7",
@@ -1118,7 +1127,7 @@ single_hue_colors = {
         },
         {
             "name": "Greys 6",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffff",
@@ -1133,7 +1142,7 @@ single_hue_colors = {
         },
         {
             "name": "Greys 7",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffff",
@@ -1151,25 +1160,25 @@ single_hue_colors = {
     "Reds": [
         {
             "name": "Reds 1",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#fee0d2", "#fc9272", "#de2d26"],
         },
         {
             "name": "Reds 2",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#fee5d9", "#fcae91", "#fb6a4a", "#cb181d"],
         },
         {
             "name": "Reds 3",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": ["#fee5d9", "#fcae91", "#fb6a4a", "#de2d26", "#a50f15"],
         },
         {
             "name": "Reds 4",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#fee5d9",
@@ -1182,7 +1191,7 @@ single_hue_colors = {
         },
         {
             "name": "Reds 5",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#fee5d9",
@@ -1196,7 +1205,7 @@ single_hue_colors = {
         },
         {
             "name": "Reds 6",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#fff5f0",
@@ -1211,7 +1220,7 @@ single_hue_colors = {
         },
         {
             "name": "Reds 7",
-            "type": "SIH",
+            "type": "singlehue",
             "category": "Colorbrewer",
             "colors": [
                 "#fff5f0",
@@ -1232,25 +1241,25 @@ sequential_colors = {
     "OrRd": [
         {
             "name": "OrRd 1",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#fee8c8", "#fdbb84", "#e34a33"],
         },
         {
             "name": "OrRd 2",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#fef0d9", "#fdcc8a", "#fc8d59", "#d7301f"],
         },
         {
             "name": "OrRd 3",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#fef0d9", "#fdcc8a", "#fc8d59", "#e34a33", "#b30000"],
         },
         {
             "name": "OrRd 4",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#fef0d9",
@@ -1263,7 +1272,7 @@ sequential_colors = {
         },
         {
             "name": "OrRd 5",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#fef0d9",
@@ -1277,7 +1286,7 @@ sequential_colors = {
         },
         {
             "name": "OrRd 6",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#fff7ec",
@@ -1292,7 +1301,7 @@ sequential_colors = {
         },
         {
             "name": "OrRd 7",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#fff7ec",
@@ -1310,25 +1319,25 @@ sequential_colors = {
     "PuBu": [
         {
             "name": "PuBu 1",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#ece7f2", "#a6bddb", "#2b8cbe"],
         },
         {
             "name": "PuBu 2",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#f1eef6", "#bdc9e1", "#74a9cf", "#0570b0"],
         },
         {
             "name": "PuBu 3",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#f1eef6", "#bdc9e1", "#74a9cf", "#2b8cbe", "#045a8d"],
         },
         {
             "name": "PuBu 4",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f1eef6",
@@ -1341,7 +1350,7 @@ sequential_colors = {
         },
         {
             "name": "PuBu 5",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f1eef6",
@@ -1355,7 +1364,7 @@ sequential_colors = {
         },
         {
             "name": "PuBu 6",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#fff7fb",
@@ -1370,7 +1379,7 @@ sequential_colors = {
         },
         {
             "name": "PuBu 7",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#fff7fb",
@@ -1388,25 +1397,25 @@ sequential_colors = {
     "BuPu": [
         {
             "name": "BuPu 1",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#e0ecf4", "#9ebcda", "#8856a7"],
         },
         {
             "name": "BuPu 2",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#edf8fb", "#b3cde3", "#8c96c6", "#88419d"],
         },
         {
             "name": "BuPu 3",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#edf8fb", "#b3cde3", "#8c96c6", "#8856a7", "#810f7c"],
         },
         {
             "name": "BuPu 4",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#edf8fb",
@@ -1419,7 +1428,7 @@ sequential_colors = {
         },
         {
             "name": "BuPu 5",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#edf8fb",
@@ -1433,7 +1442,7 @@ sequential_colors = {
         },
         {
             "name": "BuPu 6",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f7fcfd",
@@ -1448,7 +1457,7 @@ sequential_colors = {
         },
         {
             "name": "BuPu 7",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f7fcfd",
@@ -1466,25 +1475,25 @@ sequential_colors = {
     "BuGn": [
         {
             "name": "BuGn 1",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#e5f5f9", "#99d8c9", "#2ca25f"],
         },
         {
             "name": "BuGn 2",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#edf8fb", "#b2e2e2", "#66c2a4", "#238b45"],
         },
         {
             "name": "BuGn 3",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#edf8fb", "#b2e2e2", "#66c2a4", "#2ca25f", "#006d2c"],
         },
         {
             "name": "BuGn 4",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#edf8fb",
@@ -1497,7 +1506,7 @@ sequential_colors = {
         },
         {
             "name": "BuGn 5",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#edf8fb",
@@ -1511,7 +1520,7 @@ sequential_colors = {
         },
         {
             "name": "BuGn 6",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f7fcfd",
@@ -1526,7 +1535,7 @@ sequential_colors = {
         },
         {
             "name": "BuGn 7",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f7fcfd",
@@ -1544,25 +1553,25 @@ sequential_colors = {
     "YlOrBr": [
         {
             "name": "YlOrBr 1",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#fff7bc", "#fec44f", "#d95f0e"],
         },
         {
             "name": "YlOrBr 2",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#ffffd4", "#fed98e", "#fe9929", "#cc4c02"],
         },
         {
             "name": "YlOrBr 3",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#ffffd4", "#fed98e", "#fe9929", "#d95f0e", "#993404"],
         },
         {
             "name": "YlOrBr 4",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffd4",
@@ -1575,7 +1584,7 @@ sequential_colors = {
         },
         {
             "name": "YlOrBr 5",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffd4",
@@ -1589,7 +1598,7 @@ sequential_colors = {
         },
         {
             "name": "YlOrBr 6",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffe5",
@@ -1604,7 +1613,7 @@ sequential_colors = {
         },
         {
             "name": "YlOrBr 7",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffe5",
@@ -1622,25 +1631,25 @@ sequential_colors = {
     "YlGn": [
         {
             "name": "YlGn 1",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#f7fcb9", "#addd8e", "#31a354"],
         },
         {
             "name": "YlGn 2",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#ffffcc", "#c2e699", "#78c679", "#238443"],
         },
         {
             "name": "YlGn 3",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#ffffcc", "#c2e699", "#78c679", "#31a354", "#006837"],
         },
         {
             "name": "YlGn 4",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffcc",
@@ -1653,7 +1662,7 @@ sequential_colors = {
         },
         {
             "name": "YlGn 5",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffcc",
@@ -1667,7 +1676,7 @@ sequential_colors = {
         },
         {
             "name": "YlGn 6",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffe5",
@@ -1682,7 +1691,7 @@ sequential_colors = {
         },
         {
             "name": "YlGn 7",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffe5",
@@ -1700,25 +1709,25 @@ sequential_colors = {
     "RdPu": [
         {
             "name": "RdPu 1",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#fde0dd", "#fa9fb5", "#c51b8a"],
         },
         {
             "name": "RdPu 2",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#feebe2", "#fbb4b9", "#f768a1", "#ae017e"],
         },
         {
             "name": "RdPu 3",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#feebe2", "#fbb4b9", "#f768a1", "#c51b8a", "#7a0177"],
         },
         {
             "name": "RdPu 4",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#feebe2",
@@ -1731,7 +1740,7 @@ sequential_colors = {
         },
         {
             "name": "RdPu 5",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#feebe2",
@@ -1745,7 +1754,7 @@ sequential_colors = {
         },
         {
             "name": "RdPu 6",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#fff7f3",
@@ -1760,7 +1769,7 @@ sequential_colors = {
         },
         {
             "name": "RdPu 7",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#fff7f3",
@@ -1778,25 +1787,25 @@ sequential_colors = {
     "YlGnBu": [
         {
             "name": "YlGnBu 1",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#edf8b1", "#7fcdbb", "#2c7fb8"],
         },
         {
             "name": "YlGnBu 2",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#ffffcc", "#a1dab4", "#41b6c4", "#225ea8"],
         },
         {
             "name": "YlGnBu 3",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#ffffcc", "#a1dab4", "#41b6c4", "#2c7fb8", "#253494"],
         },
         {
             "name": "YlGnBu 4",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffcc",
@@ -1809,7 +1818,7 @@ sequential_colors = {
         },
         {
             "name": "YlGnBu 5",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffcc",
@@ -1823,7 +1832,7 @@ sequential_colors = {
         },
         {
             "name": "YlGnBu 6",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffd9",
@@ -1838,7 +1847,7 @@ sequential_colors = {
         },
         {
             "name": "YlGnBu 7",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffd9",
@@ -1856,25 +1865,25 @@ sequential_colors = {
     "GnBu": [
         {
             "name": "GnBu 1",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#e0f3db", "#a8ddb5", "#43a2ca"],
         },
         {
             "name": "GnBu 2",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#f0f9e8", "#bae4bc", "#7bccc4", "#2b8cbe"],
         },
         {
             "name": "GnBu 3",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#f0f9e8", "#bae4bc", "#7bccc4", "#43a2ca", "#0868ac"],
         },
         {
             "name": "GnBu 4",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f0f9e8",
@@ -1887,7 +1896,7 @@ sequential_colors = {
         },
         {
             "name": "GnBu 5",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f0f9e8",
@@ -1901,7 +1910,7 @@ sequential_colors = {
         },
         {
             "name": "GnBu 6",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f7fcf0",
@@ -1916,7 +1925,7 @@ sequential_colors = {
         },
         {
             "name": "GnBu 7",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f7fcf0",
@@ -1934,25 +1943,25 @@ sequential_colors = {
     "YlOrRd": [
         {
             "name": "YlOrRd 1",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#ffeda0", "#feb24c", "#f03b20"],
         },
         {
             "name": "YlOrRd 2",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#ffffb2", "#fecc5c", "#fd8d3c", "#e31a1c"],
         },
         {
             "name": "YlOrRd 3",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#ffffb2", "#fecc5c", "#fd8d3c", "#f03b20", "#bd0026"],
         },
         {
             "name": "YlOrRd 4",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffb2",
@@ -1965,7 +1974,7 @@ sequential_colors = {
         },
         {
             "name": "YlOrRd 5",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffb2",
@@ -1979,7 +1988,7 @@ sequential_colors = {
         },
         {
             "name": "YlOrRd 6",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#ffffcc",
@@ -1996,25 +2005,25 @@ sequential_colors = {
     "PuRd": [
         {
             "name": "PuRd 1",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#e7e1ef", "#c994c7", "#dd1c77"],
         },
         {
             "name": "PuRd 2",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#f1eef6", "#d7b5d8", "#df65b0", "#ce1256"],
         },
         {
             "name": "PuRd 3",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#f1eef6", "#d7b5d8", "#df65b0", "#dd1c77", "#980043"],
         },
         {
             "name": "PuRd 4",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f1eef6",
@@ -2027,7 +2036,7 @@ sequential_colors = {
         },
         {
             "name": "PuRd 5",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f1eef6",
@@ -2041,7 +2050,7 @@ sequential_colors = {
         },
         {
             "name": "PuRd 6",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f7f4f9",
@@ -2056,7 +2065,7 @@ sequential_colors = {
         },
         {
             "name": "PuRd 7",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f7f4f9",
@@ -2074,25 +2083,25 @@ sequential_colors = {
     "PuBuGn": [
         {
             "name": "PuBuGn 1",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#ece2f0", "#a6bddb", "#1c9099"],
         },
         {
             "name": "PuBuGn 2",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#f6eff7", "#bdc9e1", "#67a9cf", "#02818a"],
         },
         {
             "name": "PuBuGn 3",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": ["#f6eff7", "#bdc9e1", "#67a9cf", "#1c9099", "#016c59"],
         },
         {
             "name": "PuBuGn 4",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f6eff7",
@@ -2105,7 +2114,7 @@ sequential_colors = {
         },
         {
             "name": "PuBuGn 5",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#f6eff7",
@@ -2119,7 +2128,7 @@ sequential_colors = {
         },
         {
             "name": "PuBuGn 6",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#fff7fb",
@@ -2134,7 +2143,7 @@ sequential_colors = {
         },
         {
             "name": "PuBuGn 7",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Colorbrewer",
             "colors": [
                 "#fff7fb",
@@ -2152,25 +2161,25 @@ sequential_colors = {
     "uber_sequential": [
         {
             "name": "Uber Viz Sequential 1",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Uber",
             "colors": ["#E6FAFA", "#89C6CA", "#00939C"],
         },
         {
             "name": "Uber Viz Sequential 2",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Uber",
             "colors": ["#E6FAFA", "#AAD7DA", "#68B4BB", "#00939C"],
         },
         {
             "name": "Uber Viz Sequential 3",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Uber",
             "colors": ["#E6FAFA", "#B8E0E1", "#89C6CA", "#56ACB3", "#00939C"],
         },
         {
             "name": "Uber Viz Sequential 4",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Uber",
             "colors": [
                 "#E6FAFA",
@@ -2183,7 +2192,7 @@ sequential_colors = {
         },
         {
             "name": "Uber Viz Sequential 5",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Uber",
             "colors": [
                 "#E6FAFA",
@@ -2197,7 +2206,7 @@ sequential_colors = {
         },
         {
             "name": "Uber Viz Sequential 6",
-            "type": "SEQ",
+            "type": "sequential",
             "category": "Uber",
             "colors": [
                 "#E6FAFA",
@@ -2217,25 +2226,25 @@ diverging_colors = {
     "Spectral": [
         {
             "name": "Spectral 1",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#fc8d59", "#ffffbf", "#99d594"],
         },
         {
             "name": "Spectral 2",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#d7191c", "#fdae61", "#abdda4", "#2b83ba"],
         },
         {
             "name": "Spectral 3",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#d7191c", "#fdae61", "#ffffbf", "#abdda4", "#2b83ba"],
         },
         {
             "name": "Spectral 4",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#d53e4f",
@@ -2248,7 +2257,7 @@ diverging_colors = {
         },
         {
             "name": "Spectral 5",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#d53e4f",
@@ -2262,7 +2271,7 @@ diverging_colors = {
         },
         {
             "name": "Spectral 6",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#d53e4f",
@@ -2277,7 +2286,7 @@ diverging_colors = {
         },
         {
             "name": "Spectral 7",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#d53e4f",
@@ -2293,7 +2302,7 @@ diverging_colors = {
         },
         {
             "name": "Spectral 8",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#9e0142",
@@ -2310,7 +2319,7 @@ diverging_colors = {
         },
         {
             "name": "Spectral 9",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#9e0142",
@@ -2330,25 +2339,25 @@ diverging_colors = {
     "RdYlGn": [
         {
             "name": "RdYlGn 1",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#fc8d59", "#ffffbf", "#91cf60"],
         },
         {
             "name": "RdYlGn 2",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#d7191c", "#fdae61", "#a6d96a", "#1a9641"],
         },
         {
             "name": "RdYlGn 3",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"],
         },
         {
             "name": "RdYlGn 4",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#d73027",
@@ -2361,7 +2370,7 @@ diverging_colors = {
         },
         {
             "name": "RdYlGn 5",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#d73027",
@@ -2375,7 +2384,7 @@ diverging_colors = {
         },
         {
             "name": "RdYlGn 6",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#d73027",
@@ -2390,7 +2399,7 @@ diverging_colors = {
         },
         {
             "name": "RdYlGn 7",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#d73027",
@@ -2406,7 +2415,7 @@ diverging_colors = {
         },
         {
             "name": "RdYlGn 8",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#a50026",
@@ -2423,7 +2432,7 @@ diverging_colors = {
         },
         {
             "name": "RdYlGn 9",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#a50026",
@@ -2443,25 +2452,25 @@ diverging_colors = {
     "RdBu": [
         {
             "name": "RdBu 1",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#ef8a62", "#f7f7f7", "#67a9cf"],
         },
         {
             "name": "RdBu 2",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#ca0020", "#f4a582", "#92c5de", "#0571b0"],
         },
         {
             "name": "RdBu 3",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#ca0020", "#f4a582", "#f7f7f7", "#92c5de", "#0571b0"],
         },
         {
             "name": "RdBu 4",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#b2182b",
@@ -2474,7 +2483,7 @@ diverging_colors = {
         },
         {
             "name": "RdBu 5",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#b2182b",
@@ -2488,7 +2497,7 @@ diverging_colors = {
         },
         {
             "name": "RdBu 6",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#b2182b",
@@ -2503,7 +2512,7 @@ diverging_colors = {
         },
         {
             "name": "RdBu 7",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#b2182b",
@@ -2519,7 +2528,7 @@ diverging_colors = {
         },
         {
             "name": "RdBu 8",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#67001f",
@@ -2536,7 +2545,7 @@ diverging_colors = {
         },
         {
             "name": "RdBu 9",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#67001f",
@@ -2556,25 +2565,25 @@ diverging_colors = {
     "PiYG": [
         {
             "name": "PiYG 1",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#e9a3c9", "#f7f7f7", "#a1d76a"],
         },
         {
             "name": "PiYG 2",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#d01c8b", "#f1b6da", "#b8e186", "#4dac26"],
         },
         {
             "name": "PiYG 3",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#d01c8b", "#f1b6da", "#f7f7f7", "#b8e186", "#4dac26"],
         },
         {
             "name": "PiYG 4",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#c51b7d",
@@ -2587,7 +2596,7 @@ diverging_colors = {
         },
         {
             "name": "PiYG 5",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#c51b7d",
@@ -2601,7 +2610,7 @@ diverging_colors = {
         },
         {
             "name": "PiYG 6",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#c51b7d",
@@ -2616,7 +2625,7 @@ diverging_colors = {
         },
         {
             "name": "PiYG 7",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#c51b7d",
@@ -2632,7 +2641,7 @@ diverging_colors = {
         },
         {
             "name": "PiYG 8",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#8e0152",
@@ -2649,7 +2658,7 @@ diverging_colors = {
         },
         {
             "name": "PiYG 9",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#8e0152",
@@ -2669,25 +2678,25 @@ diverging_colors = {
     "PRGn": [
         {
             "name": "PRGn 1",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#af8dc3", "#f7f7f7", "#7fbf7b"],
         },
         {
             "name": "PRGn 2",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#7b3294", "#c2a5cf", "#a6dba0", "#008837"],
         },
         {
             "name": "PRGn 3",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#7b3294", "#c2a5cf", "#f7f7f7", "#a6dba0", "#008837"],
         },
         {
             "name": "PRGn 4",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#762a83",
@@ -2700,7 +2709,7 @@ diverging_colors = {
         },
         {
             "name": "PRGn 5",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#762a83",
@@ -2714,7 +2723,7 @@ diverging_colors = {
         },
         {
             "name": "PRGn 6",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#762a83",
@@ -2729,7 +2738,7 @@ diverging_colors = {
         },
         {
             "name": "PRGn 7",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#762a83",
@@ -2745,7 +2754,7 @@ diverging_colors = {
         },
         {
             "name": "PRGn 8",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#40004b",
@@ -2762,7 +2771,7 @@ diverging_colors = {
         },
         {
             "name": "PRGn 9",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#40004b",
@@ -2782,25 +2791,25 @@ diverging_colors = {
     "RdYlBu": [
         {
             "name": "RdYlBu 1",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#fc8d59", "#ffffbf", "#91bfdb"],
         },
         {
             "name": "RdYlBu 2",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#d7191c", "#fdae61", "#abd9e9", "#2c7bb6"],
         },
         {
             "name": "RdYlBu 3",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#d7191c", "#fdae61", "#ffffbf", "#abd9e9", "#2c7bb6"],
         },
         {
             "name": "RdYlBu 4",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#d73027",
@@ -2813,7 +2822,7 @@ diverging_colors = {
         },
         {
             "name": "RdYlBu 5",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#d73027",
@@ -2827,7 +2836,7 @@ diverging_colors = {
         },
         {
             "name": "RdYlBu 6",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#d73027",
@@ -2842,7 +2851,7 @@ diverging_colors = {
         },
         {
             "name": "RdYlBu 7",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#d73027",
@@ -2858,7 +2867,7 @@ diverging_colors = {
         },
         {
             "name": "RdYlBu 8",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#a50026",
@@ -2875,7 +2884,7 @@ diverging_colors = {
         },
         {
             "name": "RdYlBu 9",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#a50026",
@@ -2895,25 +2904,25 @@ diverging_colors = {
     "BrBG": [
         {
             "name": "BrBG 1",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#d8b365", "#f5f5f5", "#5ab4ac"],
         },
         {
             "name": "BrBG 2",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#a6611a", "#dfc27d", "#80cdc1", "#018571"],
         },
         {
             "name": "BrBG 3",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#a6611a", "#dfc27d", "#f5f5f5", "#80cdc1", "#018571"],
         },
         {
             "name": "BrBG 4",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#8c510a",
@@ -2926,7 +2935,7 @@ diverging_colors = {
         },
         {
             "name": "BrBG 5",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#8c510a",
@@ -2940,7 +2949,7 @@ diverging_colors = {
         },
         {
             "name": "BrBG 6",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#8c510a",
@@ -2955,7 +2964,7 @@ diverging_colors = {
         },
         {
             "name": "BrBG 7",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#8c510a",
@@ -2971,7 +2980,7 @@ diverging_colors = {
         },
         {
             "name": "BrBG 8",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#543005",
@@ -2988,7 +2997,7 @@ diverging_colors = {
         },
         {
             "name": "BrBG 9",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#543005",
@@ -3008,25 +3017,25 @@ diverging_colors = {
     "RdGy": [
         {
             "name": "RdGy 1",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#ef8a62", "#ffffff", "#999999"],
         },
         {
             "name": "RdGy 2",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#ca0020", "#f4a582", "#bababa", "#404040"],
         },
         {
             "name": "RdGy 3",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#ca0020", "#f4a582", "#ffffff", "#bababa", "#404040"],
         },
         {
             "name": "RdGy 4",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#b2182b",
@@ -3039,7 +3048,7 @@ diverging_colors = {
         },
         {
             "name": "RdGy 5",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#b2182b",
@@ -3053,7 +3062,7 @@ diverging_colors = {
         },
         {
             "name": "RdGy 6",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#b2182b",
@@ -3068,7 +3077,7 @@ diverging_colors = {
         },
         {
             "name": "RdGy 7",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#b2182b",
@@ -3084,7 +3093,7 @@ diverging_colors = {
         },
         {
             "name": "RdGy 8",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#67001f",
@@ -3101,7 +3110,7 @@ diverging_colors = {
         },
         {
             "name": "RdGy 9",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#67001f",
@@ -3121,25 +3130,25 @@ diverging_colors = {
     "PuOr": [
         {
             "name": "PuOr 1",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#f1a340", "#f7f7f7", "#998ec3"],
         },
         {
             "name": "PuOr 2",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#e66101", "#fdb863", "#b2abd2", "#5e3c99"],
         },
         {
             "name": "PuOr 3",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": ["#e66101", "#fdb863", "#f7f7f7", "#b2abd2", "#5e3c99"],
         },
         {
             "name": "PuOr 4",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#b35806",
@@ -3152,7 +3161,7 @@ diverging_colors = {
         },
         {
             "name": "PuOr 5",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#b35806",
@@ -3166,7 +3175,7 @@ diverging_colors = {
         },
         {
             "name": "PuOr 6",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#b35806",
@@ -3181,7 +3190,7 @@ diverging_colors = {
         },
         {
             "name": "PuOr 7",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#b35806",
@@ -3197,7 +3206,7 @@ diverging_colors = {
         },
         {
             "name": "PuOr 8",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#7f3b08",
@@ -3214,7 +3223,7 @@ diverging_colors = {
         },
         {
             "name": "PuOr 9",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Colorbrewer",
             "colors": [
                 "#7f3b08",
@@ -3234,25 +3243,25 @@ diverging_colors = {
     "uber_diverging": [
         {
             "name": "Uber Viz Diverging 0",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Uber",
             "colors": ["#C22E00", "#FEEEE8", "#00939C"][::-1],
         },
         {
             "name": "Uber Viz Diverging 0.5",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Uber",
             "colors": ["#C22E00", "#EFBEAE", "#A2D4D7", "#00939C"][::-1],
         },
         {
             "name": "Uber Viz Diverging 1",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Uber",
             "colors": ["#C22E00", "#EC9370", "#FEEEE8", "#85C4C8", "#00939C"][::-1],
         },
         {
             "name": "Uber Viz Diverging 1.5",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Uber",
             "colors": [
                 "#C22E00",
@@ -3265,7 +3274,7 @@ diverging_colors = {
         },
         {
             "name": "Uber Viz Diverging 2",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Uber",
             "colors": [
                 "#C22E00",
@@ -3279,7 +3288,7 @@ diverging_colors = {
         },
         {
             "name": "Uber Viz Diverging 2.5",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Uber",
             "colors": [
                 "#C22E00",
@@ -3294,7 +3303,7 @@ diverging_colors = {
         },
         {
             "name": "Uber Viz Diverging 3",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Uber",
             "colors": [
                 "#C22E00",
@@ -3310,7 +3319,7 @@ diverging_colors = {
         },
         {
             "name": "Uber Viz Diverging 3.5",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Uber",
             "colors": [
                 "#C22E00",
@@ -3327,7 +3336,7 @@ diverging_colors = {
         },
         {
             "name": "Uber Viz Diverging 4",
-            "type": "DIV",
+            "type": "diverging",
             "category": "Uber",
             "colors": [
                 "#C22E00",
@@ -3346,40 +3355,9 @@ diverging_colors = {
     ],
 }
 
-# # Convert rgb to hex
-# def rgb_to_hex(rgb):
-#     return "#%02x%02x%02x" % rgb
-
-
-# # Convert the sequential color to the same style like the uber colors and convert the color to hex
-# final_result = {}
-# for key, value in diverging.items():
-#     result = []
-#     cnt = 0
-#     for key2, value2 in value.items():
-#         cnt += 1
-#         colors = []
-#         for color in value2:
-#             if key2 == "type":
-#                 continue
-#             color = color.replace("rgb(", "").replace(")", "").split(",")
-#             color = [int(x) for x in color]
-#             color = rgb_to_hex(tuple(color))
-#             colors.append(color)
-
-#         if colors == []:
-#             continue
-#         step = {}
-#         step["name"] = key + " " + str(cnt)
-#         step["type"] = "DIV"
-#         step["category"] = "Colorbrewer"
-#         step["colors"] = colors
-#         result.append(step)
-
-#     final_result[key] = result
-
-# import json
-
-# # Write result as dict to a file
-# with open("diverging.json", "w") as fp:
-#     json.dump(final_result, fp, indent=4)
+color_ranges = {
+    ColorRangeType.sequential: sequential_colors,
+    ColorRangeType.diverging: diverging_colors,
+    ColorRangeType.qualitative: qualitative_colors,
+    ColorRangeType.single_hue: single_hue_colors,
+}

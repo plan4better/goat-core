@@ -103,6 +103,7 @@ class CRUDBuffer(CRUDToolBase):
         # Create new layer
         await self.create_feature_layer_tool(
             layer_in=layer_result,
+            params=params,
         )
 
         # Delete temporary tables

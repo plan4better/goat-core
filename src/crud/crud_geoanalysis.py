@@ -283,6 +283,7 @@ class CRUDAggregatePoint(CRUDAggregateBase):
         # Create new layer
         await self.create_feature_layer_tool(
             layer_in=layer_in,
+            params=params,
         )
 
         # Delete temporary tables
@@ -522,6 +523,7 @@ class CRUDAggregatePolygon(CRUDAggregateBase):
         # Create new layer
         await self.create_feature_layer_tool(
             layer_in=layer_in,
+            params=params,
         )
         # Delete temporary tables
         await self.delete_temp_tables()
@@ -690,9 +692,11 @@ class CRUDOriginDestination(CRUDToolBase):
         # Create new layer
         await self.create_feature_layer_tool(
             layer_in=result_layer_relation,
+            params=params,
         )
         await self.create_feature_layer_tool(
             layer_in=result_layer_point,
+            params=params,
         )
 
         return {

@@ -192,9 +192,11 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
         # Create new layers
         await self.create_feature_layer_tool(
             layer_in=layer_starting_points,
+            params=params,
         )
         await self.create_feature_layer_tool(
             layer_in=layer_isochrone,
+            params=params,
         )
 
         return {

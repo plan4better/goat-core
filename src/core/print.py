@@ -1,21 +1,26 @@
 import io
 import json
+import random
 from typing import Dict, List, Union
 
+import aiohttp
 import matplotlib.pyplot as plt
 import pandas as pd
+import asyncio
+import io
+from PIL import Image
+
+from cairosvg import svg2png
+from pydantic import BaseModel
 from pymgl import Map
 from shapely import from_wkt
 from sqlalchemy.ext.asyncio import AsyncSession
-import random
-from pydantic import BaseModel
-
 
 from src.core.config import settings
-from src.db.models.layer import Layer, LayerType
-from src.utils import async_get_with_retry
-from src.schemas.project import InitialViewState
 from src.db.models import Project
+from src.db.models.layer import Layer, LayerType
+from src.schemas.project import InitialViewState
+from src.utils import async_get_with_retry
 
 
 def rgb_to_hex(rgb: tuple) -> str:
@@ -25,6 +30,31 @@ def rgb_to_hex(rgb: tuple) -> str:
 def get_mapbox_style_color(data: Dict, type: str) -> Union[str, List]:
     colors = data["properties"].get(f"{type}_range", {}).get("colors")
     field_name = data["properties"].get(f"{type}_field", {}).get("name")
+    color_scale = data["properties"].get(f"{type}_scale")
+    color_maps = data["properties"].get(f"{type}_range", {}).get("color_map")
+
+    if (
+        color_maps
+        and field_name
+        and isinstance(color_maps, list)
+        and color_scale == "ordinal"
+    ):
+        values_and_colors = []
+        for color_map in color_maps:
+            color_map_value = color_map[0]
+            color_map_hex = color_map[1]
+            if not color_map_value or not color_map_hex:
+                continue
+            if isinstance(color_map_value, list):
+                for value in color_map_value:
+                    values_and_colors.append(value)
+                    values_and_colors.append(color_map_hex)
+            else:
+                values_and_colors.append(color_map_value)
+                values_and_colors.append(color_map_hex)
+
+        return ["match", ["get", field_name]] + values_and_colors + ["#AAAAAA"]
+
     if (
         not field_name
         or not colors
@@ -58,22 +88,72 @@ def get_mapbox_style_color(data: Dict, type: str) -> Union[str, List]:
     return config
 
 
-def transform_to_mapbox_layer_style_spec(data: Dict) -> Dict:
+def get_mapbox_style_marker(data: dict):
+
+    properties = data["properties"]
+    marker_maps = properties.get("marker_mapping")
+    field_name = properties.get("marker_field", {}).get("name")
+    marker = f"{settings.MARKER_PREFIX}{properties.get('marker', {}).get('name')}"
+    if marker_maps and field_name:
+        values_and_icons = []
+        icon_set = set()
+        for marker_map in marker_maps:
+            marker_map_value = marker_map[0]
+            marker_map_icon = marker_map[1]
+            if not marker_map_value or not marker_map_icon:
+                continue
+            if isinstance(marker_map_value, list):
+                for value in marker_map_value:
+                    values_and_icons.append(value)
+                    icon = f"{settings.MARKER_PREFIX}{marker_map_icon['name']}"
+                    values_and_icons.append(icon)
+                    icon_set.add(icon)
+            else:
+                values_and_icons.append(marker_map_value)
+                icon = f"{settings.MARKER_PREFIX}{marker_map_icon['name']}"
+                values_and_icons.append(icon)
+                icon_set.add(icon)
+
+        # Set the icons
+        properties["marker"] = list(icon_set)
+
+        return ["match", ["get", field_name], *values_and_icons, marker]
+
+    return marker
+
+
+def transform_to_mapbox_layer_style_spec(data: dict) -> dict:
     type = data.get("feature_layer_geometry_type")
     if type == "point":
         point_properties = data.get("properties")
-        return {
-            "type": "circle",
-            "paint": {
-                "circle-color": get_mapbox_style_color(data, "color"),
-                "circle-opacity": point_properties.get("filled", False)
-                * point_properties.get("opacity", 0),
-                "circle-radius": point_properties.get("radius", 5),
-                "circle-stroke-color": get_mapbox_style_color(data, "stroke_color"),
-                "circle-stroke-width": point_properties.get("stroked", False)
-                * point_properties.get("stroke_width", 1),
-            },
-        }
+        # Check if there is a marker field
+        if point_properties.get("custom_marker") is True:
+            style = {
+                "type": "symbol",
+                "layout": {
+                    "icon-image": get_mapbox_style_marker(data),
+                    "icon-size": 1,
+                },
+                "paint": {
+                    "icon-opacity": point_properties.get("opacity", 0),
+                    "icon-color": get_mapbox_style_color(data, "color"),
+                },
+            }
+        else:
+            style = {
+                "type": "circle",
+                "paint": {
+                    "circle-color": get_mapbox_style_color(data, "color"),
+                    "circle-opacity": point_properties.get("filled", False)
+                    * point_properties.get("opacity", 0),
+                    "circle-radius": point_properties.get("radius", 5),
+                    "circle-stroke-color": get_mapbox_style_color(data, "stroke_color"),
+                    "circle-stroke-width": point_properties.get("stroked", False)
+                    * point_properties.get("stroke_width", 1),
+                },
+            }
+        return style
+
     elif type == "polygon":
         polygon_properties = data.get("properties")
         return {
@@ -106,6 +186,44 @@ class PrintMap:
         self.thumbnail_height = 280
         self.thumbnail_width = 674
         self.async_session = async_session
+
+    async def add_icons_to_map(self, map: Map, layer: Layer):
+        """Add icons to map."""
+
+        # Request icon from assets url
+        marker_size = layer.properties["marker_size"]
+        async with aiohttp.ClientSession() as session:
+            for marker in layer.properties.get("marker_mapping"):
+                try:
+                    icon_url = marker[1]["url"]
+                    icon_name = f"{settings.MARKER_PREFIX}{marker[1]['name']}"
+
+                    header = (
+                        {"Content-Type": "image/svg+xml"}
+                        if icon_url.endswith(".svg")
+                        else {"Content-Type": "image/png"}
+                    )
+                    # Get icon
+                    response = await session.get(icon_url, headers=header)
+                    icon = await response.read()
+
+                    # If icon is svg convert to png
+                    if icon_url.endswith(".svg"):
+                        icon = svg2png(bytestring=icon, output_height=marker_size, output_width=marker_size)
+                    elif not icon_url.endswith(".png"):
+                        raise ValueError("Invalid icon type.")
+                    # Save image to local dir
+                    with open(f"{icon_name}.png", "wb") as f:
+                        f.write(icon)
+                    # # Open the image and get raw pixel data
+                    image = Image.open(io.BytesIO(icon))
+                    icon = image.tobytes()
+                    # Add icon to map
+                    # TODO: Fix this, it's not working
+                    map.addImage(icon_name, icon, marker_size, marker_size, 1.0, True)
+                except Exception as e:
+                    print(f"Error while adding icon to map: {e}")
+        return map
 
     async def create_layer_thumbnail(self, layer: Layer, file_name: str) -> str:
         """Create layer thumbnail."""
@@ -156,6 +274,10 @@ class PrintMap:
 
         # Transform layer to mapbox style
         style = transform_to_mapbox_layer_style_spec(layer.dict())
+
+        # Add icons to map in case of icon style
+        if style["type"] == "symbol":
+            map = await self.add_icons_to_map(map, layer)
 
         # Get collection id
         layer_id = layer.id
@@ -306,10 +428,18 @@ class PrintMap:
 
         # Sort layer_project by layer order
         if len(layers_project) > 1:
-            layers_project.sort(key=lambda x: project.layer_order.index(x.id))
+            layers_project.sort(
+                key=lambda x: project.layer_order.index(x.id), reverse=True
+            )
 
         for layer in layers_project:
             if layer.type == LayerType.table:
+                continue
+
+            if (
+                layer.properties["visibility"] is False
+                or layer.properties["visibility"] is None
+            ):
                 continue
 
             # Get collection id
@@ -356,7 +486,7 @@ class PrintMap:
                 )
             )
 
-        #img_bytes = map.renderPNG()
+        # img_bytes = map.renderPNG()
         try:
             img_bytes = map.renderPNG()
         except RuntimeError as e:

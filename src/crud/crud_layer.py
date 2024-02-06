@@ -16,7 +16,7 @@ from sqlmodel import SQLModel
 
 # Local application imports
 from src.core.config import settings
-from src.core.job import CRUDFailedJob, job_init, run_background_or_immediately, job_log
+from src.core.job import CRUDFailedJob, job_init, job_log, run_background_or_immediately
 from src.core.layer import FileUpload, OGRFileHandling, delete_old_files
 
 # Import PrintMap only outside of tests
@@ -24,10 +24,16 @@ if settings.TEST_MODE is False:
     from src.core.print import PrintMap
 from src.crud.base import CRUDBase
 from src.db.models.layer import Layer
-from src.schemas.error import LayerNotFoundError, NoCRSError, ThumbnailComputeError
+from src.schemas.error import (
+    ColumnNotFoundError,
+    LayerNotFoundError,
+    NoCRSError,
+    OperationNotSupportedError,
+    ThumbnailComputeError,
+)
 from src.schemas.job import JobStatusType, Msg, MsgType
 from src.schemas.layer import (
-    ColumnStatisticsOperation,
+    ComputeBreakOperation,
     FeatureType,
     IFeatureStandardCreateAdditionalAttributes,
     IFileUploadMetadata,
@@ -43,7 +49,7 @@ from src.schemas.layer import (
     layer_update_class,
 )
 from src.schemas.style import get_base_style
-from src.schemas.toolbox_base import MaxFeatureCnt
+from src.schemas.toolbox_base import MaxFeatureCnt, ColumnStatisticsOperation
 from src.utils import (
     async_delete_dir,
     async_zip_directory,
@@ -55,6 +61,31 @@ from src.utils import (
 
 class CRUDLayer(CRUDBase):
     """CRUD class for Layer."""
+
+    async def label_cluster_keep(self, async_session: AsyncSession, layer: Layer):
+        """Label the rows that should be kept in case of vector tile clustering. Based on the logic to priotize features close to the centroid of an h3 grid of resolution 8."""
+
+        # Build query to update the selected rows
+        if layer.type == LayerType.feature:
+            sql_query = f"""WITH to_update AS
+            (
+                SELECT id, CASE
+                    WHEN row_number() OVER (PARTITION BY h3_group
+                    ORDER BY ST_DISTANCE(ST_CENTROID(geom), ST_SETSRID(h3_cell_to_lat_lng(h3_group)::geometry, 4326))) = 1 THEN TRUE
+                    ELSE FALSE
+                END AS cluster_keep
+                FROM {layer.table_name}
+                WHERE layer_id = '{str(layer.id)}'
+                ORDER BY h3_group, ST_DISTANCE(ST_CENTROID(geom), ST_SETSRID(h3_cell_to_lat_lng(h3_lat_lng_to_cell(ST_CENTROID(geom)::point, 8))::geometry, 4326))
+            )
+            UPDATE {layer.table_name} p
+            SET cluster_keep = TRUE
+            FROM to_update u
+            WHERE p.id = u.id
+            AND u.cluster_keep IS TRUE"""
+
+            await async_session.execute(text(sql_query))
+            await async_session.commit()
 
     @job_log(job_step_name="internal_layer_create")
     async def create_internal(
@@ -114,22 +145,15 @@ class CRUDLayer(CRUDBase):
         )
 
         # Create thumbnail using print class
-        file_name = str(layer.id) + "_" + str(uuid4()) + ".png"
-        if (
-            layer.type in (LayerType.feature, LayerType.table)
-            and settings.TEST_MODE is False
-        ):
+        if settings.TEST_MODE is False:
+            file_name = str(layer.id) + "_" + str(uuid4()) + ".png"
             try:
                 thumbnail_url = await PrintMap(
                     async_session=async_session
                 ).create_layer_thumbnail(layer=layer_in, file_name=file_name)
-            except Exception as e:
+            except Exception:
                 msg_text = "Failed to create thumbnail."
                 print(msg_text)
-                return {
-                    "msg": Msg(type=MsgType.warning, text=msg_text),
-                    "status": JobStatusType.finished.value,
-                }
 
             # Update thumbnail_url
             layer = await CRUDBase(Layer).update(
@@ -137,6 +161,10 @@ class CRUDLayer(CRUDBase):
                 db_obj=layer,
                 obj_in={"thumbnail_url": thumbnail_url},
             )
+
+        # Label cluster_keep
+        if layer.type == LayerType.feature:
+            await self.label_cluster_keep(async_session, layer)
 
         return {
             "msg": "Layer successfully created.",
@@ -452,9 +480,7 @@ class CRUDLayer(CRUDBase):
         )
 
         if column_mapped is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Column not found"
-            )
+            raise ColumnNotFoundError("Column not found")
 
         return {
             "layer": layer,
@@ -614,19 +640,16 @@ class CRUDLayer(CRUDBase):
             args["breaks"] = breaks
 
         # Choose the SQL query based on operation
-        if operation == ColumnStatisticsOperation.quantile:
+        if operation == ComputeBreakOperation.quantile:
             sql_query = "SELECT * FROM basic.quantile_breaks(:table_name, :column_mapped, :where, :breaks)"
-        elif operation == ColumnStatisticsOperation.equal_interval:
+        elif operation == ComputeBreakOperation.equal_interval:
             sql_query = "SELECT * FROM basic.equal_interval_breaks(:table_name, :column_mapped, :where, :breaks)"
-        elif operation == ColumnStatisticsOperation.standard_deviation:
+        elif operation == ComputeBreakOperation.standard_deviation:
             sql_query = "SELECT * FROM basic.standard_deviation_breaks(:table_name, :column_mapped, :where)"
-        elif operation == ColumnStatisticsOperation.heads_and_tails:
+        elif operation == ComputeBreakOperation.heads_and_tails:
             sql_query = "SELECT * FROM basic.heads_and_tails_breaks(:table_name, :column_mapped, :where, :breaks)"
         else:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Operation not supported",
-            )
+            raise OperationNotSupportedError("Operation not supported")
 
         # Execute the query
         res = await async_session.execute(sql_query, args)
@@ -695,7 +718,6 @@ class CRUDLayerImport(CRUDFailedJob):
                     continue
                 attribute_mapping[field_type + "_attr" + str(cnt)] = field_name
                 cnt += 1
-
 
         # Upload file to temporary table using ogr2ogr
         result = await ogr_file_upload.upload_ogr2ogr(

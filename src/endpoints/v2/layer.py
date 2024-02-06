@@ -47,7 +47,7 @@ from src.schemas.error import HTTPErrorHandler, http_error_handler
 from src.schemas.job import JobType
 from src.schemas.layer import (
     AreaStatisticsOperation,
-    ColumnStatisticsOperation,
+    ComputeBreakOperation,
     IFileUploadMetadata,
     IInternalLayerCreate,
     IInternalLayerExport,
@@ -528,7 +528,7 @@ async def class_breaks(
         description="The ID of the layer to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
-    operation: ColumnStatisticsOperation = Path(
+    operation: ComputeBreakOperation = Path(
         ...,
         description="The operation to perform",
         example="quantile",
@@ -556,15 +556,16 @@ async def class_breaks(
 ):
     """Get statistics of a column. Based on the saved layer filter in the project."""
 
-    statistics = await crud_layer.get_class_breaks(
-        async_session=async_session,
-        id=id,
-        operation=operation,
-        column_name=column_name,
-        breaks=breaks,
-        query=query,
-        stripe_zeros=stripe_zeros,
-    )
+    with HTTPErrorHandler():
+        statistics = await crud_layer.get_class_breaks(
+            async_session=async_session,
+            id=id,
+            operation=operation,
+            column_name=column_name,
+            breaks=breaks,
+            query=query,
+            stripe_zeros=stripe_zeros,
+        )
 
     # Return result
     return statistics

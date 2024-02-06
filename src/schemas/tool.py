@@ -18,6 +18,7 @@ from src.schemas.toolbox_base import (
 from src.db.models.layer import LayerType
 from src.schemas.layer import FeatureGeometryType
 from src.db.models.layer import ToolType
+from src.schemas.colors import ColorRangeType
 
 
 class IJoin(BaseModel):
@@ -73,6 +74,15 @@ class IJoin(BaseModel):
     @property
     def tool_type(self):
         return ToolType.join
+
+    @property
+    def properties_base(self):
+        return {
+            "color_range_type": ColorRangeType.sequential,
+            "color_field": {"name": self.column_statistics.field, "type": "number"},
+            "color_scale": "quantile",
+        }
+
 
 
 class AreaLayerType(str, Enum):
@@ -144,6 +154,14 @@ class IAggregationBase(BaseModel):
                 )
         return v
 
+    @property
+    def properties_base(self):
+        return {
+            "color_range_type": ColorRangeType.sequential,
+            "color_field": {"name": self.column_statistics.field, "type": "number"},
+            "color_scale": "quantile",
+        }
+
 
 class IAggregationPoint(IAggregationBase):
     """Aggregation tool schema."""
@@ -183,7 +201,6 @@ class IAggregationPolygon(IAggregationBase):
     @property
     def tool_type(self):
         return ToolType.aggregate_polygon
-
 
 class IBuffer(BaseModel):
     """Buffer tool schema."""
@@ -242,6 +259,16 @@ class IBuffer(BaseModel):
     @property
     def tool_type(self):
         return ToolType.buffer
+
+    @property
+    def properties_base(self):
+        breaks = self.max_distance / self.distance_step if self.max_distance / self.distance_step < 9 else 9
+        return {
+            "color_range_type": ColorRangeType.sequential,
+            "color_field": {"name": "radius_size", "type": "number"},
+            "color_scale": "quantile",
+            "breaks": breaks,
+        }
 
 class IOriginDestination(BaseModel):
     """Origin Destination tool schema."""

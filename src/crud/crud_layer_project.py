@@ -22,6 +22,7 @@ from typing import Union
 # Local application imports
 from .base import CRUDBase
 from src.schemas.error import UnsupportedLayerTypeError, LayerNotFoundError
+from sqlalchemy.sql import select
 
 
 class CRUDLayerProject(CRUDBase):
@@ -151,7 +152,7 @@ class CRUDLayerProject(CRUDBase):
         return layer_project
 
     async def check_and_alter_layer_name(
-        self, async_session: AsyncSession, project_id: UUID, layer_name: str
+        self, async_session: AsyncSession, project_id: UUID, folder_id: UUID, layer_name: str
     ) -> str:
         """Check if layer name already exists in project and alter it like layer (n+1) if necessary"""
 
@@ -159,14 +160,17 @@ class CRUDLayerProject(CRUDBase):
         pattern = re.compile(rf"^{re.escape(layer_name)} \((\d+)\)$")
 
         # Modify the query to select only the name attribute of layers that start with the given layer_name
-        query = select(LayerProjectLink.name).where(
+        names_in_project = await async_session.execute(select(LayerProjectLink.name).where(
             LayerProjectLink.project_id == project_id,
             LayerProjectLink.name.like(f"{layer_name}%"),
-        )
-
-        # Execute the query
-        result = await async_session.execute(query)
-        layer_names = [row[0] for row in result.fetchall()]
+        ))
+        names_in_project = [row[0] for row in names_in_project.fetchall()]
+        names_in_folder = await async_session.execute(select(Layer.name).where(
+            Layer.folder_id == folder_id,
+            Layer.name.like(f"{layer_name}%"),
+        ))
+        names_in_folder = [row[0] for row in names_in_folder.fetchall()]
+        layer_names = list(set(names_in_project + names_in_folder))
 
         # Find the highest number (n) among the layer names using list comprehension
         numbers = [

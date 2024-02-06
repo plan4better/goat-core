@@ -5,11 +5,11 @@ from fastapi import BackgroundTasks
 from httpx import AsyncClient
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql import text
 from sqlmodel import SQLModel
 
-from src.core.config import settings
 from src.core.job import CRUDFailedJob
+from src.core.print import PrintMap
+from src.core.config import settings
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import layer as crud_layer
 from src.crud.crud_layer_project import layer_project as crud_layer_project
@@ -30,9 +30,9 @@ from src.schemas.layer import (
     IFeatureLayerToolCreate,
     OgrPostgresType,
     UserDataGeomType,
-    UserDataTable,
+    ComputeBreakOperation,
 )
-from src.schemas.style import get_base_style
+from src.schemas.style import get_base_style, get_tool_style
 from src.schemas.tool import IToolParam
 from src.schemas.toolbox_base import (
     ColumnStatisticsOperation,
@@ -175,21 +175,23 @@ class CRUDToolBase(CRUDFailedJob):
     async def create_feature_layer_tool(
         self,
         layer_in: IFeatureLayerToolCreate,
+        params: IToolParam,
     ):
+        # Get project to put the new layer in the same folder as the project
+        project = await crud_project.get(self.async_session, id=self.project_id)
+
         # Check layer name and alter if needed
         new_layer_name = await crud_layer_project.check_and_alter_layer_name(
             async_session=self.async_session,
             project_id=self.project_id,
+            folder_id=project.folder_id,
             layer_name=layer_in.name,
         )
         layer_in.name = new_layer_name
 
-        # Get project to put the new layer in the same folder as the project
-        project = await crud_project.get(self.async_session, id=self.project_id)
-
         # TODO: Compute properties dynamically and create thumbnail dynamically
         properties = get_base_style(layer_in.feature_layer_geometry_type)
-        thumbnail = (
+        thumbnail_url = (
             "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png"
         )
         layer = Layer(
@@ -199,7 +201,7 @@ class CRUDToolBase(CRUDFailedJob):
             type=LayerType.feature,
             feature_layer_type=FeatureType.tool,
             properties=properties,
-            thumbnail_url=thumbnail,
+            thumbnail_url=thumbnail_url,
         )
 
         # Get extent, size and properties
@@ -215,10 +217,52 @@ class CRUDToolBase(CRUDFailedJob):
         if layer.extent is None:
             raise LayerExtentError("The layer extent is None.")
 
+        # Create layer
         layer = await crud_layer.create(
             db=self.async_session,
             obj_in=layer,
         )
+        await crud_layer.label_cluster_keep(
+            async_session=self.async_session,
+            layer=layer,
+        )
+
+        # Create style for layer
+        # Request scale breaks in case of color_scale
+        if "properties_base" in params:
+            if params.properties_base.get("color_scale"):
+                # Get unique unique scale breaks
+                operation = params.properties_base.get("color_scale")
+                # Get scale breaks
+                color_scale_breaks = await crud_layer.get_class_breaks(
+                    async_session=self.async_session,
+                    id=layer.id,
+                    operation=ComputeBreakOperation(operation),
+                    column_name=params.properties_base["color_field"]["name"],
+                    stripe_zeros=True,
+                    breaks=params.properties_base["breaks"],
+                    query=None,
+                )
+                # Get properties
+                properties = get_tool_style(
+                    feature_geometry_type=layer.feature_layer_geometry_type,
+                    color_field=params.properties_base["color_field"],
+                    color_scale_breaks=color_scale_breaks,
+                    color_range_type=params.properties_base["color_range_type"],
+                )
+        else:
+            properties = get_base_style(layer_in.feature_layer_geometry_type)
+
+        # Update layer with properties and thumbnail
+        layer = await crud_layer.update(
+            async_session=self.async_session,
+            id=layer.id,
+            layer_in={"properties": properties},
+        )
+
+        # Label cluster_keep
+        if layer.type == LayerType.feature:
+            await crud_layer.label_cluster_keep(self.async_session, layer)
 
         # Add layer to project
         await crud_layer_project.create(
@@ -226,6 +270,7 @@ class CRUDToolBase(CRUDFailedJob):
             project_id=self.project_id,
             layer_ids=[layer.id],
         )
+
         return {"status": JobStatusType.finished.value}
 
     async def check_max_feature_cnt(

@@ -124,6 +124,7 @@ class CRUDJoin(CRUDToolBase):
         # Create new layer
         await self.create_feature_layer_tool(
             layer_in=layer_in,
+            params=params,
         )
         return {
             "status": JobStatusType.finished.value,

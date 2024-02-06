@@ -1,5 +1,4 @@
 from typing import Any, Dict, Optional
-
 import boto3
 from pydantic import BaseSettings, HttpUrl, PostgresDsn, validator
 
@@ -128,6 +127,8 @@ class Settings(BaseSettings):
     ASSETS_URL: Optional[str] = None
     THUMBNAIL_DIR_LAYER: Optional[str] = "img/users/dev/thumbnails/layer"
     THUMBNAIL_DIR_PROJECT: Optional[str] = "img/users/dev/thumbnails/project"
+    MARKER_DIR: Optional[str] = "icons/maki"
+    MARKER_PREFIX: Optional[str] = "goat-marker-"
 
     class Config:
         case_sensitive = True
