@@ -1,5 +1,6 @@
 import time
 from httpx import AsyncClient
+from uuid import UUID
 from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
 from src.core.tool import CRUDToolBase
@@ -32,13 +33,9 @@ class CRUDIsochroneBase(CRUDToolBase):
             f"{settings.USER_DATA_SCHEMA}.point_{str(self.user_id).replace('-', '')}"
         )
 
-    async def create_or_return_layer_starting_points(
+    async def create_layer_starting_points(
         self, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT
-    ):
-        # Check if starting points are a layer
-        if params.starting_points.layer_project_id:
-            layer = await self.get_layers_project(params)
-            return layer
+    ) -> IFeatureLayerToolCreate:
 
         # Create layer object
         layer = IFeatureLayerToolCreate(
@@ -94,6 +91,36 @@ class CRUDIsochroneBase(CRUDToolBase):
 
         return layer
 
+    async def get_lats_lons(
+        self, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT
+    ):
+        # Check if starting points are a layer else create layer
+        if params.starting_points.layer_project_id:
+            layer_starting_points = await self.get_layers_project(params)
+            where_query = layer_starting_points["layer_project_id"].where_query
+            table_name = layer_starting_points["layer_project_id"].table_name
+        else:
+            layer_starting_points = await self.create_layer_starting_points(
+                params=params
+            )
+            where_query = f"layer_id = '{layer_starting_points.id}'"
+            table_name = self.table_starting_points
+
+        sql = f"""
+            SELECT ST_X(geom) AS lon, ST_Y(geom) AS lat
+            FROM {table_name}
+            WHERE {where_query};
+        """
+        starting_points = (await self.async_session.execute(sql)).fetchall()
+        starting_points = [dict(x) for x in starting_points]
+        lats = [x["lat"] for x in starting_points]
+        lons = [x["lon"] for x in starting_points]
+        return {
+            "layer_starting_points": layer_starting_points,
+            "lats": lats,
+            "lons": lons,
+        }
+
 
 class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
     def __init__(
@@ -118,20 +145,11 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
     ):
         """Compute active mobility isochrone using GOAT Routing endpoint."""
 
-        # Create layer to store isochrone starting points if required
-        layer_starting_points = await self.create_or_return_layer_starting_points(params=params)
-
         # Fetch starting points from previously created layer if required
-        if params.starting_points.layer_project_id:
-            sql = f"""
-                SELECT ST_X(geom) AS lon, ST_Y(geom) AS lat
-                FROM {layer_starting_points["layer_project_id"].table_name}
-                WHERE {layer_starting_points["layer_project_id"].where_query};
-            """
-            starting_points = (await self.async_session.execute(sql)).fetchall()
-            starting_points = [dict(x) for x in starting_points]
-            params.starting_points.latitude = [x["lat"] for x in starting_points]
-            params.starting_points.longitude = [x["lon"] for x in starting_points]
+        starting_pojnts = await self.get_lats_lons(params=params)
+        lats = starting_pojnts["lats"]
+        lons = starting_pojnts["lons"]
+        layer_starting_points = starting_pojnts["layer_starting_points"]
 
         # Create feature layer to store computed isochrone output
         layer_isochrone = IFeatureLayerToolCreate(
@@ -148,20 +166,22 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
         # Construct request payload
         request_payload = {
             "starting_points": {
-                "latitude": params.starting_points.latitude,
-                "longitude": params.starting_points.longitude,
+                "latitude": lats,
+                "longitude": lons,
             },
             "routing_type": params.routing_type.value,
-            "travel_cost": {
-                "max_traveltime": params.travel_cost.max_traveltime,
-                "traveltime_step": params.travel_cost.traveltime_step,
-                "speed": params.travel_cost.speed,
-            }
-            if type(params.travel_cost) == TravelTimeCostActiveMobility
-            else {
-                "max_distance": params.travel_cost.max_distance,
-                "distance_step": params.travel_cost.distance_step,
-            },
+            "travel_cost": (
+                {
+                    "max_traveltime": params.travel_cost.max_traveltime,
+                    "traveltime_step": params.travel_cost.traveltime_step,
+                    "speed": params.travel_cost.speed,
+                }
+                if type(params.travel_cost) == TravelTimeCostActiveMobility
+                else {
+                    "max_distance": params.travel_cost.max_distance,
+                    "distance_step": params.travel_cost.distance_step,
+                }
+            ),
             "isochrone_type": params.isochrone_type.value,
             "polygon_difference": params.polygon_difference,
             "result_table": result_table,
@@ -195,11 +215,12 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
                 f"Error while calling the routing endpoint: {str(e)}"
             )
 
-        # Create new layers
-        await self.create_feature_layer_tool(
-            layer_in=layer_starting_points["layer_project_id"],
-            params=params,
-        )
+        # Create new layers. Create new layer if starting points are not a layer
+        if not params.starting_points.layer_project_id:
+            await self.create_feature_layer_tool(
+                layer_in=layer_starting_points,
+                params=params,
+            )
         await self.create_feature_layer_tool(
             layer_in=layer_isochrone,
             params=params,
@@ -214,6 +235,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
     @job_init()
     async def run_isochrone(self, params: IIsochroneActiveMobility):
         return await self.isochrone(params=params)
+
 
 class CRUDIsochronePT(CRUDIsochroneBase):
     def __init__(
@@ -260,20 +282,12 @@ class CRUDIsochronePT(CRUDIsochroneBase):
     ):
         """Compute public transport isochrone using R5 routing endpoint."""
 
-        # Create layer to store isochrone starting points if required
-        layer_starting_points = await self.create_or_return_layer_starting_points(params=params)
-
         # Fetch starting points from previously created layer if required
-        if params.starting_points.layer_project_id:
-            sql = f"""
-                SELECT ST_X(geom) AS lon, ST_Y(geom) AS lat
-                FROM {layer_starting_points["layer_project_id"].table_name}
-                WHERE {layer_starting_points["layer_project_id"].where_query};
-            """
-            starting_points = (await self.async_session.execute(sql)).fetchall()
-            starting_points = [dict(x) for x in starting_points]
-            params.starting_points.latitude = [x["lat"] for x in starting_points]
-            params.starting_points.longitude = [x["lon"] for x in starting_points]
+        starting_pojnts = await self.get_lats_lons(params=params)
+        lats = starting_pojnts["lats"]
+        lons = starting_pojnts["lons"]
+        layer_starting_points = starting_pojnts["layer_starting_points"]
+
 
         # Create feature layer to store computed isochrone output
         layer_isochrone = IFeatureLayerToolCreate(
@@ -317,8 +331,8 @@ class CRUDIsochronePT(CRUDIsochroneBase):
                         ST_Buffer(
                             ST_SetSRID(
                                 ST_MakePoint(
-                                    {params.starting_points.longitude[i]},
-                                    {params.starting_points.latitude[i]}),
+                                    {lons[i]},
+                                    {lats[i]}),
                                 4326
                             )::geography,
                             100000
@@ -355,8 +369,8 @@ class CRUDIsochronePT(CRUDIsochroneBase):
                 },
                 "directModes": params.routing_type.access_mode.value.upper(),
                 "egressModes": params.routing_type.egress_mode.value.upper(),
-                "fromLat": params.starting_points.latitude[i],
-                "fromLon": params.starting_points.longitude[i],
+                "fromLat": lats[i],
+                "fromLon": lons[i],
                 "zoom": params.zoom,
                 "maxBikeTime": params.max_bike_time,
                 "maxRides": params.max_rides,
@@ -429,12 +443,15 @@ class CRUDIsochronePT(CRUDIsochroneBase):
                     f"Error while saving R5 isochrone result to database: {str(e)}"
                 )
 
-            # Create new layers
-            await self.create_feature_layer_tool(
-                layer_in=layer_starting_points["layer_project_id"],
-            )
+            # Create new layers. Create new layer if starting points are not a layer
+            if not params.starting_points.layer_project_id:
+                await self.create_feature_layer_tool(
+                    layer_in=layer_starting_points,
+                    params=params,
+                )
             await self.create_feature_layer_tool(
                 layer_in=layer_isochrone,
+                params=params,
             )
 
 

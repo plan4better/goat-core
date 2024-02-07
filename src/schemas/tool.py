@@ -79,7 +79,7 @@ class IJoin(BaseModel):
     def properties_base(self):
         return {
             "color_range_type": ColorRangeType.sequential,
-            "color_field": {"name": self.column_statistics.field, "type": "number"},
+            "color_field": {"name": self.column_statistics.operation.value, "type": "number"},
             "color_scale": "quantile",
         }
 
@@ -158,7 +158,7 @@ class IAggregationBase(BaseModel):
     def properties_base(self):
         return {
             "color_range_type": ColorRangeType.sequential,
-            "color_field": {"name": self.column_statistics.field, "type": "number"},
+            "color_field": {"name": self.column_statistics.operation.value, "type": "number"},
             "color_scale": "quantile",
         }
 
@@ -262,7 +262,7 @@ class IBuffer(BaseModel):
 
     @property
     def properties_base(self):
-        breaks = self.max_distance / self.distance_step if self.max_distance / self.distance_step < 9 else 9
+        breaks = self.max_distance / self.distance_step if self.max_distance / self.distance_step < 7 else 7
         return {
             "color_range_type": ColorRangeType.sequential,
             "color_field": {"name": "radius_size", "type": "number"},

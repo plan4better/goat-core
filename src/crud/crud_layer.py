@@ -31,7 +31,7 @@ from src.schemas.error import (
     OperationNotSupportedError,
     ThumbnailComputeError,
 )
-from src.schemas.job import JobStatusType, Msg, MsgType
+from src.schemas.job import JobStatusType
 from src.schemas.layer import (
     ComputeBreakOperation,
     FeatureType,
@@ -49,7 +49,7 @@ from src.schemas.layer import (
     layer_update_class,
 )
 from src.schemas.style import get_base_style
-from src.schemas.toolbox_base import MaxFeatureCnt, ColumnStatisticsOperation
+from src.schemas.toolbox_base import ColumnStatisticsOperation, MaxFeatureCnt
 from src.utils import (
     async_delete_dir,
     async_zip_directory,
