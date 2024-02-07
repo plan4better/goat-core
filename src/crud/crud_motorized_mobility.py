@@ -195,7 +195,7 @@ class CRUDOevGueteklasse(CRUDToolBase):
 
         # Create layer object
         station_category_layer = IFeatureLayerToolCreate(
-            name=DefaultResultLayerName.isochrone_starting_points.value,
+            name=DefaultResultLayerName.oev_gueteklasse_station.value,
             feature_layer_geometry_type=UserDataGeomType.point.value,
             attribute_mapping={
                 "text_attr1": "stop_name",
@@ -232,11 +232,11 @@ class CRUDOevGueteklasse(CRUDToolBase):
 
         # Create result layers
         await self.create_feature_layer_tool(
-            layer_in=station_category_layer,
+            layer_in=buffer_layer,
             params=params,
         )
         await self.create_feature_layer_tool(
-            layer_in=buffer_layer,
+            layer_in=station_category_layer,
             params=params,
         )
         return {
