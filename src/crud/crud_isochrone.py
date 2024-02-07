@@ -108,8 +108,6 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
 
         self.http_client = http_client
-        self.NUM_RETRIES = 5  # Number of times to retry calling the endpoint
-        self.RETRY_DELAY = 2  # Number of seconds to wait between retries
 
     @job_log(job_step_name="isochrone")
     async def isochrone(
@@ -170,7 +168,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
 
         try:
             # Call GOAT Routing endpoint multiple times for upto 20 seconds / 10 retries
-            for i in range(self.NUM_RETRIES):
+            for i in range(settings.CRUD_NUM_RETRIES):
                 # Call GOAT Routing endpoint to compute isochrone
                 response = await self.http_client.post(
                     url=f"{settings.GOAT_ROUTING_URL}/isochrone",
@@ -179,11 +177,11 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
                 )
                 if response.status_code == 202:
                     # Endpoint is still processing request, retry shortly
-                    if i == self.NUM_RETRIES - 1:
+                    if i == settings.CRUD_NUM_RETRIES - 1:
                         raise Exception(
                             "GOAT routing endpoint took too long to process request."
                         )
-                    time.sleep(self.RETRY_DELAY)
+                    time.sleep(settings.CRUD_RETRY_INTERVAL)
                     continue
                 elif response.status_code == 201:
                     # Endpoint has finished processing request, break
@@ -228,8 +226,6 @@ class CRUDIsochronePT(CRUDIsochroneBase):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
 
         self.http_client = http_client
-        self.NUM_RETRIES = 10  # Number of times to retry calling the endpoint
-        self.RETRY_DELAY = 2  # Number of seconds to wait between retries
 
     async def write_isochrone_result(
         self, isochrone_type, layer_id, result_table, shapes, grid
@@ -373,7 +369,7 @@ class CRUDIsochronePT(CRUDIsochroneBase):
             result = None
             try:
                 # Call R5 endpoint multiple times for upto 20 seconds / 10 retries
-                for i in range(self.NUM_RETRIES):
+                for i in range(settings.CRUD_NUM_RETRIES):
                     # Call R5 endpoint to compute isochrone
                     response = await self.http_client.post(
                         url=f"{r5_host}/api/analysis",
@@ -382,11 +378,11 @@ class CRUDIsochronePT(CRUDIsochroneBase):
                     )
                     if response.status_code == 202:
                         # Engine is still processing request, retry shortly
-                        if i == self.NUM_RETRIES - 1:
+                        if i == settings.CRUD_NUM_RETRIES - 1:
                             raise Exception(
                                 "R5 engine took too long to process request."
                             )
-                        time.sleep(self.RETRY_DELAY)
+                        time.sleep(settings.CRUD_RETRY_INTERVAL)
                         continue
                     elif response.status_code == 200:
                         # Engine has finished processing request, break
@@ -432,9 +428,11 @@ class CRUDIsochronePT(CRUDIsochroneBase):
             # Create new layers
             await self.create_feature_layer_tool(
                 layer_in=layer_starting_points["layer_project_id"],
+                params=params,
             )
             await self.create_feature_layer_tool(
                 layer_in=layer_isochrone,
+                params=params,
             )
 
 
