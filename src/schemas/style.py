@@ -45,6 +45,7 @@ default_polygon_style_settings = {
     "stroke_color": [217, 25, 85],
 }
 
+
 def get_base_style(feature_geometry_type: FeatureGeometryType):
     """Return the base style for the given feature geometry type and tool type."""
 
@@ -172,3 +173,110 @@ def get_tool_style_ordinal(
             "color_range": color_range,
             "color_scale": "ordinal",
         }
+
+style_oev_gueteklassen_polygon = {
+    "color": [237, 248, 251],
+    "filled": True,
+    "opacity": 0.8,
+    "stroked": False,
+    "max_zoom": 22,
+    "min_zoom": 1,
+    "visibility": True,
+    "color_field": {"name": "pt_class", "type": "string"},
+    "color_range": {
+        "name": "Custom",
+        "type": "custom",
+        "colors": ["#199741", "#8BCC62", "#DCF09E", "#FFDF9A", "#F69053", "#E4696A"],
+        "category": "Custom",
+        "color_map": [
+            [["1"], "#199741"],
+            [["2"], "#8BCC62"],
+            [["3"], "#DCF09E"],
+            [["4"], "#FFDF9A"],
+            [["5"], "#F69053"],
+            [["6"], "#E4696A"],
+        ],
+    },
+    "color_scale": "ordinal",
+    "stroke_color": [217, 25, 85],
+    "stroke_width": 3,
+    "stroke_color_range": {
+        "name": "Global Warming",
+        "type": "sequential",
+        "colors": ["#5A1846", "#900C3F", "#C70039", "#E3611C", "#F1920E", "#FFC300"],
+        "category": "Uber",
+    },
+    "stroke_color_scale": "quantile",
+    "stroke_width_range": [0, 10],
+    "stroke_width_scale": "linear",
+}
+
+style_oev_gueteklassen_point = {
+    "color": [255, 247, 251],
+    "filled": True,
+    "radius": 3,
+    "opacity": 1,
+    "stroked": False,
+    "max_zoom": 22,
+    "min_zoom": 1,
+    "visibility": True,
+    "color_field": {"name": "pt_class", "type": "number"},
+    "color_range": {
+        "name": "Custom",
+        "type": "custom",
+        "colors": [
+            "#000000",
+            "#000000",
+            "#000000",
+            "#000000",
+            "#000000",
+            "#000000",
+            "#000000",
+            "#717171",
+        ],
+        "category": "Custom",
+        "color_map": [
+            [["1"], "#000000"],
+            [["2"], "#000000"],
+            [["3"], "#000000"],
+            [["4"], "#000000"],
+            [["5"], "#000000"],
+            [["6"], "#000000"],
+            [["7"], "#000000"],
+            [["999"], "#717171"],
+        ],
+    },
+    "color_scale": "ordinal",
+    "marker_size": 10,
+    "fixed_radius": False,
+    "radius_range": [0, 10],
+    "radius_scale": "linear",
+    "stroke_color": [225, 49, 106],
+    "stroke_width": 2,
+    "custom_marker": False,
+    "marker_size_range": [0, 10],
+    "color_scale_breaks": {
+        "max": 999,
+        "min": 1,
+        "mean": 108.53644963828603,
+        "breaks": [3, 4, 4, 5, 5, 6, 7],
+    },
+    "stroke_color_range": {
+        "name": "Global Warming",
+        "type": "sequential",
+        "colors": ["#5A1846", "#900C3F", "#C70039", "#E3611C", "#F1920E", "#FFC300"],
+        "category": "Uber",
+    },
+    "stroke_color_scale": "quantile",
+    "stroke_width_range": [0, 10],
+    "stroke_width_scale": "linear",
+}
+
+oev_gueteklasse_style = {
+    "point": style_oev_gueteklassen_point,
+    "polygon": style_oev_gueteklassen_polygon,
+}
+
+custom_styles = {
+    ToolType.oev_gueteklasse: oev_gueteklasse_style,
+}

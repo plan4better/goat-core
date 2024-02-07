@@ -32,7 +32,12 @@ from src.schemas.layer import (
     OgrPostgresType,
     UserDataGeomType,
 )
-from src.schemas.style import get_base_style, get_tool_style_with_breaks, get_tool_style_ordinal
+from src.schemas.style import (
+    get_base_style,
+    get_tool_style_with_breaks,
+    get_tool_style_ordinal,
+    custom_styles,
+)
 from src.schemas.tool import IToolParam
 from src.schemas.toolbox_base import (
     ColumnStatisticsOperation,
@@ -234,7 +239,12 @@ class CRUDToolBase(CRUDFailedJob):
         # Create style for layer
         # Request scale breaks in case of color_scale
         properties = None
-        if hasattr(params, "properties_base"):
+        if layer.tool_type in custom_styles:
+            properties = custom_styles[layer.tool_type][
+                layer.feature_layer_geometry_type
+            ]
+
+        elif hasattr(params, "properties_base"):
             if (
                 params.properties_base.get("color_scale")
                 and params.properties_base.get("color_field").get("type") == "number"
@@ -296,7 +306,7 @@ class CRUDToolBase(CRUDFailedJob):
                     color_field=params.properties_base["color_field"],
                     unique_values=unique_values,
                 )
-                
+
         if properties is None:
             properties = get_base_style(layer_in.feature_layer_geometry_type)
 
