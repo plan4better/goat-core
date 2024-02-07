@@ -18,6 +18,7 @@ from sqlmodel import SQLModel
 from src.core.config import settings
 from src.core.job import CRUDFailedJob, job_init, job_log, run_background_or_immediately
 from src.core.layer import FileUpload, OGRFileHandling, delete_old_files
+from src.crud.crud_layer_project import layer_project as crud_layer_project
 
 # Import PrintMap only outside of tests
 if settings.TEST_MODE is False:
@@ -96,6 +97,7 @@ class CRUDLayer(CRUDBase):
         file_metadata: dict,
         attribute_mapping: dict,
         job_id: UUID,
+        project_id: UUID = None,
     ):
         additional_attributes = {}
         # Get layer_id and size from import job
@@ -165,6 +167,14 @@ class CRUDLayer(CRUDBase):
         # Label cluster_keep
         if layer.type == LayerType.feature:
             await self.label_cluster_keep(async_session, layer)
+
+        if project_id:
+            # Add layer to project
+            await crud_layer_project.create(
+                async_session=async_session,
+                layer_ids=[layer.id],
+                project_id=project_id,
+            )
 
         return {
             "msg": "Layer successfully created.",
@@ -415,56 +425,6 @@ class CRUDLayer(CRUDBase):
         result = result.fetchall()
         return result[0][0]
 
-    async def get_feature_cnt(
-        self,
-        async_session: AsyncSession,
-        layer_project: SQLModel | BaseModel,
-        where_query: str = None,
-    ):
-        """Get feature count for a layer or a layer project."""
-
-        # Get feature count total
-        feature_cnt = {}
-        table_name = layer_project.table_name
-        sql_query = f"SELECT COUNT(*) FROM {table_name} WHERE layer_id = '{str(layer_project.layer_id)}'"
-        result = await async_session.execute(text(sql_query))
-        feature_cnt["total_count"] = result.scalar_one()
-
-        # Get feature count filtered
-        if not where_query:
-            where_query = build_where_clause([layer_project.where_query])
-        else:
-            where_query = build_where_clause([where_query])
-        if where_query:
-            sql_query = f"SELECT COUNT(*) FROM {table_name} {where_query}"
-            result = await async_session.execute(text(sql_query))
-            feature_cnt["filtered_count"] = result.scalar_one()
-        return feature_cnt
-
-    async def check_exceed_feature_cnt(
-        self,
-        async_session: AsyncSession,
-        max_feature_cnt: int,
-        layer,
-        where_query: str,
-    ):
-        """Check if feature count is exceeding the defined limit."""
-        feature_cnt = await self.get_feature_cnt(
-            async_session=async_session, layer_project=layer, where_query=where_query
-        )
-
-        if feature_cnt.get("filtered_count") is not None:
-            cnt_to_check = feature_cnt["filtered_count"]
-        else:
-            cnt_to_check = feature_cnt["total_count"]
-
-        if cnt_to_check > max_feature_cnt:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Operation not supported. The layer contains more than {max_feature_cnt} features. Please apply a filter to reduce the number of features.",
-            )
-        return feature_cnt
-
     async def check_if_column_suitable_for_stats(
         self, async_session: AsyncSession, id: UUID, column_name: str, query: str
     ):
@@ -699,6 +659,7 @@ class CRUDLayerImport(CRUDFailedJob):
         self,
         file_metadata: dict,
         layer_in: IInternalLayerCreate,
+        project_id: UUID = None,
     ):
         """Import file using ogr2ogr."""
 
@@ -740,6 +701,7 @@ class CRUDLayerImport(CRUDFailedJob):
             file_metadata=file_metadata,
             attribute_mapping=attribute_mapping,
             job_id=self.job_id,
+            project_id=project_id,
         )
 
         return result

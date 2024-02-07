@@ -32,6 +32,7 @@ from src.core.content import (
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import CRUDLayerExport, CRUDLayerImport
 from src.crud.crud_layer import layer as crud_layer
+from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.db.models.layer import (
     FeatureType,
     FeatureUploadType,
@@ -156,6 +157,7 @@ async def create_layer_internal(
     ).import_file(
         file_metadata=file_metadata,
         layer_in=layer_in,
+        project_id=project_id,
     )
     return {"job_id": job.id}
 
@@ -423,7 +425,7 @@ async def get_feature_count(
     where_query = build_where(
         layer.id, layer.table_name, query, layer.attribute_mapping
     )
-    count = await crud_layer.get_feature_cnt(
+    count = await crud_layer_project.get_feature_cnt(
         async_session=async_session,
         layer_project=layer,
         where_query=where_query,

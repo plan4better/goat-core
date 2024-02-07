@@ -4,11 +4,16 @@ from uuid import UUID
 
 # Third party imports
 from fastapi import HTTPException, status
-from pydantic import ValidationError, parse_obj_as
-from sqlalchemy import select
+from pydantic import ValidationError, parse_obj_as, BaseModel
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import SQLModel
+from typing import Union
 
-from src.crud.crud_layer import layer as crud_layer
+# Local application imports
+from .base import CRUDBase
+from src.schemas.error import UnsupportedLayerTypeError, LayerNotFoundError
+from src.utils import build_where_clause
 from src.db.models._link_model import LayerProjectLink
 from src.db.models.layer import Layer
 from src.db.models.project import Project
@@ -17,13 +22,6 @@ from src.schemas.project import (
     layer_type_mapping_read,
     layer_type_mapping_update,
 )
-from typing import Union
-
-# Local application imports
-from .base import CRUDBase
-from src.schemas.error import UnsupportedLayerTypeError, LayerNotFoundError
-from sqlalchemy.sql import select
-
 
 class CRUDLayerProject(CRUDBase):
     async def layer_projects_to_schemas(
@@ -52,7 +50,7 @@ class CRUDLayerProject(CRUDBase):
 
             # Get feature cnt for all feature layers and tables
             if layer_project.type in [LayerType.feature.value, LayerType.table.value]:
-                feature_cnt = await crud_layer.get_feature_cnt(
+                feature_cnt = await self.get_feature_cnt(
                     async_session=async_session, layer_project=layer_project
                 )
                 layer_project.total_count = feature_cnt["total_count"]
@@ -219,7 +217,7 @@ class CRUDLayerProject(CRUDBase):
                 )
 
         # Get layer from catalog
-        layers = await crud_layer.get_multi(
+        layers = await CRUDBase(Layer).get_multi(
             async_session,
             query=select(Layer).where(Layer.id.in_(layer_ids)),
         )
@@ -294,7 +292,7 @@ class CRUDLayerProject(CRUDBase):
         layer_id = layer_project_old.layer_id
 
         # Get base layer object
-        layer = await crud_layer.get(async_session, id=layer_id)
+        layer = await CRUDBase(Layer).get(async_session, id=layer_id)
         layer_dict = layer.dict()
 
         # Get right schema for respective layer type
@@ -336,12 +334,61 @@ class CRUDLayerProject(CRUDBase):
         layer_project = model_type_read(**layer_dict)
 
         # Get feature cnt
-        feature_cnt = await crud_layer.get_feature_cnt(
+        feature_cnt = await self.get_feature_cnt(
             async_session, layer_project=layer_project
         )
         layer_project.total_count = feature_cnt.get("total_count")
         layer_project.filtered_count = feature_cnt.get("filtered_count")
         return layer_project
 
+    async def get_feature_cnt(
+        self,
+        async_session: AsyncSession,
+        layer_project: SQLModel | BaseModel,
+        where_query: str = None,
+    ):
+        """Get feature count for a layer or a layer project."""
+
+        # Get feature count total
+        feature_cnt = {}
+        table_name = layer_project.table_name
+        sql_query = f"SELECT COUNT(*) FROM {table_name} WHERE layer_id = '{str(layer_project.layer_id)}'"
+        result = await async_session.execute(text(sql_query))
+        feature_cnt["total_count"] = result.scalar_one()
+
+        # Get feature count filtered
+        if not where_query:
+            where_query = build_where_clause([layer_project.where_query])
+        else:
+            where_query = build_where_clause([where_query])
+        if where_query:
+            sql_query = f"SELECT COUNT(*) FROM {table_name} {where_query}"
+            result = await async_session.execute(text(sql_query))
+            feature_cnt["filtered_count"] = result.scalar_one()
+        return feature_cnt
+
+    async def check_exceed_feature_cnt(
+        self,
+        async_session: AsyncSession,
+        max_feature_cnt: int,
+        layer,
+        where_query: str,
+    ):
+        """Check if feature count is exceeding the defined limit."""
+        feature_cnt = await self.get_feature_cnt(
+            async_session=async_session, layer_project=layer, where_query=where_query
+        )
+
+        if feature_cnt.get("filtered_count") is not None:
+            cnt_to_check = feature_cnt["filtered_count"]
+        else:
+            cnt_to_check = feature_cnt["total_count"]
+
+        if cnt_to_check > max_feature_cnt:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Operation not supported. The layer contains more than {max_feature_cnt} features. Please apply a filter to reduce the number of features.",
+            )
+        return feature_cnt
 
 layer_project = CRUDLayerProject(LayerProjectLink)
