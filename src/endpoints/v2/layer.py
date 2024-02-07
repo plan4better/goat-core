@@ -121,7 +121,11 @@ async def create_layer_internal(
     background_tasks: BackgroundTasks,
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID = Depends(get_user_id),
-    project_id: Optional[UUID] = None,
+    project_id: Optional[UUID] = Query(
+        None,
+        description="The ID of the project to add the layer to",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
     layer_in: IInternalLayerCreate = Body(
         ...,
         examples=layer_request_examples["create_internal"],
