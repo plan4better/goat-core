@@ -109,10 +109,10 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
 
         self.http_client = http_client
 
-    @job_log(job_step_name="isochrone")
     async def isochrone(
         self,
         params: IIsochroneActiveMobility,
+        result_params: dict = None,
     ):
         """Compute active mobility isochrone using GOAT Routing endpoint."""
 
@@ -131,17 +131,18 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
             params.starting_points.latitude = [x["lat"] for x in starting_points]
             params.starting_points.longitude = [x["lon"] for x in starting_points]
 
-        # Create feature layer to store computed isochrone output
-        layer_isochrone = IFeatureLayerToolCreate(
-            name=DefaultResultLayerName.isochrone_active_mobility.value,
-            feature_layer_geometry_type=IsochroneGeometryTypeMapping[
-                params.isochrone_type.value
-            ],
-            attribute_mapping={"integer_attr1": "travel_cost"},
-            tool_type=params.tool_type.value,
-            job_id=self.job_id,
-        )
-        result_table = f"{settings.USER_DATA_SCHEMA}.{layer_isochrone.feature_layer_geometry_type.value}_{str(self.user_id).replace('-', '')}"
+        if not result_params:
+            # Create feature layer to store computed isochrone output
+            layer_isochrone = IFeatureLayerToolCreate(
+                name=DefaultResultLayerName.isochrone_active_mobility.value,
+                feature_layer_geometry_type=IsochroneGeometryTypeMapping[
+                    params.isochrone_type.value
+                ],
+                attribute_mapping={"integer_attr1": "travel_cost"},
+                tool_type=params.tool_type.value,
+                job_id=self.job_id,
+            )
+            result_table = f"{settings.USER_DATA_SCHEMA}.{layer_isochrone.feature_layer_geometry_type.value}_{str(self.user_id).replace('-', '')}"
 
         # Construct request payload
         request_payload = {
@@ -162,8 +163,8 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
             },
             "isochrone_type": params.isochrone_type.value,
             "polygon_difference": params.polygon_difference,
-            "result_table": result_table,
-            "layer_id": str(layer_isochrone.id),
+            "result_table": result_table if not result_params else result_params["result_table"],
+            "layer_id": str(layer_isochrone.id) if not result_params else result_params["layer_id"],
         }
 
         try:
@@ -198,20 +199,25 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
             layer_in=layer_starting_points["layer_project_id"],
             params=params,
         )
-        await self.create_feature_layer_tool(
-            layer_in=layer_isochrone,
-            params=params,
-        )
+        if not result_params:
+            await self.create_feature_layer_tool(
+                layer_in=layer_isochrone,
+                params=params,
+            )
 
         return {
             "status": JobStatusType.finished.value,
             "msg": "Active mobility isochrone was successfully computed.",
         }
 
+    @job_log(job_step_name="isochrone")
+    async def isochrone_job(self, params: IIsochroneActiveMobility):
+         return await self.isochrone(params=params)
+
     @run_background_or_immediately(settings)
     @job_init()
     async def run_isochrone(self, params: IIsochroneActiveMobility):
-        return await self.isochrone(params=params)
+        return await self.isochrone_job(params=params)
 
 class CRUDIsochronePT(CRUDIsochroneBase):
     def __init__(

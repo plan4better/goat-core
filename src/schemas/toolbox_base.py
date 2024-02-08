@@ -43,6 +43,7 @@ class DefaultResultLayerName(str, Enum):
     oev_gueteklasse = "ÖV-Güteklassen"
     oev_gueteklasse_station = "ÖV-Güteklassen Station"
     trip_count_station = "Trip Count Station"
+    nearby_station_access = "Nearby Station Access"
     aggregate_point = "Aggregation Point"
     aggregate_polygon = "Aggregation Polygon"
     aggregate_line = "Aggregation Line"
