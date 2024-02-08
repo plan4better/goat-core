@@ -41,6 +41,7 @@ from src.schemas.style import (
 from src.schemas.tool import IToolParam
 from src.schemas.toolbox_base import (
     ColumnStatisticsOperation,
+    ColumnStatistic,
     GeofenceTable,
     MaxFeatureCnt,
     MaxFeaturePolygonArea,
@@ -464,11 +465,14 @@ class CRUDToolBase(CRUDFailedJob):
     async def check_column_statistics(
         self,
         layer_project: BaseModel,
-        column_statistics_field: str,
+        column_statistics: ColumnStatistic,
     ):
         """Check if the column statistics field is valid and return the mapped statistics field and the mapped statistics field type."""
 
         # Check if field is $intersected_area and geometry type is polygon
+        column_statistics_field = column_statistics.field
+        column_statistics_operation = column_statistics.operation
+
         if column_statistics_field == "$intersected_area":
             if layer_project.feature_layer_geometry_type != FeatureGeometryType.polygon:
                 raise GeometryTypeError(
@@ -479,12 +483,15 @@ class CRUDToolBase(CRUDFailedJob):
                 "mapped_statistics_field_type": OgrPostgresType.Real.value,
             }
 
+        # Get mapped field
         mapped_statistics_field = search_value(
             layer_project.attribute_mapping, column_statistics_field
         )
-        # Check if mapped statistics field is float, integer or biginteger
         mapped_statistics_field_type = mapped_statistics_field.split("_")[0]
-        await self.check_is_number(mapped_statistics_field_type)
+
+        # Check if mapped statistics field is float, integer or biginteger if the operation is not count
+        if column_statistics_operation != ColumnStatisticsOperation.count:
+            await self.check_is_number(mapped_statistics_field_type)
 
         return {
             "mapped_statistics_field": mapped_statistics_field,

@@ -52,7 +52,7 @@ class CRUDJoin(CRUDToolBase):
         # Check if mapped statistics field is float, integer or biginteger
         mapped_statistics_field = await self.check_column_statistics(
             layer_project=join_layer_project,
-            column_statistics_field=params.column_statistics.field,
+            column_statistics=params.column_statistics,
         )
         mapped_statistics_field = mapped_statistics_field["mapped_statistics_field"]
 

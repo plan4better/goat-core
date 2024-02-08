@@ -29,7 +29,7 @@ default_line_style_settings = {
     "filled": True,
     "opacity": 1,
     "stroked": True,
-    "stroke_width": 10,
+    "stroke_width": 7,
     "stroke_width_range": [0, 10],
     "stroke_width_scale": "linear",
 }
@@ -108,9 +108,10 @@ def get_tool_style_with_breaks(
         return {
             **default_line_style_settings,
             "color": color,
-            "color_field": color_field,
             "color_range": random_color_range,
             "color_scale": "quantile",
+            "stroke_color_scale_breaks": color_scale_breaks,
+            "stroke_color_field": color_field,
             "stroke_color": color,
             "stroke_color_range": random_color_range,
             "stroke_color_scale": "quantile",

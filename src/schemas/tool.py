@@ -316,6 +316,13 @@ class IOriginDestination(BaseModel):
     def tool_type(self):
         return ToolType.origin_destination
 
+    @property
+    def properties_base(self):
+        return {
+            "color_range_type": ColorRangeType.sequential,
+            "color_field": {"name": self.weight_column, "type": "number"},
+            "color_scale": "quantile",
+        }
 
 
 class IToolParam(BaseModel):
