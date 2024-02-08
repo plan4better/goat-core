@@ -220,7 +220,9 @@ class IBuffer(BaseModel):
     distance_step: int = Field(
         ...,
         title="Distance Step",
-        description="The distance step in meters.",
+        description="The number of steps.",
+        ge=1,
+        le=20,
     )
     polygon_union: bool | None = Field(
         None,
@@ -233,15 +235,13 @@ class IBuffer(BaseModel):
         description="If true, the polygons returned will be the geometrical difference of the current step and the predecessor steps.",
     )
 
-    # Make sure that there is a maximum of 20 steps. It can be calculated by max_distance / distance_step
-    @validator("distance_step", pre=True)
-    def check_distance_step(cls, v, values):
-        if 20 < values["max_distance"] / v:
-            raise ValueError(
-                "You can only have a maximum of 20 steps. The distance step is too small for the chosen max_distance."
-            )
+    # Make sure that the number of steps is smaller then then max distance
+    @validator("distance_step", pre=True, always=True)
+    def distance_step_smaller_than_max_distance(cls, v, values):
+        if v > values["max_distance"]:
+            raise ValueError("The distance step must be smaller than the max distance.")
         return v
-
+    
     # Make sure that polygon difference is only True if polygon union is True
     @validator("polygon_difference", pre=True)
     def check_polygon_difference(cls, v, values):

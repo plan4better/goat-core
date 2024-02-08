@@ -295,7 +295,7 @@ async def test_buffer(client: AsyncClient, fixture_add_basic_layer_to_project):
         json={
             "source_layer_project_id": layer_project_id,
             "max_distance": 1000,
-            "distance_step": 100,
+            "distance_step": 5,
         },
     )
     response_json = response.json()
@@ -317,7 +317,7 @@ async def test_buffer_union(client: AsyncClient, fixture_add_basic_layer_to_proj
         json={
             "source_layer_project_id": layer_project_id,
             "max_distance": 1000,
-            "distance_step": 100,
+            "distance_step": 5,
             "polygon_union": True,
         },
     )
@@ -342,7 +342,7 @@ async def test_buffer_union_difference(
         json={
             "source_layer_project_id": layer_project_id,
             "max_distance": 1000,
-            "distance_step": 100,
+            "distance_step": 5,
             "polygon_union": True,
             "polygon_difference": True,
         },

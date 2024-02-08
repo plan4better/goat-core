@@ -249,21 +249,21 @@ class CRUDToolBase(CRUDFailedJob):
                 params.properties_base.get("color_scale")
                 and params.properties_base.get("color_field").get("type") == "number"
             ):
-                # Check if number of breaks is given or if it should be computed
+                # Get unique values for color field
+                unique_values = await crud_layer.get_unique_values(
+                    async_session=self.async_session,
+                    id=layer.id,
+                    column_name=params.properties_base["color_field"]["name"],
+                    order=OrderEnum.descendent.value,
+                    query=None,
+                    page_params=PaginationParams(page=1, size=7),
+                )
                 if params.properties_base.get("breaks") is None:
-                    # Check if layer has max nine unique values in color_field
-                    unique_values = await crud_layer.get_unique_values(
-                        async_session=self.async_session,
-                        id=layer.id,
-                        column_name=params.properties_base["color_field"]["name"],
-                        order=OrderEnum.descendent.value,
-                        query=None,
-                        page_params=PaginationParams(page=1, size=7),
-                    )
                     # Get len propertes as breaks
                     breaks = len(unique_values.items)
                 else:
-                    breaks = params.properties_base["breaks"]
+                    # Get breaks from params if len is less then number of unique values
+                    breaks = params.properties_base["breaks"] if len(unique_values.items) > params.properties_base["breaks"] else len(unique_values.items)
 
                 if breaks > 2:
                     # Get unique unique scale breaks

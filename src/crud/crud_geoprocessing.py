@@ -41,7 +41,10 @@ class CRUDBuffer(CRUDToolBase):
 
 
         # Buffer steps based on params.max_distance and params.distance_step
-        steps = list(range(params.distance_step, params.max_distance + params.distance_step, params.distance_step))
+        steps = []
+        step_size = params.max_distance / params.distance_step
+        for i in range(params.distance_step):
+            steps.append(step_size + (i * step_size))
         if params.polygon_union:
             # Build buffer query
             sql_buffer_query = f"""
@@ -53,6 +56,7 @@ class CRUDBuffer(CRUDToolBase):
 				GROUP BY h3_3, buffer_size
 			) x
 			GROUP BY buffer_size
+            ORDER BY buffer_size
 			"""
         else:
             # Build buffer query
@@ -60,6 +64,7 @@ class CRUDBuffer(CRUDToolBase):
             SELECT '{layer_result.id}', ST_UNION(ST_BUFFER(geom::geography, buffer_size)::geometry) geom, buffer_size
             FROM {temp_table_name}, UNNEST(ARRAY{steps}) buffer_size
             GROUP BY id, buffer_size
+            ORDER BY buffer_size
             """
 
         # Create wrapper for polygon difference between buffer steps using CROSS JOIN LATERAL
@@ -79,13 +84,13 @@ class CRUDBuffer(CRUDToolBase):
                 (
                     SELECT geom geom_prev
                     FROM buffered y
-                    WHERE y.buffer_size = x.buffer_size - {params.distance_step}
+                    WHERE y.buffer_size = x.buffer_size - {step_size}
                 ) y
-                WHERE x.buffer_size > {params.distance_step}
+                WHERE x.buffer_size > {step_size}
                 UNION ALL
                 SELECT '{layer_result.id}'::UUID, geom, buffer_size
                 FROM buffered
-                WHERE buffer_size = {params.distance_step}
+                WHERE buffer_size = {step_size}
             )
             SELECT *
             FROM diff
