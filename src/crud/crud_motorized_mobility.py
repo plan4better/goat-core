@@ -353,7 +353,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
 
         try:
             # Create result table to store isochrone geometry
-            isochrone_table = f"temporal.temp_{str(layer_stations.id).replace('-', '')}"
+            isochrone_table = f"temporal.temp_{str(self.job_id).replace('-', '')}"
             sql_create_temp_table = f"""
                 CREATE TABLE {isochrone_table} (
                     id serial,
