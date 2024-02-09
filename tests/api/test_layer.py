@@ -5,7 +5,7 @@ import pytest
 from httpx import AsyncClient
 
 from src.core.config import settings
-from src.schemas.layer import AreaStatisticsOperation, ColumnStatisticsOperation
+from src.schemas.layer import AreaStatisticsOperation, ComputeBreakOperation
 from tests.utils import get_with_wrong_id
 from src.schemas.layer import TableLayerExportType, FeatureLayerExportType
 from src.utils import delete_file, delete_dir
@@ -447,8 +447,8 @@ async def test_get_statistics_column(
     }
 
     # Request each statistical operation
-    for operation in ColumnStatisticsOperation:
-        if operation.value == ColumnStatisticsOperation.standard_deviation.value:
+    for operation in ComputeBreakOperation:
+        if operation.value == ComputeBreakOperation.standard_deviation.value:
             # There is no breaks parameter for standard deviation
             response = await client.get(
                 f"{settings.API_V2_STR}/layer/{layer_id}/class-breaks/{operation.value}/{column}?stripe_zeros=true"
@@ -459,7 +459,7 @@ async def test_get_statistics_column(
             )
         assert response.status_code == 200
         # Check that the results are the same as the expected results. Avoid checking the breaks for standard deviation as they can slighly differ.
-        if operation.value != ColumnStatisticsOperation.standard_deviation.value:
+        if operation.value != ComputeBreakOperation.standard_deviation.value:
             assert response.json() == results[operation.value]
     return
 

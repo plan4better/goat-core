@@ -146,8 +146,8 @@ class CRUDOevGueteklasse(CRUDToolBase):
             # Create difference between different buffers*
             await self.async_session.execute(
                 f"""
-                INSERT INTO {self.table_oev_gueteklasse} (integer_attr1, layer_id, geom)
-                SELECT a.pt_class::integer, '{buffer_layer.id}', CASE WHEN j.geom IS NULL THEN a.geom ELSE j.geom END AS geom
+                INSERT INTO {self.table_oev_gueteklasse} (text_attr1, layer_id, geom)
+                SELECT a.pt_class::text, '{buffer_layer.id}', CASE WHEN j.geom IS NULL THEN a.geom ELSE j.geom END AS geom
                 FROM {temp_union_buffer} a
                 LEFT JOIN LATERAL
                 (
@@ -197,7 +197,7 @@ class CRUDOevGueteklasse(CRUDToolBase):
 
         # Create layer object
         station_category_layer = IFeatureLayerToolCreate(
-            name=DefaultResultLayerName.isochrone_starting_points.value,
+            name=DefaultResultLayerName.oev_gueteklasse_station.value,
             feature_layer_geometry_type=UserDataGeomType.point.value,
             attribute_mapping={
                 "text_attr1": "stop_name",
@@ -220,7 +220,7 @@ class CRUDOevGueteklasse(CRUDToolBase):
         buffer_layer = IFeatureLayerToolCreate(
             name=DefaultResultLayerName.oev_gueteklasse.value,
             feature_layer_geometry_type=UserDataGeomType.polygon.value,
-            attribute_mapping={"integer_attr1": "pt_class"},
+            attribute_mapping={"text_attr1": "pt_class"},
             tool_type=ToolType.oev_gueteklasse.value,
             job_id=self.job_id,
         )
@@ -234,11 +234,11 @@ class CRUDOevGueteklasse(CRUDToolBase):
 
         # Create result layers
         await self.create_feature_layer_tool(
-            layer_in=station_category_layer,
+            layer_in=buffer_layer,
             params=params,
         )
         await self.create_feature_layer_tool(
-            layer_in=buffer_layer,
+            layer_in=station_category_layer,
             params=params,
         )
         return {

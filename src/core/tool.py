@@ -9,13 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
 from src.core.job import CRUDFailedJob
-from src.core.print import PrintMap
-from src.core.config import settings
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import layer as crud_layer
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.crud.crud_project import project as crud_project
 from src.db.models.layer import FeatureType, Layer, LayerType, ToolType
+from src.schemas.common import OrderEnum
 from src.schemas.error import (
     AreaSizeError,
     ColumnTypeError,
@@ -27,21 +26,26 @@ from src.schemas.error import (
 )
 from src.schemas.job import JobStatusType, JobType, Msg, MsgType
 from src.schemas.layer import (
+    ComputeBreakOperation,
     FeatureGeometryType,
     IFeatureLayerToolCreate,
     OgrPostgresType,
     UserDataGeomType,
-    ComputeBreakOperation,
 )
-from src.schemas.style import get_base_style, get_tool_style
+from src.schemas.style import (
+    get_base_style,
+    get_tool_style_with_breaks,
+    get_tool_style_ordinal,
+    custom_styles,
+)
 from src.schemas.tool import IToolParam
 from src.schemas.toolbox_base import (
     ColumnStatisticsOperation,
+    ColumnStatistic,
     GeofenceTable,
     MaxFeatureCnt,
     MaxFeaturePolygonArea,
 )
-from src.schemas.common import OrderEnum
 from src.utils import build_where_clause, get_random_string, search_value
 
 
@@ -235,44 +239,76 @@ class CRUDToolBase(CRUDFailedJob):
 
         # Create style for layer
         # Request scale breaks in case of color_scale
-        if hasattr(params, 'properties_base'):
-            if params.properties_base.get("color_scale"):
-                # Check if number of breaks is given or if it should be computed
+        properties = None
+        if layer.tool_type in custom_styles:
+            properties = custom_styles[layer.tool_type][
+                layer.feature_layer_geometry_type
+            ]
+
+        elif hasattr(params, "properties_base"):
+            if (
+                params.properties_base.get("color_scale")
+                and params.properties_base.get("color_field").get("type") == "number"
+            ):
+                # Get unique values for color field
+                unique_values = await crud_layer.get_unique_values(
+                    async_session=self.async_session,
+                    id=layer.id,
+                    column_name=params.properties_base["color_field"]["name"],
+                    order=OrderEnum.descendent.value,
+                    query=None,
+                    page_params=PaginationParams(page=1, size=7),
+                )
                 if params.properties_base.get("breaks") is None:
-                    # Check if layer has max nine unique values in color_field
-                    unique_values = await crud_layer.get_unique_values(
-                        async_session=self.async_session,
-                        id=layer.id,
-                        column_name=params.properties_base["color_field"]["name"],
-                        order=OrderEnum.descendent.value,
-                        query=None,
-                        page_params=PaginationParams(page=1, size=9)
-                    )
                     # Get len propertes as breaks
                     breaks = len(unique_values.items)
                 else:
-                    breaks = params.properties_base["breaks"]
+                    # Get breaks from params if len is less then number of unique values
+                    breaks = params.properties_base["breaks"] if len(unique_values.items) > params.properties_base["breaks"] else len(unique_values.items)
 
-                # Get unique unique scale breaks
-                operation = params.properties_base.get("color_scale")
-                # Get scale breaks
-                color_scale_breaks = await crud_layer.get_class_breaks(
+                if breaks > 2:
+                    # Get unique unique scale breaks
+                    operation = params.properties_base.get("color_scale")
+                    # Get scale breaks
+                    color_scale_breaks = await crud_layer.get_class_breaks(
+                        async_session=self.async_session,
+                        id=layer.id,
+                        operation=ComputeBreakOperation(operation),
+                        column_name=params.properties_base["color_field"]["name"],
+                        stripe_zeros=True,
+                        breaks=breaks,
+                        query=None,
+                    )
+                    # Get properties
+                    properties = get_tool_style_with_breaks(
+                        feature_geometry_type=layer.feature_layer_geometry_type,
+                        color_field=params.properties_base["color_field"],
+                        color_scale_breaks=color_scale_breaks,
+                        color_range_type=params.properties_base["color_range_type"],
+                    )
+            elif (
+                params.properties_base.get("color_scale")
+                and params.properties_base.get("color_field").get("type") == "string"
+            ):
+                # Check if layer has max nine unique values in color_field
+                unique_values = await crud_layer.get_unique_values(
                     async_session=self.async_session,
                     id=layer.id,
-                    operation=ComputeBreakOperation(operation),
                     column_name=params.properties_base["color_field"]["name"],
-                    stripe_zeros=True,
-                    breaks=breaks,
+                    order=OrderEnum.descendent.value,
                     query=None,
+                    page_params=PaginationParams(page=1, size=7),
                 )
                 # Get properties
-                properties = get_tool_style(
+                unique_values = [item.value for item in unique_values.items]
+                properties = get_tool_style_ordinal(
                     feature_geometry_type=layer.feature_layer_geometry_type,
-                    color_field=params.properties_base["color_field"],
-                    color_scale_breaks=color_scale_breaks,
                     color_range_type=params.properties_base["color_range_type"],
+                    color_field=params.properties_base["color_field"],
+                    unique_values=unique_values,
                 )
-        else:
+
+        if properties is None:
             properties = get_base_style(layer_in.feature_layer_geometry_type)
 
         # Update layer with properties and thumbnail
@@ -429,11 +465,14 @@ class CRUDToolBase(CRUDFailedJob):
     async def check_column_statistics(
         self,
         layer_project: BaseModel,
-        column_statistics_field: str,
+        column_statistics: ColumnStatistic,
     ):
         """Check if the column statistics field is valid and return the mapped statistics field and the mapped statistics field type."""
 
         # Check if field is $intersected_area and geometry type is polygon
+        column_statistics_field = column_statistics.field
+        column_statistics_operation = column_statistics.operation
+
         if column_statistics_field == "$intersected_area":
             if layer_project.feature_layer_geometry_type != FeatureGeometryType.polygon:
                 raise GeometryTypeError(
@@ -444,12 +483,15 @@ class CRUDToolBase(CRUDFailedJob):
                 "mapped_statistics_field_type": OgrPostgresType.Real.value,
             }
 
+        # Get mapped field
         mapped_statistics_field = search_value(
             layer_project.attribute_mapping, column_statistics_field
         )
-        # Check if mapped statistics field is float, integer or biginteger
         mapped_statistics_field_type = mapped_statistics_field.split("_")[0]
-        await self.check_is_number(mapped_statistics_field_type)
+
+        # Check if mapped statistics field is float, integer or biginteger if the operation is not count
+        if column_statistics_operation != ColumnStatisticsOperation.count:
+            await self.check_is_number(mapped_statistics_field_type)
 
         return {
             "mapped_statistics_field": mapped_statistics_field,

@@ -36,6 +36,9 @@ class CRUDProject(CRUDBase):
             db=async_session,
             obj_in=project_in,
         )
+        # Default initial view state
+        initial_view_state = {"zoom": 5, "pitch": 0, "bearing": 0, "latitude": 51.01364693631891, "max_zoom": 20, "min_zoom": 0, "longitude": 9.576740589534126}
+       
         # Create link between user and project for initial view state
         user_project = await crud_user_project.create(
             async_session,

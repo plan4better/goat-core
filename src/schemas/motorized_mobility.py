@@ -13,6 +13,7 @@ from src.schemas.toolbox_base import (
 from src.schemas.active_mobility import RoutingActiveMobilityType
 from src.schemas.colors import ColorRangeType
 
+
 class IsochroneStartingPointsMotorizedMobility(IsochroneStartingPointsBase):
     """Model for the active mobility isochrone starting points."""
 
@@ -305,6 +306,14 @@ class IOevGueteklasse(BaseModel):
     def geofence_table(self):
         return "basic.geofence_pt"
 
+    @property
+    def properties_base(self):
+        return {
+            "color_scale": "ordinal",
+            "color_range_type": ColorRangeType.sequential,
+            "color_field": {"name": "pt_class", "type": "string"},
+        }
+
 
 class ITripCountStation(BaseModel):
     """Model for the trip count."""
@@ -339,6 +348,7 @@ class ITripCountStation(BaseModel):
             "color_field": {"name": "total", "type": "number"},
             "color_scale": "quantile",
         }
+
 
 class IStartingPointNearbyStation(IsochroneStartingPointsBase):
     """Model for the starting points of the nearby station endpoint."""
@@ -383,6 +393,7 @@ class INearbyStationAccess(BaseModel):
         title="Time Window",
         description="The time window of the isochrone.",
     )
+
     @property
     def tool_type(self):
         return ToolType.nearby_station_access
@@ -394,6 +405,7 @@ class INearbyStationAccess(BaseModel):
     @property
     def geofence_table(self):
         return "basic.geofence_pt"
+
 
 request_examples_isochrone_pt = {
     # 1. Isochrone for public transport with all modes

@@ -41,7 +41,7 @@ class CRUDAggregateBase(CRUDToolBase):
         # Check if mapped statistics field is float, integer or biginteger
         result_check_statistics_field = await self.check_column_statistics(
             layer_project=source_layer_project,
-            column_statistics_field=params.column_statistics.field,
+            column_statistics=params.column_statistics,
         )
         mapped_statistics_field = result_check_statistics_field[
             "mapped_statistics_field"
@@ -81,6 +81,13 @@ class CRUDAggregateBase(CRUDToolBase):
         else:
             attribute_mapping_aggregation = {"text_attr1": f"h3_{params.h3_resolution}"}
 
+        # Change data type in case of text and count as then it is integer
+        if (
+            params.column_statistics.operation
+            == ColumnStatisticsOperation.count
+        ):
+            result_check_statistics_field["mapped_statistics_field_type"] = "integer"
+    
         result_column = get_result_column(
             attribute_mapping=attribute_mapping_aggregation,
             base_column_name=params.column_statistics.operation.value,
