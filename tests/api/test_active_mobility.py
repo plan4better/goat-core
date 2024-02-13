@@ -22,7 +22,7 @@ async def test_single_isochrone_active_mobility_layer(
         "routing_type": "walking",
         "travel_cost": {
             "max_traveltime": 30,
-            "traveltime_step": 5,
+            "steps": 5,
             "speed": 5,
         },
         "isochrone_type": "polygon",
@@ -37,6 +37,8 @@ async def test_single_isochrone_active_mobility_layer(
     job = await check_job_status(client, response.json()["job_id"])
     # Check if job is finished
     assert job["status_simple"] == "finished"
+
+
 @pytest.mark.asyncio
 async def test_single_isochrone_active_mobility_lat_lon(
     client: AsyncClient,
@@ -45,11 +47,11 @@ async def test_single_isochrone_active_mobility_lat_lon(
     fixture_create_user,
 ):
     project_id = fixture_create_project["id"]
-    user_id = fixture_create_user["id"]
+    fixture_create_user["id"]
 
     # Produce isochrone request payload
     max_traveltime = 30
-    traveltime_step = 5
+    steps = 5
     params = {
         "starting_points": {
             "latitude": [51.201582802561035],
@@ -58,7 +60,7 @@ async def test_single_isochrone_active_mobility_lat_lon(
         "routing_type": "walking",
         "travel_cost": {
             "max_traveltime": max_traveltime,
-            "traveltime_step": traveltime_step,
+            "steps": steps,
             "speed": 5,
         },
         "isochrone_type": "polygon",
@@ -83,7 +85,7 @@ async def test_single_isochrone_active_mobility_lat_lon(
     # num_rows = len(
     #     (await db_session.execute(f"SELECT * FROM {result_table};")).fetchall()
     # )
-    # assert num_rows == (max_traveltime / traveltime_step)
+    # assert num_rows == (max_traveltime / steps)
 
 
 @pytest.mark.asyncio
@@ -115,13 +117,13 @@ async def test_single_isochrone_active_mobility_dynamic(
 
     # Produce a random isochrone request payload
     max_traveltime = random.randint(5, 30)
-    traveltime_step = random.randint(1, int(max_traveltime / 2))
+    steps = random.randint(1, int(max_traveltime / 2))
     params = {
         "starting_points": {"latitude": [lat], "longitude": [long]},
         "routing_type": random.choice(["walking", "bicycle", "pedelec"]),
         "travel_cost": {
             "max_traveltime": max_traveltime,
-            "traveltime_step": traveltime_step,
+            "steps": steps,
             "speed": random.randint(1, 25),
         },
         "isochrone_type": "polygon",
@@ -145,6 +147,6 @@ async def test_single_isochrone_active_mobility_dynamic(
     num_rows = len(
         (await db_session.execute(f"SELECT * FROM {result_table};")).fetchall()
     )
-    assert num_rows == (max_traveltime / traveltime_step)
+    assert num_rows == (max_traveltime / steps)
 
     # TODO: We could also measure the area of the isochrone and see if it corresponds to an expected value.

@@ -1,6 +1,5 @@
 import time
 from httpx import AsyncClient
-from uuid import UUID
 from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
 from src.core.tool import CRUDToolBase
@@ -173,13 +172,13 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
             "travel_cost": (
                 {
                     "max_traveltime": params.travel_cost.max_traveltime,
-                    "traveltime_step": params.travel_cost.traveltime_step,
+                    "steps": params.travel_cost.steps,
                     "speed": params.travel_cost.speed,
                 }
                 if type(params.travel_cost) == TravelTimeCostActiveMobility
                 else {
                     "max_distance": params.travel_cost.max_distance,
-                    "distance_step": params.travel_cost.distance_step,
+                    "steps": params.travel_cost.steps,
                 }
             ),
             "isochrone_type": params.isochrone_type.value,
@@ -215,7 +214,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
                 f"Error while calling the routing endpoint: {str(e)}"
             )
 
-        # Create new layers. 
+        # Create new layers.
         await self.create_feature_layer_tool(
             layer_in=layer_isochrone,
             params=params,
