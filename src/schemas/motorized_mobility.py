@@ -83,6 +83,22 @@ class TravelTimeCostMotorizedMobility(BaseModel):
         description="The travel time step in minutes.",
     )
 
+class TravelTimeCostMotorizedMobilityNew(BaseModel):
+    """Travel time cost schema."""
+
+    max_traveltime: int = Field(
+        ...,
+        title="Max Travel Time",
+        description="The maximum travel time in minutes.",
+        ge=1,
+        le=60,
+    )
+    steps: int = Field(
+        ...,
+        title="Steps",
+        description="The number of steps.",
+    )
+
 
 class PTTimeWindow(BaseModel):
     weekday: PTSupportedDay = Field(
@@ -159,6 +175,66 @@ class IIsochronePT(BaseModel):
         description="The routing type of the isochrone.",
     )
     travel_cost: TravelTimeCostMotorizedMobility = Field(
+        ...,
+        title="Travel Cost",
+        description="The travel cost of the isochrone.",
+    )
+    time_window: PTTimeWindow = Field(
+        ...,
+        title="Time Window",
+        description="The time window of the isochrone.",
+    )
+    isochrone_type: IsochroneType = Field(
+        ...,
+        title="Return Type",
+        description="The return type of the isochrone.",
+    )
+
+    decay_function: IsochroneDecayFunction = Field(
+        IsochroneDecayFunction(),
+        title="Decay Function",
+        description="The decay function of the isochrone.",
+    )
+
+    # Defaults - not currently user configurable
+    walk_speed: float = 1.39
+    max_walk_time: int = 20
+    bike_speed: float = 4.166666666666667
+    max_bike_time: int = 20
+    bike_traffic_stress: int = 4
+    max_rides: int = 4
+    zoom: int = 9
+    percentiles: List[int] = [5]
+    monte_carlo_draws: int = 200
+
+    @property
+    def tool_type(self):
+        return ToolType.isochrone_pt
+
+    @property
+    def geofence_table(self):
+        mode = ToolType.isochrone_pt.value.replace("isochrone_", "")
+        return f"basic.geofence_{mode}"
+
+    @property
+    def input_layer_types(self):
+        return {"layer_project_id": input_layer_type_point}
+
+
+class IIsochronePTNew(BaseModel):
+    """Model for the public transport isochrone"""
+
+    starting_points: IsochroneStartingPointsMotorizedMobility = Field(
+        ...,
+        title="Starting Points",
+        description="The starting points of the isochrone.",
+    )
+    routing_type: RoutingPTType = Field(
+        ...,
+        title="Routing Type",
+        description="The routing type of the isochrone.",
+    )
+    travel_cost: TravelTimeCostMotorizedMobilityNew = Field(
         ...,
         title="Travel Cost",
         description="The travel cost of the isochrone.",

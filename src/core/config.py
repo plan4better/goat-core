@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     CUSTOMER_SCHEMA: Optional[str] = "customer"
     REGION_MAPPING_PT_TABLE: Optional[str] = "basic.region_mapping_pt"
     ASYNC_CLIENT_DEFAULT_TIMEOUT: Optional[float] = 5.0
-    ASYNC_CLIENT_READ_TIMEOUT: Optional[float] = 10.0
+    ASYNC_CLIENT_READ_TIMEOUT: Optional[float] = 15.0
 
     SENTRY_DSN: Optional[HttpUrl] = None
     POSTGRES_SERVER: str

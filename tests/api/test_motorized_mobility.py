@@ -98,7 +98,7 @@ async def test_single_isochrone_public_transport(
         },
         "travel_cost": {
             "max_traveltime": 60,
-            "traveltime_step": 5,
+            "steps": 5,
         },
         "time_window": {
             "weekday": "weekday",
