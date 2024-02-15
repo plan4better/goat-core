@@ -203,6 +203,16 @@ class IIsochronePT(BaseModel):
     @property
     def input_layer_types(self):
         return {"layer_project_id": input_layer_type_point}
+    
+    @property
+    def properties_base(self):
+        return {
+            "color_range_type": ColorRangeType.sequential,
+            "color_field": {"name": "travel_cost", "type": "number"},
+            "color_scale": "quantile",
+            "breaks": self.travel_cost.steps,
+        }
+
 
 
 class RoutingCarType(str, Enum):
@@ -242,6 +252,15 @@ class IIsochroneCar(BaseModel):
     @property
     def input_layer_types(self):
         return {"layer_project_id": input_layer_type_point}
+
+    @property
+    def properties_base(self):
+        return {
+            "color_range_type": ColorRangeType.sequential,
+            "color_field": {"name": "travel_cost", "type": "number"},
+            "color_scale": "quantile",
+            "breaks": self.travel_cost.steps,
+        }
 
 
 class CountLimitPerTool(int, Enum):

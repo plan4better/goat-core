@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, validator
 
 from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import IsochroneStartingPointsBase, check_starting_points, input_layer_type_point
-
+from src.schemas.colors import ColorRangeType
 
 class IsochroneStartingPointsActiveMobility(IsochroneStartingPointsBase):
     """Model for the active mobility isochrone starting points."""
@@ -138,6 +138,16 @@ class IIsochroneActiveMobility(BaseModel):
     @property
     def input_layer_types(self):
         return {"layer_project_id": input_layer_type_point}
+    
+    @property
+    def properties_base(self):
+        return {
+            "color_range_type": ColorRangeType.sequential,
+            "color_field": {"name": "travel_cost", "type": "number"},
+            "color_scale": "quantile",
+            "breaks": self.travel_cost.steps,
+        }
+
 
 
 request_examples = {
