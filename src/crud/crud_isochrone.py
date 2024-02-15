@@ -17,7 +17,7 @@ from src.schemas.error import (
 )
 from src.schemas.job import JobStatusType
 from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
-from src.schemas.motorized_mobility import IIsochroneCar, IIsochronePT
+from src.schemas.motorized_mobility import IIsochroneCar, IIsochronePTNew
 from src.schemas.toolbox_base import (
     DefaultResultLayerName,
     IsochroneGeometryTypeMapping,
@@ -33,7 +33,7 @@ class CRUDIsochroneBase(CRUDToolBase):
         )
 
     async def create_layer_starting_points(
-        self, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT
+        self, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePTNew
     ) -> IFeatureLayerToolCreate:
 
         # Create layer object
@@ -91,7 +91,7 @@ class CRUDIsochroneBase(CRUDToolBase):
         return layer
 
     async def get_lats_lons(
-        self, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT
+        self, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePTNew
     ):
         # Check if starting points are a layer else create layer
         if params.starting_points.layer_project_id:
@@ -277,7 +277,7 @@ class CRUDIsochronePT(CRUDIsochroneBase):
     @job_log(job_step_name="isochrone")
     async def isochrone(
         self,
-        params: IIsochronePT,
+        params: IIsochronePTNew,
     ):
         """Compute public transport isochrone using R5 routing endpoint."""
 
@@ -421,7 +421,7 @@ class CRUDIsochronePT(CRUDIsochroneBase):
                     grid=isochrone_grid,
                     travel_time=params.travel_cost.max_traveltime,
                     percentile=5,
-                    step=params.travel_cost.traveltime_step,
+                    steps=params.travel_cost.steps,
                 )
             except Exception as e:
                 raise R5IsochroneComputeError(
@@ -462,5 +462,5 @@ class CRUDIsochronePT(CRUDIsochroneBase):
 
     @run_background_or_immediately(settings)
     @job_init()
-    async def run_isochrone(self, params: IIsochronePT):
+    async def run_isochrone(self, params: IIsochronePTNew):
         return await self.isochrone(params=params)
