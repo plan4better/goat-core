@@ -41,7 +41,7 @@ BEGIN
 	EXECUTE format(
 		'INSERT INTO %s
 		SELECT st.stop_id, b.integer_attr1, st.h3_3
-		FROM basic.stops_v2 st, %s b
+		FROM basic.stops st, %s b
 		WHERE ST_Intersects(st.geom, b.geom)
 		AND (st.location_type IS NULL OR st.location_type = ''0'')',
 		temp_table_stops, table_area
@@ -55,7 +55,7 @@ BEGIN
 			FROM %s c
 			CROSS JOIN LATERAL (
 				SELECT t.route_type, SUM(weekdays[$1]::integer) cnt, ARRAY_AGG(route_id) AS route_ids
-				FROM basic.stop_times_optimized t, basic.stops_v2 s
+				FROM basic.stop_times_optimized t, basic.stops s
 				WHERE t.stop_id = s.stop_id
 				AND s.stop_id = c.stop_id
 				AND s.h3_3 = c.h3_3
@@ -72,7 +72,7 @@ BEGIN
 			GROUP BY stop_id, access_time, h3_3
 		)
 		SELECT s.stop_id, s.stop_name, o.access_time, o.route_cnt, s.geom, o.route_ids, o.h3_3
-		FROM o, basic.stops_v2 s
+		FROM o, basic.stops s
 		WHERE o.stop_id = s.stop_id
 		AND s.h3_3 = o.h3_3', temp_table_stops) USING weekday, start_time, end_time, weekday;
 
