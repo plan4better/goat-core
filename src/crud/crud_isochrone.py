@@ -1,4 +1,5 @@
 import time
+import asyncio
 from httpx import AsyncClient
 from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
@@ -202,7 +203,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
                         raise Exception(
                             "GOAT routing endpoint took too long to process request."
                         )
-                    time.sleep(self.RETRY_DELAY)
+                    await asyncio.sleep(self.RETRY_DELAY) 
                     continue
                 elif response.status_code == 201:
                     # Endpoint has finished processing request, break
@@ -399,7 +400,7 @@ class CRUDIsochronePT(CRUDIsochroneBase):
                             raise Exception(
                                 "R5 engine took too long to process request."
                             )
-                        time.sleep(self.RETRY_DELAY)
+                        await asyncio.sleep(self.RETRY_DELAY) 
                         continue
                     elif response.status_code == 200:
                         # Engine has finished processing request, break
