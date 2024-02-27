@@ -34,12 +34,12 @@ class CRUDIsochroneBase(CRUDToolBase):
         )
 
     async def create_layer_starting_points(
-        self, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePTNew
+        self, layer_name: DefaultResultLayerName, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT
     ) -> IFeatureLayerToolCreate:
 
         # Create layer object
         layer = IFeatureLayerToolCreate(
-            name=DefaultResultLayerName.isochrone_starting_points.value,
+            name=layer_name.value,
             feature_layer_geometry_type=UserDataGeomType.point.value,
             attribute_mapping={},
             tool_type=params.tool_type.value,
@@ -92,7 +92,7 @@ class CRUDIsochroneBase(CRUDToolBase):
         return layer
 
     async def get_lats_lons(
-        self, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePTNew
+        self, layer_name: DefaultResultLayerName, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT
     ):
         # Check if starting points are a layer else create layer
         if params.starting_points.layer_project_id:
@@ -101,6 +101,7 @@ class CRUDIsochroneBase(CRUDToolBase):
             table_name = layer_starting_points["layer_project_id"].table_name
         else:
             layer_starting_points = await self.create_layer_starting_points(
+                layer_name=layer_name,
                 params=params
             )
             where_query = f"layer_id = '{layer_starting_points.id}'"
@@ -143,11 +144,18 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
     ):
         """Compute active mobility isochrone using GOAT Routing endpoint."""
 
-        # Fetch starting points from previously created layer if required
-        starting_pojnts = await self.get_lats_lons(params=params)
-        lats = starting_pojnts["lats"]
-        lons = starting_pojnts["lons"]
-        layer_starting_points = starting_pojnts["layer_starting_points"]
+        # Fetch starting points
+        starting_points = await self.get_lats_lons(
+            layer_name=(
+                DefaultResultLayerName.isochrone_starting_points
+                if not result_params else
+                result_params["starting_points_layer_name"]
+            ),
+            params=params
+        )
+        lats = starting_points["lats"]
+        lons = starting_points["lons"]
+        layer_starting_points = starting_points["layer_starting_points"]
 
         if not result_params:
             # Create feature layer to store computed isochrone output
@@ -164,6 +172,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
             layer_id = layer_isochrone.id
         else:
             layer_id = result_params["layer_id"]
+
         # Construct request payload
         request_payload = {
             "starting_points": {
@@ -174,7 +183,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
             "travel_cost": (
                 {
                     "max_traveltime": params.travel_cost.max_traveltime,
-                    "steps": params.travel_cost.steps,
+                    "steps": params.travel_cost.traveltime_step,
                     "speed": params.travel_cost.speed,
                 }
                 if type(params.travel_cost) == TravelTimeCostActiveMobility
@@ -218,23 +227,20 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
                 f"Error while calling the routing endpoint: {str(e)}"
             )
 
-        # Create new layers.
-        await self.create_feature_layer_tool(
-            layer_in=layer_isochrone,
-            params=params,
-        )
         # Create new layer if starting points are not a layer
         if not params.starting_points.layer_project_id:
+            await self.create_feature_layer_tool(
+                layer_in=layer_starting_points,
+                params=params,
+            )
+
+        # Create layers only if result_params are not provided
+        if not result_params:
+            # Create new layers.
             await self.create_feature_layer_tool(
                 layer_in=layer_isochrone,
                 params=params,
             )
-            # Create new layer if starting points are not a layer
-            if not params.starting_points.layer_project_id:
-                await self.create_feature_layer_tool(
-                    layer_in=layer_starting_points,
-                    params=params,
-                )
         return {
             "status": JobStatusType.finished.value,
             "msg": "Active mobility isochrone was successfully computed.",
@@ -294,7 +300,10 @@ class CRUDIsochronePT(CRUDIsochroneBase):
         """Compute public transport isochrone using R5 routing endpoint."""
 
         # Fetch starting points from previously created layer if required
-        starting_pojnts = await self.get_lats_lons(params=params)
+        starting_pojnts = await self.get_lats_lons(
+            layer_name=DefaultResultLayerName.isochrone_starting_points,
+            params=params,
+        )
         lats = starting_pojnts["lats"]
         lons = starting_pojnts["lons"]
         layer_starting_points = starting_pojnts["layer_starting_points"]

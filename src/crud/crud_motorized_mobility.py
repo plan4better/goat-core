@@ -344,6 +344,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             attribute_mapping={
                 "text_attr1": "stop_name",
                 "integer_attr1": "access_time",
+                "integer_attr2": "agg_frequency",
                 "jsonb_attr1": "routes",
             },
             tool_type=params.tool_type.value,
@@ -374,7 +375,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             routing_type=params.access_mode,
             travel_cost=TravelTimeCostActiveMobility(
                 max_traveltime=params.max_traveltime,
-                traveltime_step=1,
+                traveltime_step=params.max_traveltime,
                 speed=params.speed,
             ),
             isochrone_type=IsochroneType.polygon,
@@ -394,6 +395,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             result_params={
                 "result_table": isochrone_table,
                 "layer_id": str(layer_stations.id),
+                "starting_points_layer_name": DefaultResultLayerName.nearby_station_access_starting_points,
             },
         )
 
@@ -419,17 +421,14 @@ class CRUDNearbyStationAccess(CRUDToolBase):
                 GROUP BY sr.stop_id, sr.stop_name, sr.access_time, sr.geom, sr.route_id, sr.route_type
             ),
             frequency AS (
-                SELECT s.stop_id, s.stop_name, s.access_time, s.geom, r.route_short_name, s.route_type,
-                    ROUND((EXTRACT(EPOCH FROM (
-                        '{str(timedelta(seconds=params.time_window.to_time))}'::interval - '{str(timedelta(seconds=params.time_window.from_time))}'::interval
-                    )) / 60) / trip_cnt) AS frequency
+                SELECT s.stop_id, s.stop_name, s.access_time, s.geom, r.route_short_name,
+                    s.route_type, trip_cnt, ROUND({params.time_window.duration_minutes} / trip_cnt) AS frequency
                 FROM service s
                 INNER JOIN basic.routes r ON r.route_id = s.route_id
             )
-            INSERT INTO {result_table} (layer_id, geom, text_attr1, integer_attr1, jsonb_attr1)
-            SELECT '{str(layer_stations.id)}', geom, stop_name, access_time, jsonb_agg(jsonb_build_object(
-                'route_short_name', route_short_name, 'route_type', route_type, 'frequency', frequency
-            )) AS routes
+            INSERT INTO {result_table} (layer_id, geom, text_attr1, integer_attr1, integer_attr2, jsonb_attr1)
+            SELECT '{str(layer_stations.id)}', geom, stop_name, access_time, ROUND({params.time_window.duration_minutes} / sum(trip_cnt)) AS agg_frequency,
+                jsonb_agg(jsonb_build_object('route_short_name', route_short_name, 'route_type', route_type, 'frequency', frequency)) AS routes
             FROM frequency
             GROUP BY stop_id, stop_name, access_time, geom;
         """

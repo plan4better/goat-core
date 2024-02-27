@@ -136,6 +136,10 @@ class PTTimeWindow(BaseModel):
         }
         return mapping[PTSupportedDay(self.weekday).value]
 
+    @property
+    def duration_minutes(self):
+        return round((self.to_time - self.from_time) / 60)
+
 
 class IsochroneType(str, Enum):
     """Isochrone type schema for public transport."""
