@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, validator
 
 from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import IsochroneStartingPointsBase, check_starting_points, input_layer_type_point
-
+from src.schemas.colors import ColorRangeType
 
 class IsochroneStartingPointsActiveMobility(IsochroneStartingPointsBase):
     """Model for the active mobility isochrone starting points."""
@@ -32,10 +32,10 @@ class TravelTimeCostActiveMobility(BaseModel):
         ge=1,
         le=45,
     )
-    traveltime_step: int = Field(
+    steps: int = Field(
         ...,
-        title="Travel Time Step",
-        description="The travel time step in minutes.",
+        title="Steps",
+        description="The number of steps.",
     )
     speed: int = Field(
         ...,
@@ -44,6 +44,15 @@ class TravelTimeCostActiveMobility(BaseModel):
         ge=1,
         le=25,
     )
+
+    # Ensure the number of steps doesn't exceed the maximum traveltime
+    @validator("steps", pre=True, always=True)
+    def valid_num_steps(cls, v):
+        if v > 45:
+            raise ValueError(
+                "The number of steps must not exceed the maximum traveltime."
+            )
+        return v
 
 
 # TODO: Check how to treat miles
@@ -57,17 +66,19 @@ class TravelDistanceCostActiveMobility(BaseModel):
         ge=50,
         le=20000,
     )
-    distance_step: int = Field(
+    steps: int = Field(
         ...,
-        title="Distance Step",
-        description="The distance step in meters.",
+        title="Steps",
+        description="The number of steps.",
     )
 
-    # Make sure that the distance step can be divided by 50 m
-    @validator("distance_step", pre=True, always=True)
-    def distance_step_divisible_by_50(cls, v):
-        if v % 50 != 0:
-            raise ValueError("The distance step must be divisible by 50 m.")
+    # Ensure the number of steps doesn't exceed the maximum distance
+    @validator("steps", pre=True, always=True)
+    def valid_num_steps(cls, v):
+        if v > 20000:
+            raise ValueError(
+                "The number of steps must not exceed the maximum distance."
+            )
         return v
 
 
@@ -127,6 +138,16 @@ class IIsochroneActiveMobility(BaseModel):
     @property
     def input_layer_types(self):
         return {"layer_project_id": input_layer_type_point}
+    
+    @property
+    def properties_base(self):
+        return {
+            "color_range_type": ColorRangeType.sequential,
+            "color_field": {"name": "travel_cost", "type": "number"},
+            "color_scale": "quantile",
+            "breaks": self.travel_cost.steps,
+        }
+
 
 
 request_examples = {
@@ -138,7 +159,7 @@ request_examples = {
                 "routing_type": "walking",
                 "travel_cost": {
                     "max_traveltime": 30,
-                    "traveltime_step": 10,
+                    "steps": 10,
                     "speed": 5,
                 },
                 "isochrone_type": "polygon",
@@ -152,7 +173,7 @@ request_examples = {
                 "routing_type": "bicycle",
                 "travel_cost": {
                     "max_traveltime": 15,
-                    "traveltime_step": 5,
+                    "steps": 5,
                     "speed": 15,
                 },
                 "isochrone_type": "polygon",
@@ -166,7 +187,7 @@ request_examples = {
                 "routing_type": "walking",
                 "travel_cost": {
                     "max_traveltime": 30,
-                    "traveltime_step": 10,
+                    "steps": 10,
                     "speed": 5,
                 },
                 "scenario_id": "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
@@ -206,7 +227,7 @@ request_examples = {
                 "routing_type": "walking",
                 "travel_cost": {
                     "max_traveltime": 30,
-                    "traveltime_step": 10,
+                    "steps": 10,
                     "speed": 5,
                 },
             },
@@ -243,7 +264,7 @@ request_examples = {
                 "routing_type": "bicycle",
                 "travel_cost": {
                     "max_traveltime": 15,
-                    "traveltime_step": 5,
+                    "steps": 5,
                     "speed": 15,
                 },
             },
@@ -257,7 +278,7 @@ request_examples = {
                 "routing_type": "walking",
                 "travel_cost": {
                     "max_traveltime": 30,
-                    "traveltime_step": 10,
+                    "steps": 10,
                     "speed": 5,
                 },
             },

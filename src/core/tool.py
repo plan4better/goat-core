@@ -249,6 +249,7 @@ class CRUDToolBase(CRUDFailedJob):
             if (
                 params.properties_base.get("color_scale")
                 and params.properties_base.get("color_field").get("type") == "number"
+                and params.properties_base["color_field"]["name"] in (layer_in.attribute_mapping.values())
             ):
                 # Get unique values for color field
                 unique_values = await crud_layer.get_unique_values(
