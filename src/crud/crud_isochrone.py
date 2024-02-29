@@ -1,4 +1,3 @@
-import time
 import asyncio
 from httpx import AsyncClient
 from src.core.config import settings
@@ -18,7 +17,7 @@ from src.schemas.error import (
 )
 from src.schemas.job import JobStatusType
 from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
-from src.schemas.motorized_mobility import IIsochroneCar, IIsochronePTNew
+from src.schemas.motorized_mobility import IIsochroneCar, IIsochronePT
 from src.schemas.toolbox_base import (
     DefaultResultLayerName,
     IsochroneGeometryTypeMapping,
@@ -183,7 +182,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
             "travel_cost": (
                 {
                     "max_traveltime": params.travel_cost.max_traveltime,
-                    "steps": params.travel_cost.traveltime_step,
+                    "steps": params.travel_cost.steps,
                     "speed": params.travel_cost.speed,
                 }
                 if type(params.travel_cost) == TravelTimeCostActiveMobility
@@ -215,7 +214,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
                         raise Exception(
                             "GOAT routing endpoint took too long to process request."
                         )
-                    await asyncio.sleep(self.RETRY_DELAY) 
+                    await asyncio.sleep(settings.CRUD_RETRY_INTERVAL)
                     continue
                 elif response.status_code == 201:
                     # Endpoint has finished processing request, break
@@ -295,7 +294,7 @@ class CRUDIsochronePT(CRUDIsochroneBase):
     @job_log(job_step_name="isochrone")
     async def isochrone(
         self,
-        params: IIsochronePTNew,
+        params: IIsochronePT,
     ):
         """Compute public transport isochrone using R5 routing endpoint."""
 
@@ -419,7 +418,7 @@ class CRUDIsochronePT(CRUDIsochroneBase):
                             raise Exception(
                                 "R5 engine took too long to process request."
                             )
-                        await asyncio.sleep(self.RETRY_DELAY) 
+                        await asyncio.sleep(settings.CRUD_RETRY_INTERVAL)
                         continue
                     elif response.status_code == 200:
                         # Engine has finished processing request, break
@@ -481,5 +480,5 @@ class CRUDIsochronePT(CRUDIsochroneBase):
 
     @run_background_or_immediately(settings)
     @job_init()
-    async def run_isochrone(self, params: IIsochronePTNew):
+    async def run_isochrone(self, params: IIsochronePT):
         return await self.isochrone(params=params)

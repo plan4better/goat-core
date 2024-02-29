@@ -77,22 +77,6 @@ class TravelTimeCostMotorizedMobility(BaseModel):
         ge=1,
         le=60,
     )
-    traveltime_step: int = Field(
-        ...,
-        title="Travel Time Step",
-        description="The travel time step in minutes.",
-    )
-
-class TravelTimeCostMotorizedMobilityNew(BaseModel):
-    """Travel time cost schema."""
-
-    max_traveltime: int = Field(
-        ...,
-        title="Max Travel Time",
-        description="The maximum travel time in minutes.",
-        ge=1,
-        le=60,
-    )
     steps: int = Field(
         ...,
         title="Steps",
@@ -223,7 +207,7 @@ class IIsochronePT(BaseModel):
     @property
     def input_layer_types(self):
         return {"layer_project_id": input_layer_type_point}
-    
+
     @property
     def properties_base(self):
         return {
@@ -232,67 +216,6 @@ class IIsochronePT(BaseModel):
             "color_scale": "quantile",
             "breaks": self.travel_cost.steps,
         }
-
-
-
-class IIsochronePTNew(BaseModel):
-    """Model for the public transport isochrone"""
-
-    starting_points: IsochroneStartingPointsMotorizedMobility = Field(
-        ...,
-        title="Starting Points",
-        description="The starting points of the isochrone.",
-    )
-    routing_type: RoutingPTType = Field(
-        ...,
-        title="Routing Type",
-        description="The routing type of the isochrone.",
-    )
-    travel_cost: TravelTimeCostMotorizedMobilityNew = Field(
-        ...,
-        title="Travel Cost",
-        description="The travel cost of the isochrone.",
-    )
-    time_window: PTTimeWindow = Field(
-        ...,
-        title="Time Window",
-        description="The time window of the isochrone.",
-    )
-    isochrone_type: IsochroneType = Field(
-        ...,
-        title="Return Type",
-        description="The return type of the isochrone.",
-    )
-
-    decay_function: IsochroneDecayFunction = Field(
-        IsochroneDecayFunction(),
-        title="Decay Function",
-        description="The decay function of the isochrone.",
-    )
-
-    # Defaults - not currently user configurable
-    walk_speed: float = 1.39
-    max_walk_time: int = 20
-    bike_speed: float = 4.166666666666667
-    max_bike_time: int = 20
-    bike_traffic_stress: int = 4
-    max_rides: int = 4
-    zoom: int = 9
-    percentiles: List[int] = [5]
-    monte_carlo_draws: int = 200
-
-    @property
-    def tool_type(self):
-        return ToolType.isochrone_pt
-
-    @property
-    def geofence_table(self):
-        mode = ToolType.isochrone_pt.value.replace("isochrone_", "")
-        return f"basic.geofence_{mode}"
-
-    @property
-    def input_layer_types(self):
-        return {"layer_project_id": input_layer_type_point}
 
 
 class RoutingCarType(str, Enum):
@@ -522,7 +445,7 @@ request_examples_isochrone_pt = {
                 "egress_mode": "walk",
                 "access_mode": "walk",
             },
-            "travel_cost": {"max_traveltime": 40, "traveltime_step": 10},
+            "travel_cost": {"max_traveltime": 40, "steps": 10},
             "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
             "isochrone_type": "polygon",
         },
@@ -541,7 +464,7 @@ request_examples_isochrone_pt = {
                 "egress_mode": "walk",
                 "access_mode": "walk",
             },
-            "travel_cost": {"max_traveltime": 35, "traveltime_step": 5},
+            "travel_cost": {"max_traveltime": 35, "steps": 5},
             "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
             "isochrone_type": "polygon",
         },
@@ -555,7 +478,7 @@ request_examples_isochrone_car = {
         "value": {
             "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
             "routing_type": "car_peak",
-            "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
+            "travel_cost": {"max_traveltime": 30, "steps": 10},
         },
     },
     # 2. Multiisochrone for car
@@ -567,7 +490,7 @@ request_examples_isochrone_car = {
                 "longitude": [13.4050, 13.4150, 13.4250],
             },
             "routing_type": "car_peak",
-            "travel_cost": {"max_traveltime": 30, "traveltime_step": 10},
+            "travel_cost": {"max_traveltime": 30, "steps": 10},
         },
     },
 }

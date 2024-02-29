@@ -375,7 +375,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             routing_type=params.access_mode,
             travel_cost=TravelTimeCostActiveMobility(
                 max_traveltime=params.max_traveltime,
-                traveltime_step=params.max_traveltime,
+                steps=params.max_traveltime,
                 speed=params.speed,
             ),
             isochrone_type=IsochroneType.polygon,

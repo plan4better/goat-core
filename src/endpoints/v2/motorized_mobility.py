@@ -8,7 +8,7 @@ from src.endpoints.deps import get_db, get_http_client, get_user_id
 from src.schemas.job import JobType
 from src.schemas.motorized_mobility import (
     IIsochroneCar,
-    IIsochronePTNew,
+    IIsochronePT,
     IOevGueteklasse,
     request_example_oev_gueteklasse,
     request_examples_isochrone_car,
@@ -34,7 +34,7 @@ router = APIRouter()
 async def compute_pt_isochrone(
     *,
     common: CommonToolParams = Depends(),
-    params: IIsochronePTNew = Body(
+    params: IIsochronePT = Body(
         ...,
         examples=request_examples_isochrone_pt,
         description="The isochrone parameters.",
