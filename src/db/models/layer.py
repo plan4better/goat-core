@@ -38,6 +38,7 @@ class ToolType(str, Enum):
     isochrone_active_mobility = "isochrone_active_mobility"
     isochrone_pt = "isochrone_pt"
     isochrone_car = "isochrone_car"
+    isochrone_nearby_stations = "isochrone_nearby_stations"
     oev_gueteklasse = "oev_gueteklasse"
     trip_count_station = "trip_count_station"
     join = "join"

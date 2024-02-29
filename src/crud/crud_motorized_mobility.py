@@ -18,7 +18,7 @@ from src.schemas.error import SQLError
 from src.schemas.job import JobStatusType
 from src.core.job import job_log, job_init, run_background_or_immediately
 from src.core.config import settings
-from src.schemas.active_mobility import IIsochroneActiveMobility, IsochroneType, TravelTimeCostActiveMobility
+from src.schemas.active_mobility import IsochroneNearbyStations, IsochroneType, TravelTimeCostActiveMobility
 from src.endpoints.deps import get_http_client
 from src.crud.crud_isochrone import CRUDIsochroneActiveMobility
 
@@ -370,7 +370,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             raise SQLError(e)
 
         # Create active mobility isochrone request payload
-        isochrone_request = IIsochroneActiveMobility(
+        isochrone_request = IsochroneNearbyStations(
             starting_points=params.starting_points,
             routing_type=params.access_mode,
             travel_cost=TravelTimeCostActiveMobility(

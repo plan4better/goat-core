@@ -138,7 +138,66 @@ class IIsochroneActiveMobility(BaseModel):
     @property
     def input_layer_types(self):
         return {"layer_project_id": input_layer_type_point}
-    
+
+    @property
+    def properties_base(self):
+        return {
+            "color_range_type": ColorRangeType.sequential,
+            "color_field": {"name": "travel_cost", "type": "number"},
+            "color_scale": "quantile",
+            "breaks": self.travel_cost.steps,
+        }
+
+
+class IsochroneNearbyStations(BaseModel):
+    """Model for the nearby stations (active mobility) isochrone"""
+
+    starting_points: IsochroneStartingPointsActiveMobility = Field(
+        ...,
+        title="Starting Points",
+        description="The starting points of the isochrone.",
+    )
+    routing_type: RoutingActiveMobilityType = Field(
+        ...,
+        title="Routing Type",
+        description="The routing type of the isochrone.",
+    )
+    travel_cost: TravelTimeCostActiveMobility | TravelDistanceCostActiveMobility = (
+        Field(
+            ...,
+            title="Travel Cost",
+            description="The travel cost of the isochrone.",
+        )
+    )
+    scenario_id: UUID | None = Field(
+        None,
+        title="Scenario ID",
+        description="The ID of the scenario that is used for the routing.",
+    )
+    isochrone_type: IsochroneType = Field(
+        ...,
+        title="Return Type",
+        description="The return type of the isochrone.",
+    )
+    polygon_difference: bool | None = Field(
+        None,
+        title="Polygon Difference",
+        description="If true, the polygons returned will be the geometrical difference of two following calculations.",
+    )
+
+    @property
+    def tool_type(self):
+        return ToolType.isochrone_nearby_stations
+
+    @property
+    def geofence_table(self):
+        mode = ToolType.isochrone_pt.value.replace("isochrone_", "")
+        return f"basic.geofence_{mode}"
+
+    @property
+    def input_layer_types(self):
+        return {"layer_project_id": input_layer_type_point}
+
     @property
     def properties_base(self):
         return {
