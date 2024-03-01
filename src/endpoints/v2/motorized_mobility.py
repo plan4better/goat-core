@@ -2,7 +2,9 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Body, Depends
 from src.core.tool import start_calculation
 from src.crud.crud_isochrone import CRUDIsochronePT
-from src.crud.crud_motorized_mobility import CRUDOevGueteklasse, CRUDTripCountStation
+from src.crud.crud_trip_count_station import CRUDTripCountStation
+from src.crud.crud_oev_gueteklasse import CRUDOevGueteklasse
+from src.crud.crud_nearby_station_access import CRUDNearbyStationAccess
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_http_client, get_user_id
 from src.schemas.job import JobType
@@ -19,7 +21,6 @@ from src.schemas.motorized_mobility import (
 )
 from src.schemas.toolbox_base import IToolResponse
 from src.schemas.toolbox_base import CommonToolParams
-from src.crud.crud_nearby_station_access import CRUDNearbyStationAccess
 
 
 router = APIRouter()
