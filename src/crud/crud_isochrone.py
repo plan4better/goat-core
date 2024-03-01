@@ -7,7 +7,7 @@ from src.jsoline import generate_jsolines
 from src.schemas.active_mobility import (
     IIsochroneActiveMobility,
     TravelTimeCostActiveMobility,
-    IsochroneNearbyStations
+    IsochroneNearbyStationAccess
 )
 from src.schemas.error import (
     OutOfGeofenceError,
@@ -34,7 +34,7 @@ class CRUDIsochroneBase(CRUDToolBase):
         )
 
     async def create_layer_starting_points(
-        self, layer_name: DefaultResultLayerName, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT | IsochroneNearbyStations
+        self, layer_name: DefaultResultLayerName, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT | IsochroneNearbyStationAccess
     ) -> IFeatureLayerToolCreate:
 
         # Create layer object
@@ -92,7 +92,7 @@ class CRUDIsochroneBase(CRUDToolBase):
         return layer
 
     async def get_lats_lons(
-        self, layer_name: DefaultResultLayerName, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT | IsochroneNearbyStations
+        self, layer_name: DefaultResultLayerName, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT | IsochroneNearbyStationAccess
     ):
         # Check if starting points are a layer else create layer
         if params.starting_points.layer_project_id:
@@ -139,7 +139,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
 
     async def isochrone(
         self,
-        params: IIsochroneActiveMobility | IsochroneNearbyStations,
+        params: IIsochroneActiveMobility | IsochroneNearbyStationAccess,
         result_params: dict = None,
     ):
         """Compute active mobility isochrone using GOAT Routing endpoint."""

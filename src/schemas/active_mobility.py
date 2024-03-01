@@ -149,7 +149,7 @@ class IIsochroneActiveMobility(BaseModel):
         }
 
 
-class IsochroneNearbyStations(BaseModel):
+class IsochroneNearbyStationAccess(BaseModel):
     """Model for the nearby stations (active mobility) isochrone"""
 
     starting_points: IsochroneStartingPointsActiveMobility = Field(
@@ -187,7 +187,7 @@ class IsochroneNearbyStations(BaseModel):
 
     @property
     def tool_type(self):
-        return ToolType.isochrone_nearby_stations
+        return ToolType.isochrone_nearby_station_access
 
     @property
     def geofence_table(self):

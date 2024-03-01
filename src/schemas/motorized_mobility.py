@@ -372,7 +372,7 @@ class ITripCountStation(BaseModel):
         }
 
 
-class IStartingPointNearbyStation(IsochroneStartingPointsBase):
+class IStartingPointNearbyStationAccess(IsochroneStartingPointsBase):
     """Model for the starting points of the nearby station endpoint."""
 
     check_starting_points = check_starting_points(1)
@@ -381,7 +381,7 @@ class IStartingPointNearbyStation(IsochroneStartingPointsBase):
 class INearbyStationAccess(BaseModel):
     """Model for the nearby station endpoint."""
 
-    starting_points: IStartingPointNearbyStation = Field(
+    starting_points: IStartingPointNearbyStationAccess = Field(
         ...,
         title="Starting Points",
         description="The starting point for the nearby station calculation.",
