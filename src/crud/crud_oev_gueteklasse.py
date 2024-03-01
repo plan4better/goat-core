@@ -3,9 +3,7 @@ from datetime import timedelta
 from pydantic import BaseModel
 
 from src.core.tool import CRUDToolBase
-from src.schemas.motorized_mobility import (
-    IOevGueteklasse,
-)
+from src.schemas.oev_gueteklasse import IOevGueteklasse
 from src.utils import build_where_clause
 from src.db.models.layer import ToolType
 from src.schemas.toolbox_base import DefaultResultLayerName

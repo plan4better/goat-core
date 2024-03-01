@@ -2,7 +2,7 @@ import json
 from datetime import timedelta
 
 from src.core.tool import CRUDToolBase
-from src.schemas.motorized_mobility import (
+from src.schemas.trip_count_station import (
     ITripCountStation,
     public_transport_types,
 )

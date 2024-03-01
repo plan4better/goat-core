@@ -4,10 +4,12 @@ from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
 from src.core.tool import CRUDToolBase
 from src.jsoline import generate_jsolines
-from src.schemas.active_mobility import (
+from src.schemas.isochrone import (
     IIsochroneActiveMobility,
-    TravelTimeCostActiveMobility,
-    IsochroneNearbyStationAccess
+    IIsochronePT,
+    IIsochroneCar,
+    IsochroneNearbyStationAccess,
+    IsochroneTravelTimeCostActiveMobility,
 )
 from src.schemas.error import (
     OutOfGeofenceError,
@@ -18,7 +20,6 @@ from src.schemas.error import (
 )
 from src.schemas.job import JobStatusType
 from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
-from src.schemas.motorized_mobility import IIsochroneCar, IIsochronePT
 from src.schemas.toolbox_base import (
     DefaultResultLayerName,
     IsochroneGeometryTypeMapping,
@@ -186,7 +187,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
                     "steps": params.travel_cost.steps,
                     "speed": params.travel_cost.speed,
                 }
-                if type(params.travel_cost) == TravelTimeCostActiveMobility
+                if type(params.travel_cost) == IsochroneTravelTimeCostActiveMobility
                 else {
                     "max_distance": params.travel_cost.max_distance,
                     "steps": params.travel_cost.steps,

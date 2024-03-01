@@ -1,10 +1,13 @@
 from enum import Enum
-from typing import List
 
 from pydantic import BaseModel, Field, validator, conlist
 
-from src.schemas.active_mobility import IIsochroneActiveMobility
-from src.schemas.motorized_mobility import IIsochroneCar, IIsochronePT, IOevGueteklasse
+from src.schemas.isochrone import IIsochroneActiveMobility
+from src.schemas.isochrone import (
+    IIsochronePT,
+    IIsochroneCar,
+)
+from src.schemas.oev_gueteklasse import IOevGueteklasse
 from src.schemas.toolbox_base import (
     ColumnStatistic,
     ColumnStatisticsOperation,
@@ -241,7 +244,7 @@ class IBuffer(BaseModel):
         if v > values["max_distance"]:
             raise ValueError("The distance step must be smaller than the max distance.")
         return v
-    
+
     # Make sure that polygon difference is only True if polygon union is True
     @validator("polygon_difference", pre=True)
     def check_polygon_difference(cls, v, values):

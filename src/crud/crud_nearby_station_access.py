@@ -1,16 +1,18 @@
 from datetime import timedelta
 
 from src.core.tool import CRUDToolBase
-from src.schemas.motorized_mobility import (
-    INearbyStationAccess,
-)
+from src.schemas.nearby_station_access import INearbyStationAccess
 from src.schemas.toolbox_base import DefaultResultLayerName
 from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
 from src.core.config import settings
 from src.schemas.error import SQLError
 from src.schemas.job import JobStatusType
 from src.core.job import job_log, job_init, run_background_or_immediately
-from src.schemas.active_mobility import IsochroneNearbyStationAccess, IsochroneType, TravelTimeCostActiveMobility
+from src.schemas.isochrone import (
+    IsochroneNearbyStationAccess,
+    IsochroneTypeActiveMobility,
+    IsochroneTravelTimeCostActiveMobility,
+)
 from src.endpoints.deps import get_http_client
 from src.crud.crud_isochrone import CRUDIsochroneActiveMobility
 
@@ -65,12 +67,12 @@ class CRUDNearbyStationAccess(CRUDToolBase):
         isochrone_request = IsochroneNearbyStationAccess(
             starting_points=params.starting_points,
             routing_type=params.access_mode,
-            travel_cost=TravelTimeCostActiveMobility(
+            travel_cost=IsochroneTravelTimeCostActiveMobility(
                 max_traveltime=params.max_traveltime,
                 steps=params.max_traveltime,
                 speed=params.speed,
             ),
-            isochrone_type=IsochroneType.polygon,
+            isochrone_type=IsochroneTypeActiveMobility.polygon,
             polygon_difference=True,
         )
 
