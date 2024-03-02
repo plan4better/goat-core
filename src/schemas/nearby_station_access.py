@@ -73,7 +73,7 @@ request_example_nearby_station_access = {
         "summary": "Nearby station for a single starting point",
         "value": {
             "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
-            "access_mode": "walk",
+            "access_mode": "walking",
             "speed": 5,
             "max_traveltime": 10,
             "mode": ["bus", "tram", "rail", "subway"],

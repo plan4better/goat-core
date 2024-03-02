@@ -55,9 +55,9 @@ class CRUDIsochroneBase(CRUDToolBase):
             sql = f"""
                 WITH to_test AS
                 (
-                    SELECT ST_SETSRID(ST_MAKEPOINT(lon, lat), 4326) AS geom
-                    FROM UNNEST(ARRAY{str(lats)}) AS lat,
-                    UNNEST(ARRAY{str(lons)}) AS lon
+                    SELECT ST_SETSRID(ST_MAKEPOINT(lon[gs], lat[gs]), 4326) AS geom
+                    FROM generate_series(1, array_length(ARRAY{str(lats)}, 1)) AS gs,
+                    LATERAL (SELECT ARRAY{str(lats)} AS lat, ARRAY{str(lons)} AS lon) AS arrays
                 )
                 SELECT COUNT(*)
                 FROM to_test t
@@ -83,9 +83,9 @@ class CRUDIsochroneBase(CRUDToolBase):
             lons = params.starting_points.longitude[i : i + 500]
             sql = f"""
                 INSERT INTO {self.table_starting_points} (layer_id, geom)
-                SELECT '{layer.id}', ST_SETSRID(ST_MAKEPOINT(lon, lat), 4326) AS geom
-                FROM UNNEST(ARRAY{str(lats)}) AS lat,
-                UNNEST(ARRAY{str(lons)}) AS lon
+                SELECT '{layer.id}', ST_SETSRID(ST_MAKEPOINT(lon[gs], lat[gs]), 4326) AS geom
+                FROM generate_series(1, array_length(ARRAY{str(lats)}, 1)) AS gs,
+                LATERAL (SELECT ARRAY{str(lats)} AS lat, ARRAY{str(lons)} AS lon) AS arrays
             """
             # Execute query
             await self.async_session.execute(sql)

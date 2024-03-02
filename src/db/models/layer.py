@@ -143,31 +143,31 @@ class FeatureGeometryType(str, Enum):
 
 
 class DataLicense(str, Enum):
-    CC_BY = "Creative Commons Attribution"
-    CC_BY_SA = "Creative Commons Attribution-ShareAlike"
-    CC_BY_ND = "Creative Commons Attribution-NoDerivs"
-    CC_BY_NC = "Creative Commons Attribution-NonCommercial"
-    CC_BY_NC_SA = "Creative Commons Attribution-NonCommercial-ShareAlike"
-    CC_BY_NC_ND = "Creative Commons Attribution-NonCommercial-NoDerivs"
-    ODC_BY = "Open Data Commons Attribution"
-    ODC_ODbL = "Open Data Commons Open Database License"
-    GPL = "GNU General Public License"
-    LGPL = "GNU Lesser General Public License"
-    APACHE = "Apache License"
-    MIT = "MIT License"
-    PROPRIETARY_PLAN4BETTER = "Proprietary - Plan4Better"
-    OTHER = "Other"
+    CC_BY = "CC_BY"
+    CC_BY_SA = "CC_BY_SA"
+    CC_BY_ND = "CC_BY_ND"
+    CC_BY_NC = "CC_BY_NC"
+    CC_BY_NC_SA = "CC_BY_NC_SA"
+    CC_BY_NC_ND = "CC_BY_NC_ND"
+    ODC_BY = "ODC_BY"
+    ODC_ODbL = "ODC_ODbL"
+    GPL = "GPL"
+    LGPL = "LGPL"
+    APACHE = "APACHE"
+    MIT = "MIT"
+    PROPRIETARY_PLAN4BETTER = "PROPRIETARY_PLAN4BETTER"
+    OTHER = "OTHER"
 
 
 class DataCategory(str, Enum):
-    basemap = "Basemap"
-    imagery = "Imagery"
-    boundary = "Boundary"
-    people = "People"
-    transportation = "Transportation"
-    environment = "Environment"
-    landuse = "Landuse"
-    places = "Places"
+    basemap = "basemap"
+    imagery = "imagery"
+    boundary = "boundary"
+    people = "people"
+    transportation = "transportation"
+    environment = "environment"
+    landuse = "landuse"
+    places = "places"
 
 
 class GeospatialAttributes(SQLModel):
