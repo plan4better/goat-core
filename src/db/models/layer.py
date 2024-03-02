@@ -19,6 +19,7 @@ from sqlmodel import (
     SQLModel,
     Text,
     UniqueConstraint,
+    Boolean,
 )
 
 from src.core.config import settings
@@ -187,6 +188,34 @@ class GeospatialAttributes(SQLModel):
         else:
             return v
 
+def validate_language_code(v):
+    if v:
+        try:
+            pycountry.languages.get(alpha_2=v)
+        except KeyError:
+            raise ValueError(f"The passed language {v} is not valid.")
+    return v
+
+def validate_geographical_code(v):
+    continents = [
+        "Africa",
+        "Antarctica",
+        "Asia",
+        "Europe",
+        "North America",
+        "Oceania",
+        "South America",
+        "World",
+    ]
+
+    if v:
+        # Try if country code if not try if any of the continent codes
+        try:
+            pycountry.countries.get(alpha_2=v)
+        except KeyError:
+            if v not in continents:
+                raise ValueError(f"The passed country {v} is not valid.")
+    return v
 
 class LayerBase(ContentBaseAttributes):
     """Base model for layers."""
@@ -262,41 +291,19 @@ class LayerBase(ContentBaseAttributes):
         sa_column=Column(Text, nullable=True),
         description="Data category of the layer",
     )
+    in_catalog: bool | None = Field(
+        sa_column=Column(Boolean, nullable=False, server_default="False"),
+        description="If the layer should be added in the catalog",
+    )
 
     # Check if language and geographical_tag valid according to pycountry
     @validator("language_code", pre=True, check_fields=False)
     def language_code_valid(cls, v):
-        if v:
-            try:
-                pycountry.languages.get(alpha_2=v)
-            except KeyError:
-                raise ValueError(f"The passed language {v} is not valid.")
-        return v
+        return validate_language_code(v)
 
     @validator("geographical_code", pre=True, check_fields=False)
     def geographical_code_valid(cls, v):
-        continents = [
-            "Africa",
-            "Antarctica",
-            "Asia",
-            "Europe",
-            "North America",
-            "Oceania",
-            "South America",
-            "World",
-        ]
-
-        if v:
-            # Try if country code if not try if any of the continent codes
-            try:
-                pycountry.countries.get(alpha_2=v)
-            except KeyError:
-                try:
-                    continents["v"]
-                except KeyError:
-                    raise ValueError(f"The passed country {v} is not valid.")
-        return v
-
+        return validate_geographical_code(v)
 
 layer_base_example = {
     "lineage": "Derived from web research and ground surveys conducted in 2021 by trained professionals.",

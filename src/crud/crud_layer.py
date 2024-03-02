@@ -9,8 +9,9 @@ from uuid import UUID, uuid4
 from fastapi import HTTPException, UploadFile, status
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
+from geoalchemy2.shape import WKTElement
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
@@ -40,9 +41,13 @@ from src.schemas.layer import (
     IFileUploadMetadata,
     IInternalLayerCreate,
     IInternalLayerExport,
+    ILayerGet,
+    IMetadataAggregate,
+    IMetadataAggregateRead,
     ITableCreateAdditionalAttributes,
     IUniqueValue,
     LayerType,
+    MetadataGroupAttributes,
     OgrDriverType,
     SupportedOgrGeomType,
     UserDataGeomType,
@@ -547,7 +552,7 @@ class CRUDLayer(CRUDBase):
             )
 
         # Check if feature count is exceeding the defined limit
-        await self.check_exceed_feature_cnt(
+        await crud_layer_project.check_exceed_feature_cnt(
             async_session=async_session,
             max_feature_cnt=MaxFeatureCnt.area_statistics.value,
             layer=layer,
@@ -639,6 +644,121 @@ class CRUDLayer(CRUDBase):
         result = await async_session.execute(text(sql_query))
         result = result.fetchall()
         return result[0][0]
+
+    async def get_base_filter(self, user_id: UUID, params: IMetadataAggregate):
+        """Get filter for get layer queries."""
+        filters = []
+        for key, value in params.dict().items():
+            if (
+                key not in ("search", "spatial_search", "in_catalog")
+                and value is not None
+            ):
+                filters.append(getattr(Layer, key).in_(value))
+
+        # Add filter to only include catalog layers
+        if params.in_catalog is True:
+            filters.append(Layer.in_catalog == bool(True))
+        # Get layers not in catalog and owned by user
+        else:
+            filters.append(and_(Layer.in_catalog == bool(False), Layer.user_id == user_id))
+
+        # Add search filter
+        if params.search is not None:
+            filters.append(
+                or_(
+                    func.lower(Layer.name).contains(params.search.lower()),
+                    func.lower(Layer.description).contains(params.search.lower()),
+                    func.lower(Layer.distributor_name).contains(params.search.lower()),
+                )
+            )
+        if params.spatial_search is not None:
+            filters.append(
+                Layer.extent.ST_Intersects(
+                    WKTElement(params.spatial_search, srid=4326)
+                ),
+            )
+        return filters
+
+    async def get_layers_with_filter(
+        self,
+        async_session: AsyncSession,
+        user_id: UUID,
+        order_by: str,
+        order: str,
+        page_params: PaginationParams,
+        params: ILayerGet,
+    ):
+        """Get layer with filter."""
+
+        # Additional server side validation for feature_layer_type
+        if params is None:
+            params = ILayerGet()
+        if (
+            params.feature_layer_type is not None
+            and LayerType.feature not in params.type
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Feature layer type can only be set when layer type is feature",
+            )
+        # Get base filter
+        filters = await self.get_base_filter(user_id=user_id, params=params)
+
+        # Build query
+        query = select(Layer).where(and_(*filters))
+
+        # Build params
+        params = {
+            "order_by": order_by,
+            "order": order,
+        }
+
+        # Filter out None values
+        params = {k: v for k, v in params.items() if v is not None}
+
+        layers = await self.get_multi(
+            async_session,
+            query=query,
+            page_params=page_params,
+            **params,
+        )
+        return layers
+
+    async def metadata_aggregate(
+        self,
+        async_session: AsyncSession,
+        user_id: UUID,
+        params: IMetadataAggregate,
+    ):
+        """Get metadata aggregate for layers."""
+
+        if params is None:
+            params = ILayerGet()
+        # Get and filter layers
+        filters = await self.get_base_filter(user_id=user_id, params=params)
+        # Loop through all attributes
+        result = {}
+        for attribute in params:
+            key = attribute[0]
+            if key in ("search", "spatial_search", "folder_id"):
+                continue
+            # Get attribute from layer
+            group_by = getattr(Layer, key)
+            sql_query = (
+                select([group_by, func.count(Layer.id).label("count")])
+                .where(and_(*filters))
+                .group_by(group_by)
+            )
+            res = await async_session.execute(sql_query)
+            res = res.fetchall()
+            # Create metadata object
+            metadata = [
+                MetadataGroupAttributes(value=str(r[0]), count=r[1]) for r in res
+            ]
+            result[key] = metadata
+
+        result = IMetadataAggregateRead(**result)
+        return result
 
 
 layer = CRUDLayer(Layer)
