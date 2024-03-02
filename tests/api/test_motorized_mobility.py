@@ -2,7 +2,7 @@ import pytest
 from httpx import AsyncClient
 
 from src.core.config import settings
-from src.schemas.motorized_mobility import station_config_example
+from src.schemas.oev_gueteklasse import station_config_example
 from tests.utils import check_job_status
 
 

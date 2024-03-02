@@ -3,11 +3,9 @@ from fastapi import APIRouter, Body, Depends
 from src.core.tool import start_calculation
 from src.crud.crud_isochrone import CRUDIsochroneActiveMobility
 from src.endpoints.deps import get_http_client
-from src.schemas.active_mobility import (
+from src.schemas.isochrone import (
     IIsochroneActiveMobility,
-)
-from src.schemas.active_mobility import (
-    request_examples as active_mobility_request_examples,
+    request_examples_isochrone_active_mobility as active_mobility_request_examples,
 )
 from src.schemas.job import JobType
 from src.schemas.toolbox_base import CommonToolParams, IToolResponse

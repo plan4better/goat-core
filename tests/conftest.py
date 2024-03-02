@@ -2,7 +2,6 @@
 import asyncio
 import os
 import logging
-import time
 
 # Third party imports
 import pytest
@@ -14,12 +13,10 @@ from sqlalchemy import text
 from src.core.config import settings
 from src.endpoints.deps import get_db, session_manager
 from src.main import app
-from src.schemas.active_mobility import (
-    request_examples as active_mobility_request_examples,
-)
+from src.schemas.isochrone import request_examples_isochrone_active_mobility as active_mobility_request_examples
 from src.schemas.layer import LayerType
 from src.schemas.layer import request_examples as layer_request_examples
-from src.schemas.motorized_mobility import (
+from src.schemas.isochrone import (
     request_examples_isochrone_car,
     request_examples_isochrone_pt,
 )
