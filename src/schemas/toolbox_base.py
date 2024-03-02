@@ -184,6 +184,47 @@ class PTSupportedDay(str, Enum):
     sunday = "sunday"
 
 
+class PTTimeWindow(BaseModel):
+    weekday: PTSupportedDay = Field(
+        title="Weekday",
+        description="The weekday of the isochrone. There are three options: weekday, saturday, sunday.",
+    )
+    from_time: int = Field(
+        25200,
+        gt=0,
+        lt=86400,
+        description="(PT) From time. Number of seconds since midnight",
+    )
+    to_time: int = Field(
+        39600,
+        gt=0,
+        lt=86400,
+        description="(PT) To time . Number of seconds since midnight",
+    )
+
+    @property
+    def weekday_integer(self):
+        mapping = {
+            "weekday": 1,
+            "saturday": 2,
+            "sunday": 3,
+        }
+        return mapping[PTSupportedDay(self.weekday).value]
+
+    @property
+    def weekday_date(self):
+        mapping = {
+            "weekday": "2023-06-12",
+            "saturday": "2023-06-17",
+            "sunday": "2023-06-18",
+        }
+        return mapping[PTSupportedDay(self.weekday).value]
+
+    @property
+    def duration_minutes(self):
+        return round((self.to_time - self.from_time) / 60)
+
+
 class CommonToolParams:
     def __init__(
         self,

@@ -2,24 +2,29 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Body, Depends
 from src.core.tool import start_calculation
 from src.crud.crud_isochrone import CRUDIsochronePT
-from src.crud.crud_motorized_mobility import CRUDOevGueteklasse
+from src.crud.crud_trip_count_station import CRUDTripCountStation
+from src.crud.crud_oev_gueteklasse import CRUDOevGueteklasse
+from src.crud.crud_nearby_station_access import CRUDNearbyStationAccess
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_http_client, get_user_id
 from src.schemas.job import JobType
-from src.schemas.motorized_mobility import (
+from src.schemas.isochrone import (
+    IIsochronePT,
     IIsochroneCar,
-    IIsochronePTNew,
+    request_examples_isochrone_pt,
+    request_examples_isochrone_car,
+)
+from src.schemas.oev_gueteklasse import (
     IOevGueteklasse,
     request_example_oev_gueteklasse,
-    request_examples_isochrone_car,
-    request_examples_isochrone_pt,
-    request_example_nearby_station_access,
-    ITripCountStation,
+)
+from src.schemas.trip_count_station import ITripCountStation
+from src.schemas.nearby_station_access import (
     INearbyStationAccess,
+    request_example_nearby_station_access,
 )
 from src.schemas.toolbox_base import IToolResponse
 from src.schemas.toolbox_base import CommonToolParams
-from src.crud.crud_motorized_mobility import CRUDTripCountStation, CRUDNearbyStationAccess
 
 
 router = APIRouter()
@@ -34,7 +39,7 @@ router = APIRouter()
 async def compute_pt_isochrone(
     *,
     common: CommonToolParams = Depends(),
-    params: IIsochronePTNew = Body(
+    params: IIsochronePT = Body(
         ...,
         examples=request_examples_isochrone_pt,
         description="The isochrone parameters.",

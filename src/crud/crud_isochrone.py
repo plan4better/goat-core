@@ -1,13 +1,15 @@
-import time
 import asyncio
 from httpx import AsyncClient
 from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
 from src.core.tool import CRUDToolBase
 from src.jsoline import generate_jsolines
-from src.schemas.active_mobility import (
+from src.schemas.isochrone import (
     IIsochroneActiveMobility,
-    TravelTimeCostActiveMobility,
+    IIsochronePT,
+    IIsochroneCar,
+    IsochroneNearbyStationAccess,
+    IsochroneTravelTimeCostActiveMobility,
 )
 from src.schemas.error import (
     OutOfGeofenceError,
@@ -18,7 +20,6 @@ from src.schemas.error import (
 )
 from src.schemas.job import JobStatusType
 from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
-from src.schemas.motorized_mobility import IIsochroneCar, IIsochronePTNew
 from src.schemas.toolbox_base import (
     DefaultResultLayerName,
     IsochroneGeometryTypeMapping,
@@ -34,7 +35,7 @@ class CRUDIsochroneBase(CRUDToolBase):
         )
 
     async def create_layer_starting_points(
-        self, layer_name: DefaultResultLayerName, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT
+        self, layer_name: DefaultResultLayerName, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT | IsochroneNearbyStationAccess
     ) -> IFeatureLayerToolCreate:
 
         # Create layer object
@@ -92,7 +93,7 @@ class CRUDIsochroneBase(CRUDToolBase):
         return layer
 
     async def get_lats_lons(
-        self, layer_name: DefaultResultLayerName, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT
+        self, layer_name: DefaultResultLayerName, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT | IsochroneNearbyStationAccess
     ):
         # Check if starting points are a layer else create layer
         if params.starting_points.layer_project_id:
@@ -139,7 +140,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
 
     async def isochrone(
         self,
-        params: IIsochroneActiveMobility,
+        params: IIsochroneActiveMobility | IsochroneNearbyStationAccess,
         result_params: dict = None,
     ):
         """Compute active mobility isochrone using GOAT Routing endpoint."""
@@ -183,10 +184,10 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
             "travel_cost": (
                 {
                     "max_traveltime": params.travel_cost.max_traveltime,
-                    "steps": params.travel_cost.traveltime_step,
+                    "steps": params.travel_cost.steps,
                     "speed": params.travel_cost.speed,
                 }
-                if type(params.travel_cost) == TravelTimeCostActiveMobility
+                if type(params.travel_cost) == IsochroneTravelTimeCostActiveMobility
                 else {
                     "max_distance": params.travel_cost.max_distance,
                     "steps": params.travel_cost.steps,
@@ -215,7 +216,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
                         raise Exception(
                             "GOAT routing endpoint took too long to process request."
                         )
-                    await asyncio.sleep(self.RETRY_DELAY) 
+                    await asyncio.sleep(settings.CRUD_RETRY_INTERVAL)
                     continue
                 elif response.status_code == 201:
                     # Endpoint has finished processing request, break
@@ -295,7 +296,7 @@ class CRUDIsochronePT(CRUDIsochroneBase):
     @job_log(job_step_name="isochrone")
     async def isochrone(
         self,
-        params: IIsochronePTNew,
+        params: IIsochronePT,
     ):
         """Compute public transport isochrone using R5 routing endpoint."""
 
@@ -419,7 +420,7 @@ class CRUDIsochronePT(CRUDIsochroneBase):
                             raise Exception(
                                 "R5 engine took too long to process request."
                             )
-                        await asyncio.sleep(self.RETRY_DELAY) 
+                        await asyncio.sleep(settings.CRUD_RETRY_INTERVAL)
                         continue
                     elif response.status_code == 200:
                         # Engine has finished processing request, break
@@ -481,5 +482,5 @@ class CRUDIsochronePT(CRUDIsochroneBase):
 
     @run_background_or_immediately(settings)
     @job_init()
-    async def run_isochrone(self, params: IIsochronePTNew):
+    async def run_isochrone(self, params: IIsochronePT):
         return await self.isochrone(params=params)
