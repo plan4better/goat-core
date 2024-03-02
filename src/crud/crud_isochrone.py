@@ -34,12 +34,12 @@ class CRUDIsochroneBase(CRUDToolBase):
         )
 
     async def create_layer_starting_points(
-        self, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePTNew
+        self, layer_name: DefaultResultLayerName, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT
     ) -> IFeatureLayerToolCreate:
 
         # Create layer object
         layer = IFeatureLayerToolCreate(
-            name=DefaultResultLayerName.isochrone_starting_points.value,
+            name=layer_name.value,
             feature_layer_geometry_type=UserDataGeomType.point.value,
             attribute_mapping={},
             tool_type=params.tool_type.value,
@@ -92,7 +92,7 @@ class CRUDIsochroneBase(CRUDToolBase):
         return layer
 
     async def get_lats_lons(
-        self, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePTNew
+        self, layer_name: DefaultResultLayerName, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT
     ):
         # Check if starting points are a layer else create layer
         if params.starting_points.layer_project_id:
@@ -101,6 +101,7 @@ class CRUDIsochroneBase(CRUDToolBase):
             table_name = layer_starting_points["layer_project_id"].table_name
         else:
             layer_starting_points = await self.create_layer_starting_points(
+                layer_name=layer_name,
                 params=params
             )
             where_query = f"layer_id = '{layer_starting_points.id}'"
@@ -135,33 +136,42 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
 
         self.http_client = http_client
-        self.NUM_RETRIES = 5  # Number of times to retry calling the endpoint
-        self.RETRY_DELAY = 2  # Number of seconds to wait between retries
 
-    @job_log(job_step_name="isochrone")
     async def isochrone(
         self,
         params: IIsochroneActiveMobility,
+        result_params: dict = None,
     ):
         """Compute active mobility isochrone using GOAT Routing endpoint."""
 
-        # Fetch starting points from previously created layer if required
-        starting_pojnts = await self.get_lats_lons(params=params)
-        lats = starting_pojnts["lats"]
-        lons = starting_pojnts["lons"]
-        layer_starting_points = starting_pojnts["layer_starting_points"]
-
-        # Create feature layer to store computed isochrone output
-        layer_isochrone = IFeatureLayerToolCreate(
-            name=DefaultResultLayerName.isochrone_active_mobility.value,
-            feature_layer_geometry_type=IsochroneGeometryTypeMapping[
-                params.isochrone_type.value
-            ],
-            attribute_mapping={"integer_attr1": "travel_cost"},
-            tool_type=params.tool_type.value,
-            job_id=self.job_id,
+        # Fetch starting points
+        starting_points = await self.get_lats_lons(
+            layer_name=(
+                DefaultResultLayerName.isochrone_starting_points
+                if not result_params else
+                result_params["starting_points_layer_name"]
+            ),
+            params=params
         )
-        result_table = f"{settings.USER_DATA_SCHEMA}.{layer_isochrone.feature_layer_geometry_type.value}_{str(self.user_id).replace('-', '')}"
+        lats = starting_points["lats"]
+        lons = starting_points["lons"]
+        layer_starting_points = starting_points["layer_starting_points"]
+
+        if not result_params:
+            # Create feature layer to store computed isochrone output
+            layer_isochrone = IFeatureLayerToolCreate(
+                name=DefaultResultLayerName.isochrone_active_mobility.value,
+                feature_layer_geometry_type=IsochroneGeometryTypeMapping[
+                    params.isochrone_type.value
+                ],
+                attribute_mapping={"integer_attr1": "travel_cost"},
+                tool_type=params.tool_type.value,
+                job_id=self.job_id,
+            )
+            result_table = f"{settings.USER_DATA_SCHEMA}.{layer_isochrone.feature_layer_geometry_type.value}_{str(self.user_id).replace('-', '')}"
+            layer_id = layer_isochrone.id
+        else:
+            layer_id = result_params["layer_id"]
 
         # Construct request payload
         request_payload = {
@@ -173,7 +183,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
             "travel_cost": (
                 {
                     "max_traveltime": params.travel_cost.max_traveltime,
-                    "steps": params.travel_cost.steps,
+                    "steps": params.travel_cost.traveltime_step,
                     "speed": params.travel_cost.speed,
                 }
                 if type(params.travel_cost) == TravelTimeCostActiveMobility
@@ -184,13 +194,15 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
             ),
             "isochrone_type": params.isochrone_type.value,
             "polygon_difference": params.polygon_difference,
-            "result_table": result_table,
-            "layer_id": str(layer_isochrone.id),
+            "result_table": (
+                result_table if not result_params else result_params["result_table"]
+            ),
+            "layer_id": str(layer_id),
         }
 
         try:
             # Call GOAT Routing endpoint multiple times for upto 20 seconds / 10 retries
-            for i in range(self.NUM_RETRIES):
+            for i in range(settings.CRUD_NUM_RETRIES):
                 # Call GOAT Routing endpoint to compute isochrone
                 response = await self.http_client.post(
                     url=f"{settings.GOAT_ROUTING_URL}/isochrone",
@@ -199,7 +211,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
                 )
                 if response.status_code == 202:
                     # Endpoint is still processing request, retry shortly
-                    if i == self.NUM_RETRIES - 1:
+                    if i == settings.CRUD_NUM_RETRIES - 1:
                         raise Exception(
                             "GOAT routing endpoint took too long to process request."
                         )
@@ -215,15 +227,18 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
                 f"Error while calling the routing endpoint: {str(e)}"
             )
 
-        # Create new layers.
-        await self.create_feature_layer_tool(
-            layer_in=layer_isochrone,
-            params=params,
-        )
         # Create new layer if starting points are not a layer
         if not params.starting_points.layer_project_id:
             await self.create_feature_layer_tool(
                 layer_in=layer_starting_points,
+                params=params,
+            )
+
+        # Create layers only if result_params are not provided
+        if not result_params:
+            # Create new layers.
+            await self.create_feature_layer_tool(
+                layer_in=layer_isochrone,
                 params=params,
             )
         return {
@@ -231,10 +246,14 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
             "msg": "Active mobility isochrone was successfully computed.",
         }
 
+    @job_log(job_step_name="isochrone")
+    async def isochrone_job(self, params: IIsochroneActiveMobility):
+        return await self.isochrone(params=params)
+
     @run_background_or_immediately(settings)
     @job_init()
     async def run_isochrone(self, params: IIsochroneActiveMobility):
-        return await self.isochrone(params=params)
+        return await self.isochrone_job(params=params)
 
 
 class CRUDIsochronePT(CRUDIsochroneBase):
@@ -250,8 +269,6 @@ class CRUDIsochronePT(CRUDIsochroneBase):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
 
         self.http_client = http_client
-        self.NUM_RETRIES = 10  # Number of times to retry calling the endpoint
-        self.RETRY_DELAY = 2  # Number of seconds to wait between retries
 
     async def write_isochrone_result(
         self, isochrone_type, layer_id, result_table, shapes, grid
@@ -283,11 +300,13 @@ class CRUDIsochronePT(CRUDIsochroneBase):
         """Compute public transport isochrone using R5 routing endpoint."""
 
         # Fetch starting points from previously created layer if required
-        starting_pojnts = await self.get_lats_lons(params=params)
+        starting_pojnts = await self.get_lats_lons(
+            layer_name=DefaultResultLayerName.isochrone_starting_points,
+            params=params,
+        )
         lats = starting_pojnts["lats"]
         lons = starting_pojnts["lons"]
         layer_starting_points = starting_pojnts["layer_starting_points"]
-
 
         # Create feature layer to store computed isochrone output
         layer_isochrone = IFeatureLayerToolCreate(
@@ -387,7 +406,7 @@ class CRUDIsochronePT(CRUDIsochroneBase):
             result = None
             try:
                 # Call R5 endpoint multiple times for upto 20 seconds / 10 retries
-                for i in range(self.NUM_RETRIES):
+                for i in range(settings.CRUD_NUM_RETRIES):
                     # Call R5 endpoint to compute isochrone
                     response = await self.http_client.post(
                         url=f"{r5_host}/api/analysis",
@@ -396,7 +415,7 @@ class CRUDIsochronePT(CRUDIsochroneBase):
                     )
                     if response.status_code == 202:
                         # Engine is still processing request, retry shortly
-                        if i == self.NUM_RETRIES - 1:
+                        if i == settings.CRUD_NUM_RETRIES - 1:
                             raise Exception(
                                 "R5 engine took too long to process request."
                             )
@@ -454,7 +473,6 @@ class CRUDIsochronePT(CRUDIsochroneBase):
                     layer_in=layer_starting_points,
                     params=params,
                 )
-
 
         return {
             "status": JobStatusType.finished.value,
