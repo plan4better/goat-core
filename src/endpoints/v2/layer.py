@@ -1,7 +1,8 @@
 # Standard Libraries
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
+from uuid import UUID
 
 # Third-party Libraries
 from fastapi import (
@@ -20,9 +21,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
-from sqlalchemy import and_, or_, select
+
 from src.core.config import settings
-from uuid import UUID
 
 # Local application imports
 from src.core.content import (
@@ -34,7 +34,6 @@ from src.crud.crud_layer import CRUDLayerExport, CRUDLayerImport
 from src.crud.crud_layer import layer as crud_layer
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.db.models.layer import (
-    FeatureType,
     FeatureUploadType,
     FileUploadType,
     Layer,
@@ -53,11 +52,16 @@ from src.schemas.layer import (
     IInternalLayerCreate,
     IInternalLayerExport,
     ILayerExternalCreate,
+    ILayerGet,
     ILayerRead,
+    IMetadataAggregate,
+    IMetadataAggregateRead,
     IUniqueValue,
     MaxFileSizeType,
 )
-from src.schemas.layer import request_examples as layer_request_examples
+from src.schemas.layer import (
+    request_examples as layer_request_examples,
+)
 from src.utils import build_where, check_file_size
 
 router = APIRouter()
@@ -271,30 +275,21 @@ async def read_layers_by_ids(
     )
 
 
-@router.get(
+@router.post(
     "",
     response_model=Page[ILayerRead],
     response_model_exclude_none=True,
     status_code=200,
-    summary="Retrieve a list of layers using different filters",
+    summary="Retrieve a list of layers using different filters including a spatial filter. If not filter is specified, all layers will be returned.",
 )
 async def read_layers(
     async_session: AsyncSession = Depends(get_db),
     page_params: PaginationParams = Depends(),
-    folder_id: UUID4 | None = Query(None, description="Folder ID"),
     user_id: UUID4 = Depends(get_user_id),
-    layer_type: List[LayerType] | None = Query(
+    obj_in: ILayerGet = Body(
         None,
-        description="Layer type to filter by. Can be multiple. If not specified, all layer types will be returned.",
-    ),
-    feature_layer_type: List[FeatureType] | None = Query(
-        None,
-        description="Feature layer type. Can be multiple. If not specified, all feature layer types will be returned. Can only be used if 'layer_type' contains 'feature'.",
-    ),
-    search: str = Query(
-        None,
-        description="Searches the 'name' column of the layer. It will convert the text into lower case and see if the passed text is part of the name.",
-        example="Münch",
+        examples={},
+        description="Layer to get",
     ),
     order_by: str = Query(
         None,
@@ -308,46 +303,15 @@ async def read_layers(
     ),
 ):
     """This endpoints returns a list of layers based one the specified filters."""
-
-    # Additional server side validation for feature_layer_type
-    if feature_layer_type is not None and LayerType.feature not in layer_type:
-        raise HTTPException(
-            status_code=400,
-            detail="Feature layer type can only be set when layer type is feature",
-        )
-    # TODO: Put this in CRUD layer
-    if folder_id is None:
-        sql_and_filters = [Layer.user_id == user_id]
-    else:
-        sql_and_filters = [Layer.user_id == user_id, Layer.folder_id == folder_id]
-
-    # Add conditions to filter by layer_type and feature_layer_type
-    if layer_type is not None:
-        sql_and_filters.append(or_(Layer.type.in_(layer_type)))
-
-    if feature_layer_type is not None:
-        sql_and_filters.append(or_(Layer.feature_layer_type.in_(feature_layer_type)))
-
-    # Build query
-    query = select(Layer).where(and_(*sql_and_filters))
-
-    # Build params
-    params = {
-        "search_text": {"name": search} if search else None,
-        "order_by": order_by,
-        "order": order,
-    }
-
-    # Filter out None values
-    params = {k: v for k, v in params.items() if v is not None}
-
-    layers = await crud_layer.get_multi(
-        async_session,
-        query=query,
+    # Get layers from CRUD
+    layers = await crud_layer.get_layers_with_filter(
+        async_session=async_session,
+        user_id=user_id,
+        params=obj_in,
+        order_by=order_by,
+        order=order,
         page_params=page_params,
-        **params,
     )
-
     return layers
 
 
@@ -575,3 +539,26 @@ async def class_breaks(
 
     # Return result
     return statistics
+
+
+@router.post(
+    "/metadata/aggregate",
+    summary="Return the count of layers for different metadata values acting as filters",
+    response_model=IMetadataAggregateRead,
+    status_code=200,
+)
+async def metadata_aggregate(
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+    obj_in: IMetadataAggregate = Body(
+        None,
+        description="Filter for metadata to aggregate",
+    )
+):
+    """Return the count of layers for different metadata values acting as filters."""
+    result = await crud_layer.metadata_aggregate(
+        async_session=async_session,
+        user_id=user_id,
+        params=obj_in,
+    )
+    return result

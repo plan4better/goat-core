@@ -7,10 +7,13 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field, HttpUrl, ValidationError, validator
 from pyproj import CRS
 from pyproj.exceptions import CRSError
+from shapely import wkt
 
 # Local application imports
 from src.db.models._base_class import DateTimeBase, content_base_example
 from src.db.models.layer import (
+    DataCategory,
+    DataLicense,
     ExternalImageryDataType,
     ExternalVectorTileDataType,
     FeatureGeometryType,
@@ -23,6 +26,8 @@ from src.db.models.layer import (
     TableLayerExportType,
     ToolType,
     layer_base_example,
+    validate_geographical_code,
+    validate_language_code,
 )
 from src.schemas.common import CQLQuery
 from src.schemas.job import Msg
@@ -623,6 +628,100 @@ class IInternalLayerExport(CQLQuery):
             if crs != "EPSG:4326":
                 raise ValidationError("KML export only supports EPSG:4326 projection.")
         return crs
+
+
+class LayerGetBase(BaseModel):
+    folder_id: UUID | None = Field(
+        None,
+        description="Folder ID to filter by. If not specified, all layers will be returned.",
+    )
+    type: List[LayerType] | None = Field(
+        None,
+        description="Layer type to filter by. Can be multiple. If not specified, all layer types will be returned.",
+    )
+    feature_layer_type: List[FeatureType] | None = Field(
+        None,
+        description="Feature layer type to filter by. Can be multiple. If not specified, all feature layer types will be returned.",
+    )
+    search: str | None = Field(
+        None,
+        description="Searches the 'name' and 'description' column of the layer. It will convert the text into lower case and see if the passed text is part of the name.",
+    )
+    license: List[DataLicense] | None = Field(
+        None,
+        description="List of data licenses",
+    )
+    data_category: List[DataCategory] | None = Field(
+        None,
+        description="List of data categories",
+    )
+    geographical_code: List[str] | None = Field(
+        None,
+        description="List of geographical codes",
+    )
+    language_code: List[str] | None = Field(None, description="List of language codes")
+    distributor_name: List[str] | None = Field(
+        None, description="List of distributor names"
+    )
+    in_catalog: bool | None = Field(
+        False,
+        description="If true, only layers that are in the catalog will be returned and if false only the layers not in catalog and owned by the user will be returned.",
+    )
+    spatial_search: str | None = Field(None, description="Spatial search for the layer")
+
+    @validator("language_code", pre=True, check_fields=False)
+    def language_code_valid(cls, language_code):
+        if language_code:
+            for code in language_code:
+                validate_language_code(code)
+        return language_code
+
+    @validator("geographical_code", pre=True, check_fields=False)
+    def geographical_code_valid(cls, geographical_code):
+        if geographical_code:
+            for code in geographical_code:
+                validate_geographical_code(code)
+        return geographical_code
+
+    # Validate the spatial search
+    @validator("spatial_search")
+    def validate_spatial_search(cls, spatial_search):
+        if spatial_search:
+            try:
+                wkt.loads(spatial_search)
+            except Exception as e:
+                raise ValidationError(f"Invalid Geometry: {e}")
+        return spatial_search
+
+
+class ILayerGet(LayerGetBase):
+    pass
+
+
+class IMetadataAggregate(LayerGetBase):
+    pass
+
+
+class MetadataGroupAttributes(BaseModel):
+    value: str = Field(..., description="Name of the metadata group")
+    count: int = Field(..., description="Count of the metadata group")
+
+
+class IMetadataAggregateRead(BaseModel):
+    license: List[MetadataGroupAttributes] = Field(..., description="List of licenses")
+    data_category: List[MetadataGroupAttributes] = Field(
+        ..., description="List of data categories"
+    )
+    geographical_code: List[MetadataGroupAttributes] = Field(
+        ..., description="List of geographical codes"
+    )
+    language_code: List[MetadataGroupAttributes] = Field(
+        ..., description="List of language codes"
+    )
+    type: List[MetadataGroupAttributes] = Field(..., description="List of layer types")
+    distributor_name: List[MetadataGroupAttributes] = Field(
+        ..., description="List of distributor names"
+    )
 
 
 request_examples = {

@@ -1,8 +1,7 @@
 # Standard library imports
 import asyncio
-import os
 import logging
-import time
+import os
 
 # Third party imports
 import pytest
@@ -12,6 +11,7 @@ from sqlalchemy import text
 
 # Local application imports
 from src.core.config import settings
+from src.core.layer import get_user_table
 from src.endpoints.deps import get_db, session_manager
 from src.main import app
 from src.schemas.active_mobility import (
@@ -26,7 +26,6 @@ from src.schemas.motorized_mobility import (
 from src.schemas.project import (
     request_examples as project_request_examples,
 )
-from src.core.layer import get_user_table
 from tests.utils import (
     check_job_status,
     generate_random_string,
@@ -114,6 +113,7 @@ async def fixture_create_user(client: AsyncClient):
     yield user
     # Teardown: Delete the user after the test
     await client.delete(f"{settings.API_V2_STR}/user")
+
 
 @pytest.fixture
 async def fixture_create_folder(client: AsyncClient, fixture_create_user):
@@ -302,22 +302,26 @@ async def fixture_upload_file_invalid(
 
 
 async def create_internal_layer(
-    client: AsyncClient, dataset_id, fixture_get_home_folder, layer_type, project_id=None
+    client: AsyncClient,
+    dataset_id,
+    fixture_get_home_folder,
+    layer_type,
+    project_id=None,
+    layer_dict=None,
 ):
     # Get feature layer dict and add layer ID
-    feature_layer_dict = layer_request_examples["create_internal"][layer_type]["value"]
-    feature_layer_dict["name"] = generate_random_string(12)
-    feature_layer_dict["dataset_id"] = dataset_id
-    feature_layer_dict["folder_id"] = fixture_get_home_folder["id"]
+    if layer_dict is None:
+        layer_dict = layer_request_examples["create_internal"][layer_type]["value"]
+    layer_dict["name"] = generate_random_string(12)
+    layer_dict["dataset_id"] = dataset_id
+    layer_dict["folder_id"] = fixture_get_home_folder["id"]
 
     # Hit endpoint to create internal layer and add optional project_id
     if project_id:
         url = f"{settings.API_V2_STR}/layer/internal?project_id={project_id}"
     else:
         url = f"{settings.API_V2_STR}/layer/internal"
-    response = await client.post(
-        url, json=feature_layer_dict
-    )
+    response = await client.post(url, json=layer_dict)
     assert response.status_code == 201
 
     # Get job id
@@ -326,10 +330,8 @@ async def create_internal_layer(
     # Check if job is finished
     job = await check_job_status(client, job_id)
     assert job["status_simple"] == "finished"
-
-    # Get layer by name
-    response = await client.get(
-        f"{settings.API_V2_STR}/layer?search={feature_layer_dict['name']}"
+    response = await client.post(
+        f"{settings.API_V2_STR}/layer", json={"search": layer_dict["name"], "in_catalog": layer_dict.get("in_catalog")}
     )
     assert response.status_code == 200
     layer_dict = response.json()["items"][0]
@@ -366,6 +368,7 @@ async def fixture_create_internal_layers(
         )
     return layer
 
+
 @pytest.fixture
 async def fixture_create_internal_layer_in_project(
     client: AsyncClient, fixture_create_project, fixture_get_home_folder
@@ -379,6 +382,7 @@ async def fixture_create_internal_layer_in_project(
         fixture_create_project["id"],
     )
     return layer
+
 
 @pytest.fixture
 async def fixture_create_polygon_layer(
@@ -895,6 +899,84 @@ async def fixture_delete_external_layers(
 
     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}")
     assert response.status_code == 404  # Not Found
+
+
+@pytest.fixture
+async def fixture_create_catalog_layers(
+    client: AsyncClient, fixture_create_user, fixture_get_home_folder
+):
+    # Define layer metadata for the different layer types
+    varying_attributes = [
+        {
+            "geographical_code": "de",
+            "language_code": "de",
+            "distributor_name": "Plan4Better GmbH",
+            "data_category": "Transportation",
+            "license": "Creative Commons Attribution-ShareAlike",
+            "in_catalog": True,
+        },
+        {
+            "geographical_code": "be",
+            "language_code": "en",
+            "distributor_name": "Plan4Better GmbH",
+            "data_category": "Environment",
+            "license": "Open Data Commons Attribution",
+            "in_catalog": True,
+        },
+        {
+            "geographical_code": "de",
+            "language_code": "de",
+            "distributor_name": "Technical University of Munich",
+            "data_category": "Transportation",
+            "license": "Open Data Commons Attribution",
+            "in_catalog": True,
+        },
+        {
+            "geographical_code": "de",
+            "language_code": "en",
+            "distributor_name": "Technical University of Munich",
+            "data_category": "Transportation",
+            "license": "Creative Commons Attribution-ShareAlike",
+            "in_catalog": True,
+        },
+    ]
+    layer_types = ["point", "line", "polygon", "point"]
+    layers = []
+    cnt = 0
+    for layer_type in layer_types:
+        # Get layer type specific metadata
+        additional_metadata = varying_attributes[cnt]
+        file_dir = os.path.join(
+            settings.TEST_DATA_DIR, "layers", "valid", layer_type, "valid.gpkg"
+        )
+        layer_dict = {
+            "description": "Layer description",
+            "tags": ["tag1", "tag2"],
+            "thumbnail_url": "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png",
+            "lineage": "Derived from web research and ground surveys conducted in 2021 by trained professionals.",
+            "positional_accuracy": "High accuracy with an error margin of ±2 meters.",
+            "attribute_accuracy": "Attribute data verified with 90% confidence level.",
+            "completeness": "Data is 98% complete, missing data in remote areas.",
+            "upload_reference_system": 4326,
+            "upload_file_type": "geojson",
+            "distributor_email": "info@plan4better.de",
+            "distribution_url": "https://plan4better.de/data/samples/sample_data.geojson",
+            "attribution": "Dataset provided by Plan4Better GmbH.",
+            "data_reference_year": 2021,
+            **additional_metadata,
+        }
+        dataset = await upload_file(client, file_dir)
+        layer = await create_internal_layer(
+            client,
+            dataset["dataset_id"],
+            fixture_get_home_folder,
+            layer_type,
+            project_id=None,
+            layer_dict=layer_dict,
+        )
+        layers.append(layer)
+        cnt += 1
+    return layers
 
 
 def get_payload_types(request_examples: dict) -> list:

@@ -1,14 +1,19 @@
 import os
 import zipfile
 from uuid import uuid4
+
 import pytest
 from httpx import AsyncClient
 
 from src.core.config import settings
-from src.schemas.layer import AreaStatisticsOperation, ComputeBreakOperation
+from src.schemas.layer import (
+    AreaStatisticsOperation,
+    ComputeBreakOperation,
+    FeatureLayerExportType,
+    TableLayerExportType,
+)
+from src.utils import delete_dir, delete_file
 from tests.utils import get_with_wrong_id
-from src.schemas.layer import TableLayerExportType, FeatureLayerExportType
-from src.utils import delete_file, delete_dir
 
 
 @pytest.mark.asyncio
@@ -29,6 +34,7 @@ async def test_create_internal_layer(
     client: AsyncClient, fixture_create_internal_layers
 ):
     assert fixture_create_internal_layers is not None
+
 
 @pytest.mark.asyncio
 async def test_create_internal_layer_in_project(
@@ -71,8 +77,12 @@ async def test_export_internal_layer(
 
         # Check response in content and save it to /tmp as zip
         assert response.headers["Content-Type"] == "application/zip"
-        assert response.headers["Content-Disposition"] == 'attachment; filename="test.zip"'
-        file_name = response.headers["Content-Disposition"].split("=")[1].replace('"', "")
+        assert (
+            response.headers["Content-Disposition"] == 'attachment; filename="test.zip"'
+        )
+        file_name = (
+            response.headers["Content-Disposition"].split("=")[1].replace('"', "")
+        )
         file_path = f"/tmp/{file_name}"
         unzip_dir = "/tmp/test"
 
@@ -96,6 +106,7 @@ async def test_export_internal_layer(
         # Check if the size of the unzipped file is not zero
         assert os.path.getsize(f"{unzip_dir}/test.{export_type.value}") > 0
         assert os.path.getsize(f"{unzip_dir}/metadata.txt") > 0
+
 
 @pytest.mark.asyncio
 async def test_export_internal_layer_with_filter(
@@ -148,7 +159,8 @@ async def test_export_internal_layer_with_filter(
     assert os.path.getsize(f"{unzip_dir}/test.gpkg") > 0
     assert os.path.getsize(f"{unzip_dir}/metadata.txt") > 0
 
-#TODO: Add test that fails for export
+
+# TODO: Add test that fails for export
 @pytest.mark.asyncio
 async def test_export_internal_layer_wrong_srid(
     client: AsyncClient, fixture_create_polygon_layer
@@ -170,8 +182,10 @@ async def test_export_internal_layer_wrong_srid(
         json=body,
     )
     assert response.status_code == 422
-    assert response.json()["detail"] == "The data is outside the bounds of the provided CRS."
-
+    assert (
+        response.json()["detail"]
+        == "The data is outside the bounds of the provided CRS."
+    )
 
 
 @pytest.mark.asyncio
@@ -492,16 +506,63 @@ async def test_get_statistics_column_wrong_column_name(
     assert response.status_code == 404
     return
 
-# Some further test cases
-"""Valid File Import
-Use an invalid job ID for import
-Ensure the API responds with the proper HTTP error (404 Not Found)
+# Get metadata aggregate for layers based on different filters
+async def test_get_layers(
+    client: AsyncClient, fixture_create_catalog_layers
+):
+    response = await client.post(
+        f"{settings.API_V2_STR}/layer", json={"in_catalog": True}
+    )
+    assert response.status_code == 200
+    assert len(response.json()["items"]) == 4
 
-Create multiple layers
-Use the "get-by-ids" endpoint to retrieve them in bulk using their IDs
-Ensure all are returned as expected
-Retrieve Layers with Filters
 
-Create multiple layers with varying attributes (different layer_type, feature_layer_type, etc.)
-Use the layered retrieval endpoint with different combinations of filters
-Ensure the results match the expected filtered layers"""
+# Get metadata aggregate for layers based on different filters
+async def test_get_layers_metadata_aggregate(
+    client: AsyncClient, fixture_create_catalog_layers
+):
+    response = await client.post(
+        f"{settings.API_V2_STR}/layer/metadata/aggregate", json={"in_catalog": True}
+    )
+    assert response.status_code == 200
+    assert len(response.json()["license"]) == 2
+    assert len(response.json()["type"]) == 1
+    assert len(response.json()["data_category"]) == 2
+    assert len(response.json()["geographical_code"]) == 2
+    assert len(response.json()["distributor_name"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_get_layers_metadata_aggregate_with_attribute_filter(
+    client: AsyncClient, fixture_create_catalog_layers
+):
+    payload = {
+        "in_catalog": True,
+        "license": ["Creative Commons Attribution-ShareAlike"],
+        "geographical_code": ["de", "be"],
+    }
+    response = await client.post(
+        f"{settings.API_V2_STR}/layer/metadata/aggregate",
+        json=payload,
+    )
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_get_layers_metadata_aggregate_with_spatial_filter(
+    client: AsyncClient, fixture_create_catalog_layers
+):
+    polygon = "MULTIPOLYGON(((9.772307485052327 53.543531304032136,10.168237437905436 53.73823597146107,10.152582687165927 53.53979279933822,10.325959157503771 53.44963953853681,9.916487327887564 53.414067878974436,9.772307485052327 53.543531304032136)))"
+    payload = {
+        "in_catalog": True,
+        "spatial_search": polygon,
+    }
+    response = await client.post(
+        f"{settings.API_V2_STR}/layer/metadata/aggregate", json=payload
+    )
+    assert response.status_code == 200
+    assert len(response.json()["license"]) == 1
+    assert len(response.json()["type"]) == 1
+    assert len(response.json()["data_category"]) == 1
+    assert len(response.json()["geographical_code"]) == 1
+    assert len(response.json()["distributor_name"]) == 1

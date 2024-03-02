@@ -3,7 +3,7 @@ from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 from fastapi_pagination import Page, Params
 from fastapi_pagination.ext.sqlalchemy import paginate
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import delete, func
+from sqlalchemy import delete, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import RelationshipProperty, selectinload
@@ -97,11 +97,13 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         # Search for text in specified column
         if search_text is not None:
+            search_query = []
             for key, value in search_text.items():
                 # Search for text in specified column make both input and column lowercase
-                query = query.where(
+                search_query.append(
                     func.lower(getattr(self.model, key)).contains(value.lower())
                 )
+            query = query.where(or_(*search_query))
 
         columns = self.model.__table__.columns
         if order_by and order_by in columns:
