@@ -575,11 +575,13 @@ class OGRFileHandling:
             target_table = f"{settings.USER_DATA_SCHEMA}.no_geometry_{str(self.user_id).replace('-', '')}"
             select_geom = ""
             insert_geom = ""
+            filter_null_geom = ""
         else:
             geometry_type = data_types["geometry"]["type"]
             target_table = f"{settings.USER_DATA_SCHEMA}.{SupportedOgrGeomType[geometry_type].value}_{str(self.user_id).replace('-', '')}"
             select_geom = f"{geom_column} as geom, "
             insert_geom = "geom, "
+            filter_null_geom = f"WHERE ST_IsEmpty({geom_column}) IS FALSE"
         select_statement = ""
         insert_statement = ""
 
@@ -588,7 +590,7 @@ class OGRFileHandling:
             data_type = i.split("_")[0]
             select_statement += f""""{attribute_mapping[i]}"::{data_type} as {i}, """
             insert_statement += f"{i}, "
-        select_statement = f"""SELECT {select_statement} {select_geom} '{str(layer_id)}' FROM {temp_table_name}"""
+        select_statement = f"""SELECT {select_statement} {select_geom} '{str(layer_id)}' FROM {temp_table_name} {filter_null_geom}"""
 
         # Insert data in target table
         await self.async_session.execute(
