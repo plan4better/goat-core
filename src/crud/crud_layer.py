@@ -653,6 +653,9 @@ class CRUDLayer(CRUDBase):
                 key not in ("search", "spatial_search", "in_catalog")
                 and value is not None
             ):
+                # Convert value to list if not list
+                if not isinstance(value, list):
+                    value = [value]
                 filters.append(getattr(Layer, key).in_(value))
 
         # Add filter to only include catalog layers
