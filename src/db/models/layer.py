@@ -317,7 +317,7 @@ layer_base_example = {
     "distributor_name": "Plan4Better GmbH",
     "distributor_email": "info@plan4better.de",
     "distribution_url": "https://plan4better.de/data/samples/sample_data.geojson",
-    "license": "Creative Commons Attribution-ShareAlike",  # Assuming this is a value from the DataLicense Enum
+    "license": "ODC_ODbL",  # Assuming this is a value from the DataLicense Enum
     "attribution": "Dataset provided by Plan4Better GmbH.",
     "data_reference_year": 2021,
     "data_category": "Transportation",  # Assuming this is a value from the DataCategory Enum

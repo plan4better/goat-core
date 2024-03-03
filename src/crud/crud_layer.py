@@ -753,7 +753,7 @@ class CRUDLayer(CRUDBase):
             res = res.fetchall()
             # Create metadata object
             metadata = [
-                MetadataGroupAttributes(value=str(r[0]), count=r[1]) for r in res
+                MetadataGroupAttributes(value=str(r[0]), count=r[1]) for r in res if r[0] is not None
             ]
             result[key] = metadata
 

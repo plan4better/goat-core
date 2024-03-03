@@ -910,7 +910,7 @@ async def fixture_create_catalog_layers(
             "language_code": "de",
             "distributor_name": "Plan4Better GmbH",
             "data_category": "Transportation",
-            "license": "Creative Commons Attribution-ShareAlike",
+            "license": "CC_BY",
             "in_catalog": True,
         },
         {
@@ -918,7 +918,7 @@ async def fixture_create_catalog_layers(
             "language_code": "en",
             "distributor_name": "Plan4Better GmbH",
             "data_category": "Environment",
-            "license": "Open Data Commons Attribution",
+            "license": "ODC_ODbL",
             "in_catalog": True,
         },
         {
@@ -926,7 +926,7 @@ async def fixture_create_catalog_layers(
             "language_code": "de",
             "distributor_name": "Technical University of Munich",
             "data_category": "Transportation",
-            "license": "Open Data Commons Attribution",
+            "license": "ODC_ODbL",
             "in_catalog": True,
         },
         {
@@ -934,7 +934,7 @@ async def fixture_create_catalog_layers(
             "language_code": "en",
             "distributor_name": "Technical University of Munich",
             "data_category": "Transportation",
-            "license": "Creative Commons Attribution-ShareAlike",
+            "license": "CC_BY",
             "in_catalog": True,
         },
     ]
