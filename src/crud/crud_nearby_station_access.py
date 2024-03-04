@@ -124,8 +124,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             SELECT '{str(layer_stations.id)}', geom, stop_name, access_time, ROUND({params.time_window.duration_minutes} / sum(trip_cnt)) AS agg_frequency,
                 jsonb_agg(jsonb_build_object('route_short_name', route_short_name, 'route_type', route_type, 'frequency', frequency)) AS routes
             FROM frequency
-            GROUP BY stop_id, stop_name, access_time, geom
-            ORDER BY stop_name, access_time;
+            GROUP BY stop_id, stop_name, access_time, geom;
         """
         try:
             await self.async_session.execute(sql_compute_nearby_station_access)
