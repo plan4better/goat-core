@@ -9,6 +9,7 @@ from src.schemas.toolbox_base import (
     check_starting_points,
 )
 from src.schemas.isochrone import IsochroneRoutingModeActiveMobility, IsochroneRoutingModePT
+from src.schemas.colors import ColorRangeType
 
 
 class IStartingPointNearbyStationAccess(IsochroneStartingPointsBase):
@@ -66,6 +67,15 @@ class INearbyStationAccess(BaseModel):
     @property
     def geofence_table(self):
         return "basic.geofence_pt"
+
+    @property
+    def properties_base(self):
+        return {
+            "color_range_type": ColorRangeType.sequential,
+            "color_field": {"name": "access_time", "type": "number"},
+            "color_scale": "quantile",
+            "radius": 10,
+        }
 
 
 request_example_nearby_station_access = {
