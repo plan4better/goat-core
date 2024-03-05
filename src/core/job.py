@@ -75,7 +75,7 @@ def job_init():
             # Execute function
             try:
                 result = await func(*args, **kwargs)
-            except Exception as e:
+            except Exception:
                 await run_failure_func(self, func, *args, **kwargs)
                 # Update job status simple to failed
                 job = await crud_job.update(
@@ -96,6 +96,7 @@ def job_init():
                     db_obj=job,
                     obj_in={"status_simple": JobStatusType.finished.value},
                 )
+            # TODO Drop temp tables
             background_logger.info(f"Job {job_id} finished.")
             return result
 

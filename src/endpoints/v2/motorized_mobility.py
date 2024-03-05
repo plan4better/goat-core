@@ -23,6 +23,11 @@ from src.schemas.nearby_station_access import (
     INearbyStationAccess,
     request_example_nearby_station_access,
 )
+from src.schemas.heatmap import (
+    IHeatmapGravityMotorized,
+    IHeatmapClosestAverageMotorized,
+    IHeatmapConnectivityMotorized,
+)
 from src.schemas.toolbox_base import IToolResponse
 from src.schemas.toolbox_base import CommonToolParams
 
@@ -85,7 +90,7 @@ async def compute_car_isochrone(
     response_model=IToolResponse,
     status_code=201,
 )
-async def calculate_oev_gueteklassen(
+async def compute_oev_gueteklassen(
     *,
     common: CommonToolParams = Depends(),
     params: IOevGueteklasse = Body(..., examples=request_example_oev_gueteklasse),
@@ -113,7 +118,7 @@ async def calculate_oev_gueteklassen(
     response_model=IToolResponse,
     status_code=201,
 )
-async def calculate_trip_count_station(
+async def compute_trip_count_station(
     *,
     common: CommonToolParams = Depends(),
     params: ITripCountStation = Body(
@@ -139,7 +144,7 @@ async def calculate_trip_count_station(
     response_model=IToolResponse,
     status_code=201,
 )
-async def nearby_station_access(
+async def compute_nearby_station_access(
     *,
     common: CommonToolParams = Depends(),
     params: INearbyStationAccess = Body(
@@ -153,6 +158,92 @@ async def nearby_station_access(
         job_type=JobType.nearby_station_access,
         tool_class=CRUDNearbyStationAccess,
         crud_method="nearby_station_access_run",
+        async_session=common.async_session,
+        user_id=common.user_id,
+        background_tasks=common.background_tasks,
+        project_id=common.project_id,
+        params=params,
+    )
+
+@router.post(
+    "/heatmap-gravity",
+    summary="Compute gravity-based heatmap for motorized mobility",
+    response_model=IToolResponse,
+    status_code=201,
+)
+async def compute_motorized_mobility_heatmap_gravity(
+    *,
+    common: CommonToolParams = Depends(),
+    params: IHeatmapGravityMotorized = Body(
+        ...,
+        examples={},
+        description="The gravity-based heatmap parameters.",
+    ),
+):
+    """Compute gravity-based heatmap for motorized mobility."""
+
+    return await start_calculation(
+        job_type=JobType.heatmap_gravity_motorized_mobility,
+        tool_class=CRUDIsochronePT,
+        crud_method="run_heatmap",
+        async_session=common.async_session,
+        user_id=common.user_id,
+        background_tasks=common.background_tasks,
+        project_id=common.project_id,
+        params=params,
+    )
+
+
+@router.post(
+    "/heatmap-closest-average",
+    summary="Compute closest-average-based heatmap for motorized mobility",
+    response_model=IToolResponse,
+    status_code=201,
+)
+async def compute_motorized_mobility_heatmap_closest_average(
+    *,
+    common: CommonToolParams = Depends(),
+    params: IHeatmapClosestAverageMotorized = Body(
+        ...,
+        examples={},
+        description="The closest-average-based heatmap parameters.",
+    ),
+):
+    """Compute closest-average-based heatmap for motorized mobility."""
+
+    return await start_calculation(
+        job_type=JobType.heatmap_closest_average_motorized_mobility,
+        tool_class=CRUDIsochronePT,
+        crud_method="run_heatmap",
+        async_session=common.async_session,
+        user_id=common.user_id,
+        background_tasks=common.background_tasks,
+        project_id=common.project_id,
+        params=params,
+    )
+
+
+@router.post(
+    "/heatmap-connectivity",
+    summary="Compute connectivity-based heatmap for motorized mobility",
+    response_model=IToolResponse,
+    status_code=201,
+)
+async def compute_motorized_mobility_heatmap_connectivity(
+    *,
+    common: CommonToolParams = Depends(),
+    params: IHeatmapConnectivityMotorized = Body(
+        ...,
+        examples={},
+        description="The connectivity-based heatmap parameters.",
+    ),
+):
+    """Compute connectivity-based heatmap for motorized mobility."""
+
+    return await start_calculation(
+        job_type=JobType.heatmap_connectivity_motorized_mobility,
+        tool_class=CRUDIsochronePT,
+        crud_method="run_heatmap",
         async_session=common.async_session,
         user_id=common.user_id,
         background_tasks=common.background_tasks,

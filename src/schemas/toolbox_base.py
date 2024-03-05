@@ -51,6 +51,12 @@ class DefaultResultLayerName(str, Enum):
     buffer = "Buffer"
     origin_destination_relation = "O-D Relation"
     origin_destination_point = "O-D Point"
+    heatmap_gravity_active_mobility = "Heatmap (gravity)"
+    heatmap_gravity_motorized_mobility = "Heatmap (gravity)"
+    heatmap_closest_average_active_mobility = "Heatmap (closest average)"
+    heatmap_closest_average_motorized_mobility = "Heatmap (closest average)"
+    heatmap_connectivity_active_mobility = "Heatmap (connectivity)"
+    heatmap_connectivity_motorized_mobility = "Heatmap (connectivity)"
 
 class MaxFeatureCnt(int, Enum):
     """Max feature count schema."""
@@ -64,6 +70,12 @@ class MaxFeatureCnt(int, Enum):
     buffer = 10000
     trip_count_station = 10000
     origin_destination = 10000
+    heatmap_gravity_active_mobility = 1000000
+    heatmap_gravity_motorized_mobility = 1000000
+    heatmap_closest_average_active_mobility = 1000000
+    heatmap_closest_average_motorized_mobility = 1000000
+    heatmap_connectivity_active_mobility = 1000000
+    heatmap_connectivity_motorized_mobility = 1000000
 
 class ToolsWithReferenceAreaCheck(str, Enum):
     """Tools with reference area check schema."""
