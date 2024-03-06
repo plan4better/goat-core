@@ -12,8 +12,8 @@ from src.schemas.heatmap import (
     IHeatmapClosestAverageActive,
     IHeatmapConnectivityActive,
 )
-from src.crud.crud_heatmap import (
-    CRUDHeatmapGravityActiveMobility
+from src.crud.crud_heatmap_gravity import (
+    CRUDHeatmapGravityActiveMobility,
 )
 from src.schemas.job import JobType
 from src.schemas.toolbox_base import CommonToolParams, IToolResponse
