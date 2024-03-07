@@ -193,9 +193,9 @@ class CRUDToolBase(CRUDFailedJob):
         # Check layer name and alter if needed
         new_layer_name = await crud_layer_project.check_and_alter_layer_name(
             async_session=self.async_session,
-            project_id=self.project_id,
             folder_id=project.folder_id,
             layer_name=layer_in.name,
+            project_id=self.project_id,
         )
         layer_in.name = new_layer_name
 

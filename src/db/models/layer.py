@@ -241,14 +241,6 @@ class LayerBase(ContentBaseAttributes):
         max_length=500,
         description="Quantitative value indicating the completeness of the data",
     )
-    upload_reference_system: int | None = Field(
-        sa_column=Column(Integer, nullable=True),
-        description="Description of the spatial reference systems",
-    )
-    upload_file_type: FileUploadType | None = Field(
-        sa_column=Column(Text, nullable=True),
-        description="Description of the upload file type",
-    )
 
     # Distribution and Geographical Information
     geographical_code: str | None = Field(
@@ -320,7 +312,7 @@ layer_base_example = {
     "license": "ODC_ODbL",  # Assuming this is a value from the DataLicense Enum
     "attribution": "Dataset provided by Plan4Better GmbH.",
     "data_reference_year": 2021,
-    "data_category": "Transportation",  # Assuming this is a value from the DataCategory Enum
+    "data_category": "transportation",  # Assuming this is a value from the DataCategory Enum
 }
 
 
@@ -439,6 +431,14 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     attribute_mapping: dict | None = Field(
         sa_column=Column(JSONB, nullable=True),
         description="Attribute mapping for feature layers",
+    )
+    upload_reference_system: int | None = Field(
+        sa_column=Column(Integer, nullable=True),
+        description="Description of the spatial reference systems",
+    )
+    upload_file_type: FileUploadType | None = Field(
+        sa_column=Column(Text, nullable=True),
+        description="Description of the upload file type",
     )
 
     # Relationships

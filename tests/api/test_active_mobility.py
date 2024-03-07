@@ -7,6 +7,7 @@ from src.core.config import settings
 from src.db.session import AsyncSession
 from tests.utils import check_job_status
 
+
 @pytest.mark.asyncio
 async def test_single_isochrone_active_mobility_layer(
     client: AsyncClient,
@@ -14,11 +15,13 @@ async def test_single_isochrone_active_mobility_layer(
     fixture_add_aggregate_point_layer_to_project,
 ):
     project_id = fixture_add_aggregate_point_layer_to_project["project_id"]
-    layer_project_id = fixture_add_aggregate_point_layer_to_project["source_layer_project_id"]
+    layer_project_id = fixture_add_aggregate_point_layer_to_project[
+        "source_layer_project_id"
+    ]
 
     # Produce isochrone request payload
     params = {
-        "starting_points":{"layer_project_id":layer_project_id},
+        "starting_points": {"layer_project_id": layer_project_id},
         "routing_type": "walking",
         "travel_cost": {
             "max_traveltime": 30,
@@ -78,7 +81,7 @@ async def test_single_isochrone_active_mobility_lat_lon(
 
     # Check if the resulting isochrone was actually saved to the database
     # And if the number of rows in the table equals the expected number of incremental polygons
-    #TODO: This was turned off as reading from the table needs to include also the layer_id. AS the table contains data from multiple layers.
+    # TODO: This was turned off as reading from the table needs to include also the layer_id. AS the table contains data from multiple layers.
     # result_table = (
     #     f"{settings.USER_DATA_SCHEMA}.polygon_{str(user_id).replace('-', '')}"
     # )

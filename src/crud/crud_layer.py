@@ -14,11 +14,12 @@ from pydantic import BaseModel
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
+import re
 
 # Local application imports
 from src.core.config import settings
 from src.core.job import CRUDFailedJob, job_init, job_log, run_background_or_immediately
-from src.core.layer import FileUpload, OGRFileHandling, delete_old_files
+from src.core.layer import FileUpload, OGRFileHandling, delete_old_files, CRUDLayerBase
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 
 # Import PrintMap only outside of tests
@@ -26,6 +27,7 @@ if settings.TEST_MODE is False:
     from src.core.print import PrintMap
 from src.crud.base import CRUDBase
 from src.db.models.layer import Layer
+from src.db.models._link_model import LayerProjectLink
 from src.schemas.error import (
     ColumnNotFoundError,
     LayerNotFoundError,
@@ -65,7 +67,7 @@ from src.utils import (
 )
 
 
-class CRUDLayer(CRUDBase):
+class CRUDLayer(CRUDLayerBase):
     """CRUD class for Layer."""
 
     async def label_cluster_keep(self, async_session: AsyncSession, layer: Layer):
@@ -92,99 +94,6 @@ class CRUDLayer(CRUDBase):
 
             await async_session.execute(text(sql_query))
             await async_session.commit()
-
-    @job_log(job_step_name="internal_layer_create")
-    async def create_internal(
-        self,
-        async_session: AsyncSession,
-        user_id: UUID,
-        layer_in: IInternalLayerCreate,
-        file_metadata: dict,
-        attribute_mapping: dict,
-        job_id: UUID,
-        project_id: UUID = None,
-    ):
-        additional_attributes = {}
-        # Get layer_id and size from import job
-        additional_attributes["user_id"] = user_id
-        # Create attribute mapping
-        additional_attributes["attribute_mapping"] = attribute_mapping
-        # Map original file type
-        additional_attributes["original_file_type"] = file_metadata["file_ending"]
-
-        # Get default style if feature layer
-        if file_metadata["data_types"].get("geometry"):
-            geom_type = SupportedOgrGeomType[
-                file_metadata["data_types"]["geometry"]["type"]
-            ].value
-            additional_attributes["properties"] = get_base_style(
-                feature_geometry_type=geom_type
-            )
-            additional_attributes["type"] = LayerType.feature
-            additional_attributes["feature_layer_type"] = FeatureType.standard
-            additional_attributes["feature_layer_geometry_type"] = geom_type
-            additional_attributes["extent"] = file_metadata["data_types"]["geometry"][
-                "extent"
-            ]
-            additional_attributes = IFeatureStandardCreateAdditionalAttributes(
-                **additional_attributes
-            ).dict()
-        else:
-            additional_attributes["type"] = LayerType.table
-            additional_attributes = ITableCreateAdditionalAttributes(
-                **additional_attributes
-            ).dict()
-
-        # Populate layer_in with additional attributes
-        layer_in = Layer(
-            **layer_in.dict(exclude_none=True),
-            **additional_attributes,
-            job_id=job_id,
-        )
-
-        # Update size
-        layer_in.size = await self.get_feature_layer_size(
-            async_session=async_session, layer=layer_in
-        )
-        layer = await self.create(
-            db=async_session,
-            obj_in=layer_in,
-        )
-
-        # Create thumbnail using print class
-        if settings.TEST_MODE is False:
-            file_name = str(layer.id) + "_" + str(uuid4()) + ".png"
-            try:
-                thumbnail_url = await PrintMap(
-                    async_session=async_session
-                ).create_layer_thumbnail(layer=layer_in, file_name=file_name)
-            except Exception:
-                msg_text = "Failed to create thumbnail."
-                print(msg_text)
-
-            # Update thumbnail_url
-            layer = await CRUDBase(Layer).update(
-                db=async_session,
-                db_obj=layer,
-                obj_in={"thumbnail_url": thumbnail_url},
-            )
-
-        # Label cluster_keep
-        if layer.type == LayerType.feature:
-            await self.label_cluster_keep(async_session, layer)
-
-        if project_id:
-            # Add layer to project
-            await crud_layer_project.create(
-                async_session=async_session,
-                layer_ids=[layer.id],
-                project_id=project_id,
-            )
-
-        return {
-            "msg": "Layer successfully created.",
-            "status": JobStatusType.finished.value,
-        }
 
     async def get_internal(self, async_session: AsyncSession, id: UUID):
         """Gets a layer and make sure it is a internal layer."""
@@ -645,12 +554,12 @@ class CRUDLayer(CRUDBase):
         result = result.fetchall()
         return result[0][0]
 
-    async def get_base_filter(self, user_id: UUID, params: IMetadataAggregate):
+    async def get_base_filter(self, user_id: UUID, params: IMetadataAggregate, attributes_to_exclude: list = []):
         """Get filter for get layer queries."""
         filters = []
         for key, value in params.dict().items():
             if (
-                key not in ("search", "spatial_search", "in_catalog")
+                key not in ("search", "spatial_search", "in_catalog", *attributes_to_exclude)
                 and value is not None
             ):
                 # Convert value to list if not list
@@ -663,7 +572,9 @@ class CRUDLayer(CRUDBase):
             filters.append(Layer.in_catalog == bool(True))
         # Get layers not in catalog and owned by user
         else:
-            filters.append(and_(Layer.in_catalog == bool(False), Layer.user_id == user_id))
+            filters.append(
+                and_(Layer.in_catalog == bool(False), Layer.user_id == user_id)
+            )
 
         # Add search filter
         if params.search is not None:
@@ -737,14 +648,16 @@ class CRUDLayer(CRUDBase):
 
         if params is None:
             params = ILayerGet()
-        # Get and filter layers
-        filters = await self.get_base_filter(user_id=user_id, params=params)
+
         # Loop through all attributes
         result = {}
         for attribute in params:
             key = attribute[0]
             if key in ("search", "spatial_search", "folder_id"):
                 continue
+
+            # Build filter for respective group
+            filters = await self.get_base_filter(user_id=user_id, params=params, attributes_to_exclude=[key])
             # Get attribute from layer
             group_by = getattr(Layer, key)
             sql_query = (
@@ -756,7 +669,9 @@ class CRUDLayer(CRUDBase):
             res = res.fetchall()
             # Create metadata object
             metadata = [
-                MetadataGroupAttributes(value=str(r[0]), count=r[1]) for r in res if r[0] is not None
+                MetadataGroupAttributes(value=str(r[0]), count=r[1])
+                for r in res
+                if r[0] is not None
             ]
             result[key] = metadata
 
@@ -775,6 +690,107 @@ class CRUDLayerImport(CRUDFailedJob):
         self.temp_table_name = (
             f'{settings.USER_DATA_SCHEMA}."{str(self.job_id).replace("-", "")}"'
         )
+
+    @job_log(job_step_name="internal_layer_create")
+    async def create_internal(
+        self,
+        layer_in: IInternalLayerCreate,
+        file_metadata: dict,
+        attribute_mapping: dict,
+        project_id: UUID = None,
+    ):
+        additional_attributes = {}
+        # Get layer_id and size from import job
+        additional_attributes["user_id"] = self.user_id
+        # Create attribute mapping
+        additional_attributes["attribute_mapping"] = attribute_mapping
+        # Map original file type
+        additional_attributes["upload_file_type"] = file_metadata["file_ending"]
+
+        # Get default style if feature layer
+        if file_metadata["data_types"].get("geometry"):
+            geom_type = SupportedOgrGeomType[
+                file_metadata["data_types"]["geometry"]["type"]
+            ].value
+            additional_attributes["properties"] = get_base_style(
+                feature_geometry_type=geom_type
+            )
+            additional_attributes["type"] = LayerType.feature
+            additional_attributes["feature_layer_type"] = FeatureType.standard
+            additional_attributes["feature_layer_geometry_type"] = geom_type
+            additional_attributes["extent"] = file_metadata["data_types"]["geometry"][
+                "extent"
+            ]
+            additional_attributes = IFeatureStandardCreateAdditionalAttributes(
+                **additional_attributes
+            ).dict()
+            additional_attributes["upload_reference_system"] = file_metadata[
+                "data_types"
+            ]["geometry"]["srid"]
+        else:
+            additional_attributes["type"] = LayerType.table
+            additional_attributes = ITableCreateAdditionalAttributes(
+                **additional_attributes
+            ).dict()
+
+        # Check to update the layer name if it already exists
+        layer_in.name = await CRUDLayer(Layer).check_and_alter_layer_name(
+            async_session=self.async_session,
+            folder_id=layer_in.folder_id,
+            layer_name=layer_in.name,
+            project_id=project_id,
+        )
+
+        # Populate layer_in with additional attributes
+        layer_in = Layer(
+            **layer_in.dict(exclude_none=True),
+            **additional_attributes,
+            job_id=self.job_id,
+        )
+
+        # Update size
+        layer_in.size = await CRUDLayer(Layer).get_feature_layer_size(
+            async_session=self.async_session, layer=layer_in
+        )
+        layer = await CRUDLayer(Layer).create(
+            db=self.async_session,
+            obj_in=layer_in,
+        )
+
+        # Create thumbnail using print class
+        if settings.TEST_MODE is False:
+            file_name = str(layer.id) + "_" + str(uuid4()) + ".png"
+            try:
+                thumbnail_url = await PrintMap(
+                    async_session=self.async_session
+                ).create_layer_thumbnail(layer=layer_in, file_name=file_name)
+            except Exception:
+                msg_text = "Failed to create thumbnail."
+                print(msg_text)
+
+            # Update thumbnail_url
+            layer = await CRUDBase(Layer).update(
+                db=self.async_session,
+                db_obj=layer,
+                obj_in={"thumbnail_url": thumbnail_url},
+            )
+
+        # Label cluster_keep
+        if layer.type == LayerType.feature:
+            await CRUDLayer(Layer).label_cluster_keep(self.async_session, layer)
+
+        if project_id:
+            # Add layer to project
+            await crud_layer_project.create(
+                async_session=self.async_session,
+                layer_ids=[layer.id],
+                project_id=project_id,
+            )
+
+        return {
+            "msg": "Layer successfully created.",
+            "status": JobStatusType.finished.value,
+        }
 
     @run_background_or_immediately(settings)
     @job_init()
@@ -817,13 +833,10 @@ class CRUDLayerImport(CRUDFailedJob):
             job_id=self.job_id,
         )
         # Create layer metadata and thumbnail
-        result = await CRUDLayer(Layer).create_internal(
-            async_session=self.async_session,
-            user_id=self.user_id,
+        result = await self.create_internal(
             layer_in=layer_in,
             file_metadata=file_metadata,
             attribute_mapping=attribute_mapping,
-            job_id=self.job_id,
             project_id=project_id,
         )
 

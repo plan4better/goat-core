@@ -11,11 +11,12 @@ from typing import Dict, List, Union
 import aiofiles
 import aiofiles.os as aos
 import pandas as pd
+import re
 from fastapi import UploadFile
 from openpyxl import load_workbook
 from osgeo import ogr, osr
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql import text
+from sqlalchemy.sql import text, select
 from pyproj import CRS
 from shapely import wkb
 from pydantic import BaseModel
@@ -24,6 +25,7 @@ from sqlmodel import SQLModel
 # Local application imports
 from src.core.config import settings
 from src.core.job import job_log
+from src.crud.base import CRUDBase
 from src.schemas.job import JobStatusType, Msg, MsgType
 from src.schemas.layer import (
     NumberColumnsPerType,
@@ -38,6 +40,7 @@ from src.db.models.layer import (
     Layer,
     LayerType,
 )
+from src.db.models._link_model import LayerProjectLink
 from src.utils import (
     async_delete_dir,
     async_scandir,
@@ -82,6 +85,52 @@ def get_user_table(layer: Union[dict, SQLModel, BaseModel]):
 
     return f"{settings.USER_DATA_SCHEMA}.{feature_layer_geometry_type}_{str(user_id).replace('-', '')}"
 
+class CRUDLayerBase(CRUDBase):
+    async def check_and_alter_layer_name(
+        self, async_session: AsyncSession, folder_id: UUID, layer_name: str, project_id: UUID = None 
+    ) -> str:
+        """Check if layer name already exists in project and alter it like layer (n+1) if necessary"""
+
+        # Regular expression to find layer names with a number
+        pattern = re.compile(rf"^{re.escape(layer_name)} \((\d+)\)$")
+
+        # Get all layer names in project
+        if project_id:
+            names_in_project = await async_session.execute(select(LayerProjectLink.name).where(
+                LayerProjectLink.project_id == project_id,
+                LayerProjectLink.name.like(f"{layer_name}%"),
+            ))
+            names_in_project = [row[0] for row in names_in_project.fetchall()]
+            layer_names = names_in_project
+        else:
+            layer_names = []
+
+        # Get all layer names in folder
+        names_in_folder = await async_session.execute(select(Layer.name).where(
+            Layer.folder_id == folder_id,
+            Layer.name.like(f"{layer_name}%"),
+        ))
+        names_in_folder = [row[0] for row in names_in_folder.fetchall()]
+        layer_names = list(set(layer_names + names_in_folder))
+
+        # Find the highest number (n) among the layer names using list comprehension
+        numbers = [
+            int(match.group(1))
+            for name in layer_names
+            if (match := pattern.match(name))
+        ]
+        highest_num = max(numbers, default=0)
+
+        # Check if the base layer name exists
+        base_name_exists = layer_name in layer_names
+
+        # Construct the new layer name
+        if base_name_exists or highest_num > 0:
+            new_layer_name = f"{layer_name} ({highest_num + 1})"
+        else:
+            new_layer_name = layer_name
+
+        return new_layer_name
 
 
 class FileUpload:

@@ -8,7 +8,7 @@ from pydantic import ValidationError, parse_obj_as, BaseModel
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
-from typing import Union
+from typing import Union, List
 
 # Local application imports
 from .base import CRUDBase
@@ -22,8 +22,9 @@ from src.schemas.project import (
     layer_type_mapping_read,
     layer_type_mapping_update,
 )
+from src.core.layer import CRUDLayerBase
 
-class CRUDLayerProject(CRUDBase):
+class CRUDLayerProject(CRUDLayerBase):
     async def layer_projects_to_schemas(
         self, async_session: AsyncSession, layers_project
     ):
@@ -108,10 +109,10 @@ class CRUDLayerProject(CRUDBase):
         async_session: AsyncSession,
         id: int,
         project_id: UUID,
-        expected_layer_types: [Union[LayerType.feature, LayerType.table]] = [
+        expected_layer_types: List[Union[LayerType.feature, LayerType.table]] = [
             LayerType.feature
         ],
-        expected_geometry_types: [FeatureGeometryType] = None,
+        expected_geometry_types: List[FeatureGeometryType] = None,
     ):
         """Get internal layer from layer project"""
 
@@ -149,51 +150,11 @@ class CRUDLayerProject(CRUDBase):
 
         return layer_project
 
-    async def check_and_alter_layer_name(
-        self, async_session: AsyncSession, project_id: UUID, folder_id: UUID, layer_name: str
-    ) -> str:
-        """Check if layer name already exists in project and alter it like layer (n+1) if necessary"""
-
-        # Regular expression to find layer names with a number
-        pattern = re.compile(rf"^{re.escape(layer_name)} \((\d+)\)$")
-
-        # Modify the query to select only the name attribute of layers that start with the given layer_name
-        names_in_project = await async_session.execute(select(LayerProjectLink.name).where(
-            LayerProjectLink.project_id == project_id,
-            LayerProjectLink.name.like(f"{layer_name}%"),
-        ))
-        names_in_project = [row[0] for row in names_in_project.fetchall()]
-        names_in_folder = await async_session.execute(select(Layer.name).where(
-            Layer.folder_id == folder_id,
-            Layer.name.like(f"{layer_name}%"),
-        ))
-        names_in_folder = [row[0] for row in names_in_folder.fetchall()]
-        layer_names = list(set(names_in_project + names_in_folder))
-
-        # Find the highest number (n) among the layer names using list comprehension
-        numbers = [
-            int(match.group(1))
-            for name in layer_names
-            if (match := pattern.match(name))
-        ]
-        highest_num = max(numbers, default=0)
-
-        # Check if the base layer name exists
-        base_name_exists = layer_name in layer_names
-
-        # Construct the new layer name
-        if base_name_exists or highest_num > 0:
-            new_layer_name = f"{layer_name} ({highest_num + 1})"
-        else:
-            new_layer_name = layer_name
-
-        return new_layer_name
-
     async def create(
         self,
         async_session: AsyncSession,
         project_id: UUID,
-        layer_ids: [UUID],
+        layer_ids: List[UUID],
     ):
         """Create a link between a project and a layer"""
 
