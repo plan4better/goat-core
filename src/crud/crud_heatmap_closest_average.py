@@ -1,8 +1,7 @@
 from src.crud.crud_heatmap import CRUDHeatmapBase
 from src.schemas.heatmap import (
-    IHeatmapGravityActive,
-    OpportunityGravityBased,
-    ImpedanceFunctionType,
+    IHeatmapClosestAverageActive,
+    OpportunityClosestAverage,
     ActiveRoutingHeatmapType,
 )
 from src.core.config import settings
@@ -14,7 +13,7 @@ from src.schemas.toolbox_base import (
 )
 
 
-class CRUDHeatmapGravityBase(CRUDHeatmapBase):
+class CRUDHeatmapClosestAverageBase(CRUDHeatmapBase):
     TRAVELTIME_MATRIX_TABLE = {
         ActiveRoutingHeatmapType.walking: "basic.traveltime_matrix_walking",
         ActiveRoutingHeatmapType.bicycle: "basic.traveltime_matrix_bicycle",
@@ -23,61 +22,45 @@ class CRUDHeatmapGravityBase(CRUDHeatmapBase):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
 
-    # TODO: Verify function formulas
-    def build_impedance_function(self, type: ImpedanceFunctionType, sensitivity: int):
-        """Builds impedance function used to compute gravity-based heatmaps."""
-
-        if type == ImpedanceFunctionType.gaussian:
-            return f"SUM(EXP(1) ^ ((((traveltime * 60) ^ 2) * -1) / {sensitivity}) * potential)"
-        elif type == ImpedanceFunctionType.linear:
-            return "SUM(potential / (traveltime * 60))"
-        elif type == ImpedanceFunctionType.exponential:
-            return "SUM(EXP(1) ^ ((traveltime * 60) * -1) * potential)"
-        elif type == ImpedanceFunctionType.power:
-            return "SUM(potential / ((traveltime * 60) ^ 2))"
-        else:
-            raise ValueError(f"Unknown impedance function type: {type}")
-
     def build_query(
         self,
-        params: IHeatmapGravityActive,
-        opportunity_layer: OpportunityGravityBased,
+        params: IHeatmapClosestAverageActive,
+        opportunity_layer: OpportunityClosestAverage,
         opportunity_table: str,
         result_table: str,
         result_layer_id: str,
     ):
-        """Builds SQL query to compute gravity-based heatmap."""
+        """Builds SQL query to compute closest-average-based heatmap."""
 
-        potential_column = opportunity_layer.destination_potential_column \
-            if opportunity_layer.destination_potential_column else "1"
-        impedance_function = self.build_impedance_function(
-            params.impedance_function,
-            opportunity_layer.sensitivity,
-        )
         query = f"""
             WITH opportunity_cells AS (
-                SELECT id, h3_lat_lng_to_cell(geom::point, 10) AS h3_index,
-                    {potential_column} AS potential, h3_3
+                SELECT id, h3_lat_lng_to_cell(geom::point, 10) AS h3_index, h3_3
                 FROM {opportunity_table}
             ),
             sub_matrix AS (
-                SELECT matrix.orig_id, p.potential, matrix.dest_id, matrix.traveltime
+                SELECT matrix.orig_id, matrix.dest_id, matrix.traveltime
                 FROM opportunity_cells p, {self.TRAVELTIME_MATRIX_TABLE[params.routing_type]} matrix
                 WHERE matrix.h3_3 IN (SELECT DISTINCT(h3_3) FROM opportunity_cells)
                 AND matrix.orig_id = p.h3_index
                 AND matrix.traveltime <= {opportunity_layer.max_traveltime}
                 UNION ALL
-                SELECT h3_index AS orig_id, potential, ARRAY[h3_index] AS dest_id, 0 AS traveltime
+                SELECT h3_index AS orig_id, ARRAY[h3_index] AS dest_id, 0 AS traveltime
                 FROM opportunity_cells
             ),
             unnested AS (
-                SELECT matrix.orig_id, matrix.potential, dest_id.value AS dest_id, matrix.traveltime
+                SELECT matrix.orig_id, dest_id.value AS dest_id, matrix.traveltime,
+                    ROW_NUMBER() OVER(PARTITION BY matrix.orig_id ORDER BY matrix.traveltime) as rn
                 FROM sub_matrix matrix
                 JOIN LATERAL UNNEST(matrix.dest_id) dest_id(value) ON TRUE
             ),
-            grouped AS (
-                SELECT dest_id, {impedance_function} AS accessibility
+            filtered AS (
+                SELECT orig_id, dest_id, traveltime
                 FROM unnested
+                WHERE rn <= {opportunity_layer.number_of_destinations}
+            ),
+            grouped AS (
+                SELECT dest_id, AVG(traveltime) AS accessibility
+                FROM filtered
                 GROUP BY dest_id
             )
             INSERT INTO {result_table} (layer_id, geom, text_attr1, float_attr1)
@@ -88,13 +71,13 @@ class CRUDHeatmapGravityBase(CRUDHeatmapBase):
         return query
 
 
-class CRUDHeatmapGravityActiveMobility(CRUDHeatmapGravityBase):
+class CRUDHeatmapClosestAverageActiveMobility(CRUDHeatmapClosestAverageBase):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
 
-    @job_log(job_step_name="heatmap_gravity")
-    async def heatmap(self, params: IHeatmapGravityActive):
-        """Compute gravity-based heatmap for active mobility."""
+    @job_log(job_step_name="heatmap_closest_average")
+    async def heatmap(self, params: IHeatmapClosestAverageActive):
+        """Compute closest-average-based heatmap for active mobility."""
 
         # Fetch opportunity tables
         opportunity_layers = await self.fetch_opportunity_layers(params)
@@ -106,7 +89,7 @@ class CRUDHeatmapGravityActiveMobility(CRUDHeatmapGravityBase):
         for layer in opportunity_layers:
             # Create feature layer to store computed heatmap output
             layer_heatmap = IFeatureLayerToolCreate(
-                name=DefaultResultLayerName.heatmap_gravity_active_mobility.value,
+                name=DefaultResultLayerName.heatmap_closest_average_active_mobility.value,
                 feature_layer_geometry_type=FeatureGeometryType.polygon,
                 attribute_mapping={
                     "text_attr1": "h3_index",
@@ -133,10 +116,10 @@ class CRUDHeatmapGravityActiveMobility(CRUDHeatmapGravityBase):
 
         return {
             "status": JobStatusType.finished.value,
-            "msg": "Gravity-based heatmap for active mobility was successfully computed.",
+            "msg": "Closest-average-based heatmap for active mobility was successfully computed.",
         }
 
     @run_background_or_immediately(settings)
     @job_init()
-    async def run_heatmap(self, params: IHeatmapGravityActive):
+    async def run_heatmap(self, params: IHeatmapClosestAverageActive):
         return await self.heatmap(params=params)

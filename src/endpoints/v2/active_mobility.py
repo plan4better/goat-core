@@ -15,6 +15,9 @@ from src.schemas.heatmap import (
 from src.crud.crud_heatmap_gravity import (
     CRUDHeatmapGravityActiveMobility,
 )
+from src.crud.crud_heatmap_closest_average import (
+    CRUDHeatmapClosestAverageActiveMobility,
+)
 from src.schemas.job import JobType
 from src.schemas.toolbox_base import CommonToolParams, IToolResponse
 
@@ -99,7 +102,7 @@ async def compute_active_mobility_heatmap_closest_average(
 
     return await start_calculation(
         job_type=JobType.heatmap_closest_average_active_mobility,
-        tool_class=CRUDIsochroneActiveMobility,
+        tool_class=CRUDHeatmapClosestAverageActiveMobility,
         crud_method="run_heatmap",
         async_session=common.async_session,
         user_id=common.user_id,
