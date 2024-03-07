@@ -2,7 +2,7 @@ from enum import Enum
 from pydantic import Field, BaseModel
 from typing import List
 from src.schemas.layer import ToolType
-from src.schemas.toolbox_base import input_layer_type_point
+from src.schemas.toolbox_base import input_layer_type_point, input_layer_type_polygon
 
 
 # TODO: Validate the traveltime based on the mode.
@@ -130,7 +130,7 @@ class HeatmapConnectivityBase(BaseModel):
 
     @property
     def input_layer_types(self):
-        return {"opportunity_layer_project_id": input_layer_type_point}
+        return {"reference_area_layer_project_id": input_layer_type_polygon}
 
 
 class RoutingTypeActive(BaseModel):

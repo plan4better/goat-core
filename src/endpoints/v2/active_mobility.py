@@ -18,6 +18,9 @@ from src.crud.crud_heatmap_gravity import (
 from src.crud.crud_heatmap_closest_average import (
     CRUDHeatmapClosestAverageActiveMobility,
 )
+from src.crud.crud_heatmap_connectivity import (
+    CRUDHeatmapConnectivityActiveMobility,
+)
 from src.schemas.job import JobType
 from src.schemas.toolbox_base import CommonToolParams, IToolResponse
 
@@ -131,7 +134,7 @@ async def compute_active_mobility_heatmap_connectivity(
 
     return await start_calculation(
         job_type=JobType.heatmap_connectivity_active_mobility,
-        tool_class=CRUDIsochroneActiveMobility,
+        tool_class=CRUDHeatmapConnectivityActiveMobility,
         crud_method="run_heatmap",
         async_session=common.async_session,
         user_id=common.user_id,

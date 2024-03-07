@@ -7,12 +7,7 @@ from src.schemas.heatmap import (
     IHeatmapConnectivityActive,
     IHeatmapConnectivityMotorized,
 )
-from src.schemas.layer import FeatureGeometryType
-from src.schemas.toolbox_base import (
-    MaxFeaturePolygonArea,
-)
 from src.crud.crud_layer_project import layer_project as crud_layer_project
-from src.db.models.layer import LayerType
 
 
 class CRUDHeatmapBase(CRUDToolBase):
@@ -46,18 +41,6 @@ class CRUDHeatmapBase(CRUDToolBase):
                 layers_project=[layer_project],
                 tool_type=params.tool_type,
             )
-
-            # Check for each feature layer of type polygon if the tool type is in MaxFeaturePolygonArea
-            if layer_project.type == LayerType.feature:
-                if (
-                    layer_project.feature_layer_geometry_type == FeatureGeometryType.polygon
-                    and params.tool_type in MaxFeaturePolygonArea.__members__
-                ):
-                    # Check reference area size
-                    await self.check_reference_area_size(
-                        layer_project=layer_project,
-                        tool_type=params.tool_type,
-                    )
 
             # Create temporary distributed table to store data from the opportunity layer
             temp_table = await self.create_distributed_point_table(layer_project)
