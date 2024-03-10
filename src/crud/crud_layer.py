@@ -726,7 +726,7 @@ class CRUDLayerImport(CRUDFailedJob):
             ).dict()
             additional_attributes["upload_reference_system"] = file_metadata[
                 "data_types"
-            ]["geometry"]["srid"]
+            ]["geometry"]["srs"]
         else:
             additional_attributes["type"] = LayerType.table
             additional_attributes = ITableCreateAdditionalAttributes(

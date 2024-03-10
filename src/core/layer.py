@@ -301,6 +301,7 @@ class OGRFileHandling:
                 ).GetName()
             field_types["geometry"]["type"] = geometry_type
             field_types["geometry"]["extent"] = self.get_layer_extent(layer)
+            field_types["geometry"]["srs"] = "EPSG:" + layer.GetSpatialRef().GetAuthorityCode(None)
 
         for i in range(layer_def.GetFieldCount()):
             field_def = layer_def.GetFieldDefn(i)
