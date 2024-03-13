@@ -18,9 +18,8 @@ class CRUDHeatmapBase(CRUDToolBase):
         IHeatmapClosestAverageActive | IHeatmapClosestAverageMotorized | IHeatmapConnectivityActive |
         IHeatmapConnectivityMotorized,
     ):
-        opportunity_layers = []
-
         # Iterate over opportunity layers supplied by user
+        opportunity_layers = []
         for layer in params.opportunities:
             # Get project for this layer
             input_layer_types = params.input_layer_types
@@ -42,12 +41,10 @@ class CRUDHeatmapBase(CRUDToolBase):
                 tool_type=params.tool_type,
             )
 
-            # Create temporary distributed table to store data from the opportunity layer
-            temp_table = await self.create_distributed_point_table(layer_project)
-
             opportunity_layers.append({
-                "config": layer,
-                "table": temp_table,
+                "table_name": layer_project.table_name,
+                "where_query": layer_project.where_query,
+                "layer": layer,
             })
 
         return opportunity_layers

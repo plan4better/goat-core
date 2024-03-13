@@ -55,7 +55,7 @@ class CRUDHeatmapConnectivityActiveMobility(CRUDHeatmapConnectivityBase):
         # Fetch reference area table
         reference_area_layer = await self.get_layers_project(params)
         reference_area_table = await self.create_table_polygons_to_h3_grid(
-            reference_area_layer["reference_area_layer_project_id"]
+            [reference_area_layer["reference_area_layer_project_id"]]
         )
 
         # Initialize result table
