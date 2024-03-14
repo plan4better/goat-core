@@ -17,7 +17,6 @@ class CRUDHeatmapConnectivityBase(CRUDHeatmapBase):
         ActiveRoutingHeatmapType.walking: "basic.traveltime_matrix_walking",
         ActiveRoutingHeatmapType.bicycle: "basic.traveltime_matrix_bicycle",
     }
-    H3_10_CELL_AREA_SQM = 11285.625000840355
 
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
@@ -34,7 +33,7 @@ class CRUDHeatmapConnectivityBase(CRUDHeatmapBase):
         query = f"""
             INSERT INTO {result_table} (layer_id, geom, text_attr1, float_attr1)
             SELECT '{result_layer_id}', ST_SetSRID(h3_cell_to_boundary(matrix.orig_id)::geometry, 4326),
-                matrix.orig_id, SUM((ARRAY_LENGTH(matrix.dest_id, 1) * {self.H3_10_CELL_AREA_SQM}))
+                matrix.orig_id, SUM((ARRAY_LENGTH(matrix.dest_id, 1) * ((3 * SQRT(3) / 2) * POWER(h3_get_hexagon_edge_length_avg(10, 'm'), 2))))
             FROM {reference_area_table} o, {self.TRAVELTIME_MATRIX_TABLE[params.routing_type]} matrix
             WHERE matrix.h3_3 = o.h3_3
             AND matrix.orig_id = o.h3_index

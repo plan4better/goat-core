@@ -11,7 +11,6 @@ from src.schemas.layer import IFeatureLayerToolCreate, FeatureGeometryType
 from src.schemas.toolbox_base import (
     DefaultResultLayerName,
 )
-from typing import List
 
 
 class CRUDHeatmapGravityBase(CRUDHeatmapBase):
@@ -22,33 +21,6 @@ class CRUDHeatmapGravityBase(CRUDHeatmapBase):
 
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
-
-    async def create_distributed_opportunity_table(self, layers: List[dict]):
-        # Create temp table name for points
-        temp_points = await self.create_temp_table_name("points")
-
-        append_to_existing = False
-        for layer in layers:
-            # Create distributed point table using sql
-            where_query_point = "WHERE " + layer["where_query"].replace("'", "''")
-            potential_column = 1 if not layer["layer"].destination_potential_column \
-                else layer["layer"].destination_potential_column
-
-            await self.async_session.execute(
-                f"""SELECT basic.create_heatmap_gravity_opportunity_table(
-                    '{layer["table_name"]}'::text,
-                    {layer["layer"].max_traveltime}::smallint,
-                    {layer["layer"].sensitivity}::int,
-                    {potential_column}::text,
-                    '{where_query_point}'::text,
-                    '{temp_points}'::text,
-                    {append_to_existing}::boolean
-                )"""
-            )
-            await self.async_session.commit()
-            append_to_existing = True
-
-        return temp_points
 
     # TODO: Verify function formulas
     def build_impedance_function(self, type: ImpedanceFunctionType):
@@ -105,7 +77,7 @@ class CRUDHeatmapGravityActiveMobility(CRUDHeatmapGravityBase):
 
         # Fetch opportunity tables
         layers = await self.fetch_opportunity_layers(params)
-        opportunity_table = await self.create_distributed_opportunity_table(layers)
+        opportunity_table = await self.create_distributed_opportunity_table(params, layers)
 
         # Initialize result table
         result_table = f"{settings.USER_DATA_SCHEMA}.{FeatureGeometryType.polygon.value}_{str(self.user_id).replace('-', '')}"

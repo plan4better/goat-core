@@ -6,8 +6,11 @@ from src.schemas.heatmap import (
     IHeatmapClosestAverageMotorized,
     IHeatmapConnectivityActive,
     IHeatmapConnectivityMotorized,
+    HeatmapGravityBase,
+    HeatmapClosestAverageBase,
 )
 from src.crud.crud_layer_project import layer_project as crud_layer_project
+from typing import List
 
 
 class CRUDHeatmapBase(CRUDToolBase):
@@ -48,3 +51,49 @@ class CRUDHeatmapBase(CRUDToolBase):
             })
 
         return opportunity_layers
+
+    async def create_distributed_opportunity_table(
+            self,
+            params: HeatmapGravityBase | HeatmapClosestAverageBase,
+            layers: List[dict],
+    ):
+        # Create temp table name for points
+        temp_points = await self.create_temp_table_name("points")
+
+        append_to_existing = False
+        for layer in layers:
+            if isinstance(params, HeatmapGravityBase):
+                # Create distributed point table using sql
+                where_query_point = "WHERE " + layer["where_query"].replace("'", "''")
+                potential_column = 1 if not layer["layer"].destination_potential_column \
+                    else layer["layer"].destination_potential_column
+
+                await self.async_session.execute(
+                    f"""SELECT basic.create_heatmap_gravity_opportunity_table(
+                        '{layer["table_name"]}'::text,
+                        {layer["layer"].max_traveltime}::smallint,
+                        {layer["layer"].sensitivity}::int,
+                        {potential_column}::text,
+                        '{where_query_point}'::text,
+                        '{temp_points}'::text,
+                        {append_to_existing}::boolean
+                    )"""
+                )
+            else:
+                # Create distributed point table using sql
+                where_query_point = "WHERE " + layer["where_query"].replace("'", "''")
+
+                await self.async_session.execute(
+                    f"""SELECT basic.create_heatmap_closest_average_opportunity_table(
+                        '{layer["table_name"]}'::text,
+                        {layer["layer"].max_traveltime}::smallint,
+                        {layer["layer"].number_of_destinations}::int,
+                        '{where_query_point}'::text,
+                        '{temp_points}'::text,
+                        {append_to_existing}::boolean
+                    )"""
+                )
+            await self.async_session.commit()
+            append_to_existing = True
+
+        return temp_points
