@@ -1,5 +1,5 @@
 DROP FUNCTION IF EXISTS basic.oev_guetklasse_station_category;
-CREATE OR REPLACE FUNCTION basic.oev_guetklasse_station_category(_station jsonb, _station_config jsonb, _start_time numeric, _end_time numeric)
+CREATE OR REPLACE FUNCTION basic.oev_guetklasse_station_category(_child_count smallint, _station jsonb, _station_config jsonb, _start_time numeric, _end_time numeric)
  RETURNS jsonb
  LANGUAGE plpgsql
 AS $function$
@@ -37,7 +37,7 @@ BEGIN
     END IF;
 
     _station_group := (SELECT min(_group) FROM unnest(_station_groups) _group); -- Get minimum (highest priority)
-    _station_group_trip_time_frequency := _time_window / (_station_group_trip_count / 2);
+    _station_group_trip_time_frequency := _time_window / (_station_group_trip_count / (CASE WHEN _child_count != 1 THEN 2 ELSE 1 END));
    	SELECT MIN(_class)
    	INTO _time_interval
 	FROM (
@@ -58,5 +58,5 @@ BEGIN
         RETURN JSONB_BUILD_OBJECT('_class', _station_category, 'frequency', _station_group_trip_time_frequency);
     END IF;
 END;
-$function$;
+$function$
 PARALLEL SAFE;
