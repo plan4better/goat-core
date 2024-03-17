@@ -4,6 +4,7 @@ from src.schemas.colors import diverging_colors, color_ranges, ColorRangeType
 from src.utils import hex_to_rgb
 from src.schemas.tool import ToolType
 from src.core.config import settings
+from src.schemas.toolbox_base import DefaultResultLayerName
 
 
 # TODO: Add Basic pydantic validation
@@ -126,7 +127,7 @@ def get_tool_style_ordinal(
 ):
     """Return the style for the given feature geometry type and property settings."""
 
-    index_color_range = len(unique_values) - 2
+    index_color_range = len(unique_values) - 3
     random_color_range_key = random.choice(
         list(color_ranges.get(color_range_type).keys())
     )
@@ -174,6 +175,7 @@ def get_tool_style_ordinal(
             "color_range": color_range,
             "color_scale": "ordinal",
         }
+
 
 style_oev_gueteklassen_polygon = {
     "color": [237, 248, 251],
@@ -273,11 +275,48 @@ style_oev_gueteklassen_point = {
     "stroke_width_scale": "linear",
 }
 
-oev_gueteklasse_style = {
-    "point": style_oev_gueteklassen_point,
-    "polygon": style_oev_gueteklassen_polygon,
+style_starting = {
+    "color": [0, 0, 0],
+    "filled": True,
+    "marker": {
+        "url": "https://assets.plan4better.de/icons/maki/foundation-marker.svg",
+        "name": "foundation-marker",
+    },
+    "radius": 8,
+    "opacity": 1,
+    "stroked": False,
+    "max_zoom": 22,
+    "min_zoom": 1,
+    "visibility": True,
+    "color_range": {
+        "name": "Global Warming",
+        "type": "sequential",
+        "colors": ["#5A1846", "#900C3F", "#C70039", "#E3611C", "#F1920E", "#FFC300"],
+        "category": "Uber",
+    },
+    "color_scale": "quantile",
+    "marker_size": 30,
+    "fixed_radius": False,
+    "radius_range": [0, 10],
+    "radius_scale": "linear",
+    "stroke_color": [225, 49, 106],
+    "stroke_width": 2,
+    "custom_marker": True,
+    "marker_size_range": [0, 10],
+    "stroke_color_range": {
+        "name": "Global Warming",
+        "type": "sequential",
+        "colors": ["#5A1846", "#900C3F", "#C70039", "#E3611C", "#F1920E", "#FFC300"],
+        "category": "Uber",
+    },
+    "stroke_color_scale": "quantile",
+    "stroke_width_range": [0, 10],
+    "stroke_width_scale": "linear",
 }
 
 custom_styles = {
-    ToolType.oev_gueteklasse: oev_gueteklasse_style,
+    DefaultResultLayerName.oev_gueteklasse: style_oev_gueteklassen_point,
+    DefaultResultLayerName.oev_gueteklasse_station: style_oev_gueteklassen_polygon,
+    DefaultResultLayerName.isochrone_starting_points: style_starting,
+    DefaultResultLayerName.nearby_station_access_starting_points: style_starting,
 }

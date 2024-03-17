@@ -1,7 +1,5 @@
 from typing import List
-
 from pydantic import BaseModel, Field
-
 from src.schemas.colors import ColorRangeType
 from src.schemas.isochrone import (
     IsochroneRoutingModeActiveMobility,
@@ -13,7 +11,9 @@ from src.schemas.toolbox_base import (
     PTTimeWindow,
     check_starting_points,
     input_layer_type_point,
+    DefaultResultLayerName,
 )
+
 
 
 class IStartingPointNearbyStationAccess(IsochroneStartingPointsBase):
@@ -75,11 +75,12 @@ class INearbyStationAccess(BaseModel):
     @property
     def properties_base(self):
         return {
-            "color_range_type": ColorRangeType.sequential,
-            "color_field": {"name": "access_time", "type": "number"},
-            "color_scale": "quantile",
-            "breaks": 5,
-            "radius": 10,
+            DefaultResultLayerName.nearby_station_access: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {"name": "travel_cost", "type": "number"},
+                "color_scale": "quantile",
+                "breaks": self.travel_cost.steps,
+            }
         }
 
 

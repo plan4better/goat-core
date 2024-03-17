@@ -45,6 +45,7 @@ from src.schemas.toolbox_base import (
     GeofenceTable,
     MaxFeatureCnt,
     MaxFeaturePolygonArea,
+    DefaultResultLayerName,
 )
 from src.utils import build_where_clause, get_random_string, search_value
 
@@ -191,10 +192,11 @@ class CRUDToolBase(CRUDFailedJob):
         project = await crud_project.get(self.async_session, id=self.project_id)
 
         # Check layer name and alter if needed
+        default_layer_name = layer_in.name
         new_layer_name = await crud_layer_project.check_and_alter_layer_name(
             async_session=self.async_session,
             folder_id=project.folder_id,
-            layer_name=layer_in.name,
+            layer_name=default_layer_name,
             project_id=self.project_id,
         )
         layer_in.name = new_layer_name
@@ -240,42 +242,50 @@ class CRUDToolBase(CRUDFailedJob):
         # Create style for layer
         # Request scale breaks in case of color_scale
         properties = None
-        if layer.tool_type in custom_styles:
-            properties = custom_styles[layer.tool_type][
-                layer.feature_layer_geometry_type
-            ]
+        if (
+           DefaultResultLayerName(default_layer_name) in custom_styles
+        ):
+            properties = custom_styles[DefaultResultLayerName(default_layer_name)]
 
         elif hasattr(params, "properties_base"):
+            properties_base = params.properties_base[
+                DefaultResultLayerName(default_layer_name)
+            ]
             if (
-                params.properties_base.get("color_scale")
-                and params.properties_base.get("color_field").get("type") == "number"
-                and params.properties_base["color_field"]["name"] in (layer_in.attribute_mapping.values())
+                properties_base.get("color_scale") in ComputeBreakOperation.__members__
+                and properties_base.get("color_field").get("type") == "number"
+                and properties_base["color_field"]["name"]
+                in (layer_in.attribute_mapping.values())
             ):
                 # Get unique values for color field
                 unique_values = await crud_layer.get_unique_values(
                     async_session=self.async_session,
                     id=layer.id,
-                    column_name=params.properties_base["color_field"]["name"],
+                    column_name=properties_base["color_field"]["name"],
                     order=OrderEnum.descendent.value,
                     query=None,
                     page_params=PaginationParams(page=1, size=7),
                 )
-                if params.properties_base.get("breaks") is None:
+                if properties_base.get("breaks") is None:
                     # Get len propertes as breaks
                     breaks = len(unique_values.items)
                 else:
                     # Get breaks from params if len is less then number of unique values
-                    breaks = params.properties_base["breaks"] if len(unique_values.items) > params.properties_base["breaks"] else len(unique_values.items)
+                    breaks = (
+                        properties_base["breaks"]
+                        if len(unique_values.items) > properties_base["breaks"]
+                        else len(unique_values.items)
+                    )
 
                 if breaks > 2:
                     # Get unique unique scale breaks
-                    operation = params.properties_base.get("color_scale")
+                    operation = properties_base.get("color_scale")
                     # Get scale breaks
                     color_scale_breaks = await crud_layer.get_class_breaks(
                         async_session=self.async_session,
                         id=layer.id,
                         operation=ComputeBreakOperation(operation),
-                        column_name=params.properties_base["color_field"]["name"],
+                        column_name=properties_base["color_field"]["name"],
                         stripe_zeros=True,
                         breaks=breaks,
                         query=None,
@@ -283,29 +293,28 @@ class CRUDToolBase(CRUDFailedJob):
                     # Get properties
                     properties = get_tool_style_with_breaks(
                         feature_geometry_type=layer.feature_layer_geometry_type,
-                        color_field=params.properties_base["color_field"],
+                        color_field=properties_base["color_field"],
                         color_scale_breaks=color_scale_breaks,
-                        color_range_type=params.properties_base["color_range_type"],
+                        color_range_type=properties_base["color_range_type"],
                     )
             elif (
-                params.properties_base.get("color_scale")
-                and params.properties_base.get("color_field").get("type") == "string"
+                properties_base.get("color_scale") == "ordinal"
             ):
                 # Check if layer has max nine unique values in color_field
                 unique_values = await crud_layer.get_unique_values(
                     async_session=self.async_session,
                     id=layer.id,
-                    column_name=params.properties_base["color_field"]["name"],
+                    column_name=properties_base["color_field"]["name"],
                     order=OrderEnum.descendent.value,
                     query=None,
-                    page_params=PaginationParams(page=1, size=7),
+                    page_params=PaginationParams(page=1, size=9),
                 )
                 # Get properties
                 unique_values = [item.value for item in unique_values.items]
                 properties = get_tool_style_ordinal(
                     feature_geometry_type=layer.feature_layer_geometry_type,
-                    color_range_type=params.properties_base["color_range_type"],
-                    color_field=params.properties_base["color_field"],
+                    color_range_type=properties_base["color_range_type"],
+                    color_field=properties_base["color_field"],
                     unique_values=unique_values,
                 )
 

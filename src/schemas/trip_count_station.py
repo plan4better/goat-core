@@ -3,6 +3,7 @@ from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import (
     PTTimeWindow,
     input_layer_type_polygon,
+    DefaultResultLayerName,
 )
 from src.schemas.colors import ColorRangeType
 
@@ -36,9 +37,11 @@ class ITripCountStation(BaseModel):
     @property
     def properties_base(self):
         return {
-            "color_range_type": ColorRangeType.sequential,
-            "color_field": {"name": "total", "type": "number"},
-            "color_scale": "quantile",
+            DefaultResultLayerName.trip_count_station: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {"name": "total", "type": "number"},
+                "color_scale": "quantile",
+            }
         }
 
 

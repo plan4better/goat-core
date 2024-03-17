@@ -17,6 +17,7 @@ from src.schemas.toolbox_base import (
     input_layer_type_polygon,
     input_layer_type_point_polygon,
     input_layer_table,
+    DefaultResultLayerName,
 )
 from src.db.models.layer import LayerType
 from src.schemas.layer import FeatureGeometryType
@@ -81,11 +82,15 @@ class IJoin(BaseModel):
     @property
     def properties_base(self):
         return {
-            "color_range_type": ColorRangeType.sequential,
-            "color_field": {"name": self.column_statistics.operation.value, "type": "number"},
-            "color_scale": "quantile",
+            DefaultResultLayerName.join: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {
+                    "name": self.column_statistics.operation.value,
+                    "type": "number",
+                },
+                "color_scale": "quantile",
+            }
         }
-
 
 
 class AreaLayerType(str, Enum):
@@ -157,14 +162,6 @@ class IAggregationBase(BaseModel):
                 )
         return v
 
-    @property
-    def properties_base(self):
-        return {
-            "color_range_type": ColorRangeType.sequential,
-            "color_field": {"name": self.column_statistics.operation.value, "type": "number"},
-            "color_scale": "quantile",
-        }
-
 
 class IAggregationPoint(IAggregationBase):
     """Aggregation tool schema."""
@@ -182,6 +179,19 @@ class IAggregationPoint(IAggregationBase):
     @property
     def tool_type(self):
         return ToolType.aggregate_point
+
+    @property
+    def properties_base(self):
+        return {
+            DefaultResultLayerName.aggregate_point: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {
+                    "name": self.column_statistics.operation.value,
+                    "type": "number",
+                },
+                "color_scale": "quantile",
+            }
+        }
 
 
 class IAggregationPolygon(IAggregationBase):
@@ -204,6 +214,20 @@ class IAggregationPolygon(IAggregationBase):
     @property
     def tool_type(self):
         return ToolType.aggregate_polygon
+
+    @property
+    def properties_base(self):
+        return {
+            DefaultResultLayerName.aggregate_polygon: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {
+                    "name": self.column_statistics.operation.value,
+                    "type": "number",
+                },
+                "color_scale": "quantile",
+            }
+        }
+
 
 class IBuffer(BaseModel):
     """Buffer tool schema."""
@@ -256,22 +280,28 @@ class IBuffer(BaseModel):
 
     @property
     def input_layer_types(self):
-        return {
-            "source_layer_project_id": input_layer_type_feature_all
-        }
+        return {"source_layer_project_id": input_layer_type_feature_all}
+
     @property
     def tool_type(self):
         return ToolType.buffer
 
     @property
     def properties_base(self):
-        breaks = self.max_distance / self.distance_step if self.max_distance / self.distance_step < 7 else 7
+        breaks = (
+            self.max_distance / self.distance_step
+            if self.max_distance / self.distance_step < 7
+            else 7
+        )
         return {
-            "color_range_type": ColorRangeType.sequential,
-            "color_field": {"name": "radius_size", "type": "number"},
-            "color_scale": "quantile",
-            "breaks": breaks,
+            DefaultResultLayerName.buffer: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {"name": "radius_size", "type": "number"},
+                "color_scale": "quantile",
+                "breaks": breaks,
+            }
         }
+
 
 class IOriginDestination(BaseModel):
     """Origin Destination tool schema."""
@@ -307,7 +337,6 @@ class IOriginDestination(BaseModel):
         description="The column that contains the weights in the origin destination matrix.",
     )
 
-
     @property
     def input_layer_types(self):
         return {
@@ -322,9 +351,16 @@ class IOriginDestination(BaseModel):
     @property
     def properties_base(self):
         return {
-            "color_range_type": ColorRangeType.sequential,
-            "color_field": {"name": self.weight_column, "type": "number"},
-            "color_scale": "quantile",
+            DefaultResultLayerName.origin_destination_point: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {"name": self.weight_column, "type": "number"},
+                "color_scale": "quantile",
+            },
+            DefaultResultLayerName.origin_destination_relation: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {"name": self.weight_column, "type": "number"},
+                "color_scale": "quantile",
+            },
         }
 
 

@@ -538,7 +538,7 @@ async def test_get_layers_metadata_aggregate_with_attribute_filter(
 ):
     payload = {
         "in_catalog": True,
-        "license": ["Creative Commons Attribution-ShareAlike"],
+        "license": ["CC_BY"],
         "geographical_code": ["de", "be"],
     }
     response = await client.post(

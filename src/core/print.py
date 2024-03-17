@@ -33,6 +33,8 @@ def get_mapbox_style_color(data: Dict, type: str) -> Union[str, List]:
     color_scale = data["properties"].get(f"{type}_scale")
     color_maps = data["properties"].get(f"{type}_range", {}).get("color_map")
 
+    # Assuming fieldType is defined somewhere, similar to the TypeScript version
+    field_type = data["properties"].get(f"{type}_field", {}).get("type")
     if (
         color_maps
         and field_name
@@ -47,13 +49,30 @@ def get_mapbox_style_color(data: Dict, type: str) -> Union[str, List]:
                 continue
             if isinstance(color_map_value, list):
                 for value in color_map_value:
-                    values_and_colors.append(value)
+                    if field_type == "number" and value is not None:
+                        try:
+                            numeric_value = float(value)  # Convert to number
+                            values_and_colors.append(numeric_value)
+                        except ValueError:
+                            # Handle the case where conversion is not possible
+                            values_and_colors.append(value)
+                    else:
+                        values_and_colors.append(value)
                     values_and_colors.append(color_map_hex)
             else:
-                values_and_colors.append(color_map_value)
+                if field_type == "number" and color_map_value is not None:
+                    try:
+                        numeric_value = float(color_map_value)  # Convert to number
+                        values_and_colors.append(numeric_value)
+                    except ValueError:
+                        # Handle the case where conversion is not possible
+                        values_and_colors.append(color_map_value)
+                else:
+                    values_and_colors.append(color_map_value)
                 values_and_colors.append(color_map_hex)
 
         return ["match", ["get", field_name]] + values_and_colors + ["#AAAAAA"]
+
 
     if (
         not field_name
@@ -132,7 +151,7 @@ def transform_to_mapbox_layer_style_spec(data: dict) -> dict:
                 "type": "symbol",
                 "layout": {
                     "icon-image": get_mapbox_style_marker(data),
-                    "icon-size": 1,
+                    "icon-size": point_properties["radius"],
                 },
                 "paint": {
                     "icon-opacity": point_properties.get("opacity", 0),
@@ -192,12 +211,32 @@ class PrintMap:
 
         # Request icon from assets url
         marker_size = layer.properties["marker_size"]
-        async with aiohttp.ClientSession() as session:
-            for marker in layer.properties.get("marker_mapping"):
-                try:
-                    icon_url = marker[1]["url"]
-                    icon_name = f"{settings.MARKER_PREFIX}{marker[1]['name']}"
 
+        # Check if marker mapping exists then add all markers to map
+        markers = []
+        if not layer.properties.get("marker_mapping"):
+            marker = layer.properties.get("marker")
+            markers.append(
+                {
+                    "name": f"{settings.MARKER_PREFIX}{marker['name']}",
+                    "url": marker["url"],
+                }
+            )
+        else:
+            for marker in layer.properties.get("marker_mapping"):
+                markers.append(
+                    {
+                        "name": f"{settings.MARKER_PREFIX}{marker[0][0]}",
+                        "url": marker[1]["url"],
+                    }
+                )
+
+        async with aiohttp.ClientSession() as session:
+            # for marker in layer.properties.get("marker"):
+            for marker in markers:
+                icon_url = marker["url"]
+                icon_name = marker["name"]
+                try:
                     header = (
                         {"Content-Type": "image/svg+xml"}
                         if icon_url.endswith(".svg")
@@ -209,7 +248,11 @@ class PrintMap:
 
                     # If icon is svg convert to png
                     if icon_url.endswith(".svg"):
-                        icon = svg2png(bytestring=icon, output_height=marker_size, output_width=marker_size)
+                        icon = svg2png(
+                            bytestring=icon,
+                            output_height=marker_size,
+                            output_width=marker_size,
+                        )
                     elif not icon_url.endswith(".png"):
                         raise ValueError("Invalid icon type.")
                     # Save image to local dir
@@ -219,7 +262,6 @@ class PrintMap:
                     image = Image.open(io.BytesIO(icon))
                     icon = image.tobytes()
                     # Add icon to map
-                    # TODO: Fix this, it's not working
                     map.addImage(icon_name, icon, marker_size, marker_size, 1.0, True)
                 except Exception as e:
                     print(f"Error while adding icon to map: {e}")
@@ -308,17 +350,17 @@ class PrintMap:
             ),
         )
         # Add layer
-        map.addLayer(
-            json.dumps(
-                {
-                    "id": layer.name,
-                    "type": style["type"],
-                    "source": layer.name,
-                    "source-layer": "default",
-                    "paint": style["paint"],
-                }
-            )
-        )
+        layer = {
+            "id": layer.name,
+            "type": style["type"],
+            "source": layer.name,
+            "source-layer": "default",
+            "paint": style["paint"],
+        }
+        if style.get("layout"):
+            layer["layout"] = style["layout"]
+
+        map.addLayer(json.dumps(layer))
 
         img_bytes = map.renderPNG()
         image = io.BytesIO(img_bytes)

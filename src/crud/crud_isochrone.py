@@ -228,13 +228,6 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
                 f"Error while calling the routing endpoint: {str(e)}"
             )
 
-        # Create new layer if starting points are not a layer
-        if not params.starting_points.layer_project_id:
-            await self.create_feature_layer_tool(
-                layer_in=layer_starting_points,
-                params=params,
-            )
-
         # Create layers only if result_params are not provided
         if not result_params:
             # Create new layers.
@@ -242,6 +235,14 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
                 layer_in=layer_isochrone,
                 params=params,
             )
+
+        # Create new layer if starting points are not a layer
+        if not params.starting_points.layer_project_id:
+            await self.create_feature_layer_tool(
+                layer_in=layer_starting_points,
+                params=params,
+            )
+
         return {
             "status": JobStatusType.finished.value,
             "msg": "Active mobility isochrone was successfully computed.",

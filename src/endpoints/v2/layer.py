@@ -197,10 +197,8 @@ async def export_layer(
         async_session=async_session,
         user_id=user_id,
     )
-    zip_file_path = await http_error_handler(
-        crud_export.export_file_run,
-        layer_in=layer_in,
-    )
+    with HTTPErrorHandler():
+        zip_file_path = await crud_export.export_file_run(layer_in=layer_in)
     # Return file
     file_name = os.path.basename(zip_file_path)
     return FileResponse(zip_file_path, media_type="application/zip", filename=file_name)
@@ -303,15 +301,17 @@ async def read_layers(
     ),
 ):
     """This endpoints returns a list of layers based one the specified filters."""
-    # Get layers from CRUD
-    layers = await crud_layer.get_layers_with_filter(
-        async_session=async_session,
-        user_id=user_id,
-        params=obj_in,
-        order_by=order_by,
-        order=order,
-        page_params=page_params,
-    )
+
+    with HTTPErrorHandler():
+        # Get layers from CRUD
+        layers = await crud_layer.get_layers_with_filter(
+            async_session=async_session,
+            user_id=user_id,
+            params=obj_in,
+            order_by=order_by,
+            order=order,
+            page_params=page_params,
+        )
     return layers
 
 
@@ -385,19 +385,20 @@ async def get_feature_count(
 ):
     """Get feature count. Based on the passed CQL-filter."""
 
-    # Get layer
-    layer = await crud_layer.get_internal(
-        async_session=async_session,
-        id=id,
-    )
-    where_query = build_where(
-        layer.id, layer.table_name, query, layer.attribute_mapping
-    )
-    count = await crud_layer_project.get_feature_cnt(
-        async_session=async_session,
-        layer_project=layer,
-        where_query=where_query,
-    )
+    with HTTPErrorHandler():
+        # Get layer
+        layer = await crud_layer.get_internal(
+            async_session=async_session,
+            id=id,
+        )
+        where_query = build_where(
+            layer.id, layer.table_name, query, layer.attribute_mapping
+        )
+        count = await crud_layer_project.get_feature_cnt(
+            async_session=async_session,
+            layer_project=layer,
+            where_query=where_query,
+        )
 
     # Return result
     return count
@@ -429,12 +430,13 @@ async def get_area_statistics(
 ):
     """Get statistics on the area size of a polygon layer. The area is computed using geography datatype and the unit is m²."""
 
-    statistics = await crud_layer.get_area_statistics(
-        async_session=async_session,
-        id=id,
-        operation=operation,
-        query=query,
-    )
+    with HTTPErrorHandler():
+        statistics = await crud_layer.get_area_statistics(
+            async_session=async_session,
+            id=id,
+            operation=operation,
+            query=query,
+        )
 
     # Return result
     return statistics
@@ -472,14 +474,15 @@ async def get_unique_values(
 ):
     """Get unique values of a column. Based on the passed CQL-filter and order."""
 
-    values = await crud_layer.get_unique_values(
-        async_session=async_session,
-        id=id,
-        column_name=column_name,
-        query=query,
-        page_params=page_params,
-        order=order,
-    )
+    with HTTPErrorHandler():
+        values = await crud_layer.get_unique_values(
+            async_session=async_session,
+            id=id,
+            column_name=column_name,
+            query=query,
+            page_params=page_params,
+            order=order,
+        )
 
     # Return result
     return values
@@ -553,12 +556,13 @@ async def metadata_aggregate(
     obj_in: IMetadataAggregate = Body(
         None,
         description="Filter for metadata to aggregate",
-    )
+    ),
 ):
     """Return the count of layers for different metadata values acting as filters."""
-    result = await crud_layer.metadata_aggregate(
-        async_session=async_session,
-        user_id=user_id,
-        params=obj_in,
-    )
+    with HTTPErrorHandler():
+        result = await crud_layer.metadata_aggregate(
+            async_session=async_session,
+            user_id=user_id,
+            params=obj_in,
+        )
     return result

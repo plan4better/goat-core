@@ -12,10 +12,12 @@ from src.schemas.toolbox_base import (
     PTTimeWindow,
     input_layer_type_point,
     check_starting_points,
+    DefaultResultLayerName,
 )
 
 
 """Isochrone starting point validators."""
+
 
 class IsochroneStartingPointsActiveMobility(IsochroneStartingPointsBase):
     """Model for the active mobility isochrone starting points."""
@@ -32,6 +34,7 @@ class IsochroneStartingPointsMotorizedMobility(IsochroneStartingPointsBase):
 
 
 """Isochrone routing mode schemas."""
+
 
 class IsochroneRoutingModeActiveMobility(str, Enum):
     """Routing active mobility type schema."""
@@ -56,6 +59,7 @@ class IsochroneRoutingModePT(str, Enum):
 
 class IsochroneRoutingEgressModePT(str, Enum):
     """Routing public transport egress mode schema."""
+
     walk = "walk"
     bicycle = "bicycle"
 
@@ -95,6 +99,7 @@ class IsochroneRoutingTypeCar(str, Enum):
 
 
 """Isochrone travel cost schemas."""
+
 
 class IsochroneTravelTimeCostActiveMobility(BaseModel):
     """Travel time cost schema."""
@@ -175,6 +180,7 @@ class IsochroneTravelTimeCostMotorizedMobility(BaseModel):
 
 """Isochrone decay function schemas."""
 
+
 class IsochroneDecayFunctionTypePT(Enum):
     LOGISTIC = "logistic"
     LINEAR = "linear"
@@ -194,6 +200,7 @@ class IsochroneDecayFunctionPT(BaseModel):
 
 """Isochrone type schemas."""
 
+
 class IsochroneTypeActiveMobility(str, Enum):
     """Isochrone type schema for active mobility."""
 
@@ -211,6 +218,7 @@ class IsochroneTypePT(str, Enum):
 
 """User-configured isochrone payload schemas."""
 
+
 class IIsochroneActiveMobility(BaseModel):
     """Model for the active mobility isochrone"""
 
@@ -224,12 +232,13 @@ class IIsochroneActiveMobility(BaseModel):
         title="Routing Type",
         description="The routing type of the isochrone.",
     )
-    travel_cost: IsochroneTravelTimeCostActiveMobility | IsochroneTravelDistanceCostActiveMobility = (
-        Field(
-            ...,
-            title="Travel Cost",
-            description="The travel cost of the isochrone.",
-        )
+    travel_cost: (
+        IsochroneTravelTimeCostActiveMobility
+        | IsochroneTravelDistanceCostActiveMobility
+    ) = Field(
+        ...,
+        title="Travel Cost",
+        description="The travel cost of the isochrone.",
     )
     scenario_id: UUID | None = Field(
         None,
@@ -263,10 +272,11 @@ class IIsochroneActiveMobility(BaseModel):
     @property
     def properties_base(self):
         return {
-            "color_range_type": ColorRangeType.sequential,
-            "color_field": {"name": "travel_cost", "type": "number"},
-            "color_scale": "quantile",
-            "breaks": self.travel_cost.steps,
+            DefaultResultLayerName.isochrone_active_mobility: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {"name": "travel_cost", "type": "number"},
+                "color_scale": "ordinal",
+            }
         }
 
 
@@ -332,10 +342,11 @@ class IIsochronePT(BaseModel):
     @property
     def properties_base(self):
         return {
-            "color_range_type": ColorRangeType.sequential,
-            "color_field": {"name": "travel_cost", "type": "number"},
-            "color_scale": "quantile",
-            "breaks": self.travel_cost.steps,
+            DefaultResultLayerName.isochrone_pt: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {"name": "travel_cost", "type": "number"},
+                "color_scale": "ordinal",
+            }
         }
 
 
@@ -374,10 +385,11 @@ class IIsochroneCar(BaseModel):
     @property
     def properties_base(self):
         return {
-            "color_range_type": ColorRangeType.sequential,
-            "color_field": {"name": "travel_cost", "type": "number"},
-            "color_scale": "quantile",
-            "breaks": self.travel_cost.steps,
+            DefaultResultLayerName.isochrone_car: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {"name": "travel_cost", "type": "number"},
+                "color_scale": "ordinal",
+            }
         }
 
 
@@ -394,12 +406,13 @@ class IsochroneNearbyStationAccess(BaseModel):
         title="Routing Type",
         description="The routing type of the isochrone.",
     )
-    travel_cost: IsochroneTravelTimeCostActiveMobility | IsochroneTravelDistanceCostActiveMobility = (
-        Field(
-            ...,
-            title="Travel Cost",
-            description="The travel cost of the isochrone.",
-        )
+    travel_cost: (
+        IsochroneTravelTimeCostActiveMobility
+        | IsochroneTravelDistanceCostActiveMobility
+    ) = Field(
+        ...,
+        title="Travel Cost",
+        description="The travel cost of the isochrone.",
     )
     scenario_id: UUID | None = Field(
         None,
@@ -433,10 +446,12 @@ class IsochroneNearbyStationAccess(BaseModel):
     @property
     def properties_base(self):
         return {
-            "color_range_type": ColorRangeType.sequential,
-            "color_field": {"name": "travel_cost", "type": "number"},
-            "color_scale": "quantile",
-            "breaks": self.travel_cost.steps,
+            DefaultResultLayerName.nearby_station_access: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {"name": "travel_cost", "type": "number"},
+                "color_scale": "quantile",
+                "breaks": self.travel_cost.steps,
+            }
         }
 
 

@@ -34,6 +34,7 @@ from src.schemas.error import (
     NoCRSError,
     OperationNotSupportedError,
     ThumbnailComputeError,
+    UnsupportedLayerTypeError,
 )
 from src.schemas.job import JobStatusType
 from src.schemas.layer import (
@@ -100,13 +101,10 @@ class CRUDLayer(CRUDLayerBase):
 
         layer = await self.get(async_session, id=id)
         if layer is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Layer not found"
-            )
+            raise LayerNotFoundError("Layer not found")
         if layer.type not in [LayerType.feature, LayerType.table]:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Layer is not a feature layer or table layer. The requested operation cannot be performed on this layer.",
+            raise UnsupportedLayerTypeError(
+                "Layer is not a feature layer or table layer. The requested operation cannot be performed on these layer types."
             )
         return layer
 
@@ -455,9 +453,8 @@ class CRUDLayer(CRUDLayerBase):
 
         # Check if layer has polygon geoms
         if layer.feature_layer_geometry_type != UserDataGeomType.polygon.value:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Operation not supported. The layer does not contain polygon geometries. Pick a layer with polygon geometries.",
+            raise UnsupportedLayerTypeError(
+                "Operation not supported. The layer does not contain polygon geometries. Pick a layer with polygon geometries."
             )
 
         # Check if feature count is exceeding the defined limit
@@ -764,7 +761,7 @@ class CRUDLayerImport(CRUDFailedJob):
                 thumbnail_url = await PrintMap(
                     async_session=self.async_session
                 ).create_layer_thumbnail(layer=layer_in, file_name=file_name)
-            except Exception:
+            except Exception as e:
                 msg_text = "Failed to create thumbnail."
                 print(msg_text)
 

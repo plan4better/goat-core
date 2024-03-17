@@ -5,6 +5,7 @@ from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import (
     PTTimeWindow,
     input_layer_type_polygon,
+    DefaultResultLayerName,
 )
 from src.schemas.colors import ColorRangeType
 
@@ -60,14 +61,6 @@ class IOevGueteklasse(BaseModel):
     @property
     def geofence_table(self):
         return "basic.geofence_pt"
-
-    @property
-    def properties_base(self):
-        return {
-            "color_scale": "ordinal",
-            "color_range_type": ColorRangeType.sequential,
-            "color_field": {"name": "pt_class", "type": "string"},
-        }
 
 
 # Check for extended route_type defintion: https://developers.google.com/transit/gtfs/reference/extended-route-types
