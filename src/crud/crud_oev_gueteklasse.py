@@ -40,13 +40,16 @@ class CRUDOevGueteklasse(CRUDToolBase):
             WITH stations AS (
                 SELECT stop_id, stop_name, (oev_gueteklasse ->> 'frequency')::float AS frequency,
                 (oev_gueteklasse ->> '_class')::integer AS _class, '{str(station_category_layer.id)}'::uuid AS layer_id, geom AS geom
-                FROM basic.count_public_transport_services_station(
-                    '{reference_layer_project.table_name}',
-                    :where_query,
-                    '{str(timedelta(seconds=params.time_window.from_time))}',
-                    '{str(timedelta(seconds=params.time_window.to_time))}',
-                    {params.time_window.weekday_integer}
-                ) s, LATERAL basic.oev_guetklasse_station_category(trip_cnt, '{json.dumps(params.station_config.dict())}'::jsonb,
+                FROM (
+                    SELECT *, (COUNT(parent_station) OVER (PARTITION BY parent_station))::smallint as child_count
+                    FROM basic.count_public_transport_services_station (
+                        '{reference_layer_project.table_name}',
+                        :where_query,
+                        '{str(timedelta(seconds=params.time_window.from_time))}',
+                        '{str(timedelta(seconds=params.time_window.to_time))}',
+                        {params.time_window.weekday_integer}
+                    )
+                ) s, LATERAL basic.oev_guetklasse_station_category(child_count, trip_cnt, '{json.dumps(params.station_config.dict())}'::jsonb,
                 {params.time_window.from_time}, {params.time_window.to_time}) oev_gueteklasse
             )
             SELECT *

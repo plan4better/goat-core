@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION basic.count_public_transport_services_station(
 	end_time interval,
 	weekday integer
 )
-RETURNS TABLE(stop_id text, stop_name text, trip_cnt jsonb, geom geometry, trip_ids jsonb, h3_3 integer)
+RETURNS TABLE(stop_id text, stop_name text, parent_station text, trip_cnt jsonb, geom geometry, trip_ids jsonb, h3_3 integer)
 LANGUAGE plpgsql
 AS $function$
 DECLARE
@@ -71,7 +71,7 @@ BEGIN
 			WHERE cnt <> 0
 			GROUP BY stop_id, h3_3
 		)
-		SELECT s.stop_id, s.stop_name, o.trip_cnt, s.geom, o.trip_ids, o.h3_3
+		SELECT s.stop_id, s.stop_name, s.parent_station, o.trip_cnt, s.geom, o.trip_ids, o.h3_3
 		FROM o, basic.stops s
 		WHERE o.stop_id = s.stop_id
 		AND s.h3_3 = o.h3_3', temp_table_stops) USING weekday, start_time, end_time, weekday;

@@ -87,7 +87,7 @@ class CRUDAggregateBase(CRUDToolBase):
             == ColumnStatisticsOperation.count
         ):
             result_check_statistics_field["mapped_statistics_field_type"] = "integer"
-    
+
         result_column = get_result_column(
             attribute_mapping=attribute_mapping_aggregation,
             base_column_name=params.column_statistics.operation.value,

@@ -19,6 +19,12 @@ class JobType(str, Enum):
     trip_count_station = "trip_count_station"
     origin_destination = "origin_destination"
     nearby_station_access = "nearby_station_access"
+    heatmap_gravity_active_mobility = "heatmap_gravity_active_mobility"
+    heatmap_gravity_motorized_mobility = "heatmap_gravity_motorized_mobility"
+    heatmap_closest_average_active_mobility = "heatmap_closest_average_active_mobility"
+    heatmap_closest_average_motorized_mobility = "heatmap_closest_average_motorized_mobility"
+    heatmap_connectivity_active_mobility = "heatmap_connectivity_active_mobility"
+    heatmap_connectivity_motorized_mobility = "heatmap_connectivity_motorized_mobility"
 
 
 class JobStatusType(str, Enum):
@@ -103,11 +109,38 @@ class JobStatusTripCountStation(BaseModel):
     trip_count_station: JobStep = {}
 
 
-class OriginDestination(BaseModel):
+class JobStatusOriginDestination(BaseModel):
     origin_destination: JobStep = {}
 
-class NearbyStationAccess(BaseModel):
+class JobStatusNearbyStationAccess(BaseModel):
     nearby_station_access: JobStep = {}
+
+class JobStatusHeatmapGravityBase(BaseModel):
+    heatmap_gravity: JobStep = {}
+
+class JobStatusHeatmapGravityActiveMobility(JobStatusHeatmapGravityBase):
+    pass
+
+class JobStatusHeatmapGravityMotorizedMobility(JobStatusHeatmapGravityBase):
+    pass
+
+class JobStatusHeatmapClosestAverageBase(BaseModel):
+    heatmap_closest_average: JobStep = {}
+
+class JobStatusHeatmapClosestAverageActiveMobility(JobStatusHeatmapClosestAverageBase):
+    pass
+
+class JobStatusHeatmapClosestAverageMotorizedMobility(JobStatusHeatmapClosestAverageBase):
+    pass
+
+class JobStatusHeatmapConnectivityBase(BaseModel):
+    heatmap_connectivity: JobStep = {}
+
+class JobStatusHeatmapConnectivityActiveMobility(JobStatusHeatmapConnectivityBase):
+    pass
+
+class JobStatusHeatmapConnectivityMotorizedMobility(JobStatusHeatmapConnectivityBase):
+    pass
 
 
 # Only add jobs here that are consisting of multiple steps
@@ -122,6 +155,12 @@ job_mapping = {
     JobType.isochrone_car: JobStatusIsochroneCar,
     JobType.buffer: JobStatusBuffer,
     JobType.trip_count_station: JobStatusTripCountStation,
-    JobType.origin_destination: OriginDestination,
-    JobType.nearby_station_access: NearbyStationAccess,
+    JobType.origin_destination: JobStatusOriginDestination,
+    JobType.nearby_station_access: JobStatusNearbyStationAccess,
+    JobType.heatmap_gravity_active_mobility: JobStatusHeatmapGravityActiveMobility,
+    JobType.heatmap_gravity_motorized_mobility: JobStatusHeatmapGravityMotorizedMobility,
+    JobType.heatmap_closest_average_active_mobility: JobStatusHeatmapClosestAverageActiveMobility,
+    JobType.heatmap_closest_average_motorized_mobility: JobStatusHeatmapClosestAverageMotorizedMobility,
+    JobType.heatmap_connectivity_active_mobility: JobStatusHeatmapConnectivityActiveMobility,
+    JobType.heatmap_connectivity_motorized_mobility: JobStatusHeatmapConnectivityMotorizedMobility,
 }
