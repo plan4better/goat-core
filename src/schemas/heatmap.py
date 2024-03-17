@@ -1,6 +1,8 @@
 from enum import Enum
 from pydantic import Field, BaseModel
 from typing import List
+from src.schemas.layer import ToolType
+from src.schemas.toolbox_base import input_layer_type_point, input_layer_type_polygon
 
 
 # TODO: Validate the traveltime based on the mode.
@@ -91,6 +93,10 @@ class HeatmapGravityBase(BaseModel):
         description="The opportunities the heatmap should be calculated for heatmap.",
     )
 
+    @property
+    def input_layer_types(self):
+        return {"opportunity_layer_project_id": input_layer_type_point}
+
 
 class HeatmapClosestAverageBase(BaseModel):
     """Closest average based heatmap schema."""
@@ -100,6 +106,10 @@ class HeatmapClosestAverageBase(BaseModel):
         title="Opportunities",
         description="The opportunities the heatmap should be calculated for heatmap.",
     )
+
+    @property
+    def input_layer_types(self):
+        return {"opportunity_layer_project_id": input_layer_type_point}
 
 
 class HeatmapConnectivityBase(BaseModel):
@@ -117,6 +127,10 @@ class HeatmapConnectivityBase(BaseModel):
         ge=1,
         le=60,
     )
+
+    @property
+    def input_layer_types(self):
+        return {"reference_area_layer_project_id": input_layer_type_polygon}
 
 
 class RoutingTypeActive(BaseModel):
@@ -142,34 +156,48 @@ class RoutingTypeMotorized(BaseModel):
 class IHeatmapGravityActive(RoutingTypeActive, HeatmapGravityBase):
     """Gravity based heatmap for active mobility schema."""
 
-    pass
+    @property
+    def tool_type(self):
+        return ToolType.heatmap_gravity_active_mobility
+
 
 
 class IHeatmapGravityMotorized(RoutingTypeMotorized, HeatmapGravityBase):
     """Gravity based heatmap for motorized mobility schema."""
 
-    pass
+    @property
+    def tool_type(self):
+        return ToolType.heatmap_gravity_motorized_mobility
+
 
 
 class IHeatmapClosestAverageActive(RoutingTypeActive, HeatmapClosestAverageBase):
     """Closest average based heatmap for active mobility schema."""
 
-    pass
+    @property
+    def tool_type(self):
+        return ToolType.heatmap_closest_average_active_mobility
 
 
 class IHeatmapClosestAverageMotorized(RoutingTypeMotorized, HeatmapClosestAverageBase):
     """Closest average based heatmap for motorized mobility schema."""
 
-    pass
+    @property
+    def tool_type(self):
+        return ToolType.heatmap_closest_average_motorized_mobility
 
 
 class IHeatmapConnectivityActive(RoutingTypeActive, HeatmapConnectivityBase):
     """Connectivity based heatmap for active mobility schema."""
 
-    pass
+    @property
+    def tool_type(self):
+        return ToolType.heatmap_connectivity_active_mobility
 
 
 class IHeatmapConnectivityMotorized(RoutingTypeMotorized, HeatmapConnectivityBase):
     """Connectivity based heatmap for motorized mobility schema."""
 
-    pass
+    @property
+    def tool_type(self):
+        return ToolType.heatmap_connectivity_motorized_mobility

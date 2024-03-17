@@ -50,6 +50,12 @@ class ToolType(str, Enum):
     buffer = "buffer"
     origin_destination = "origin_destination"
     nearby_station_access = "nearby_station_access"
+    heatmap_gravity_active_mobility = "heatmap_gravity_active_mobility"
+    heatmap_gravity_motorized_mobility = "heatmap_gravity_motorized_mobility"
+    heatmap_closest_average_active_mobility = "heatmap_closest_average_active_mobility"
+    heatmap_closest_average_motorized_mobility = "heatmap_closest_average_motorized_mobility"
+    heatmap_connectivity_active_mobility = "heatmap_connectivity_active_mobility"
+    heatmap_connectivity_motorized_mobility = "heatmap_connectivity_motorized_mobility"
 
 
 class FeatureType(str, Enum):
