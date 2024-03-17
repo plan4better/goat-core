@@ -1,15 +1,17 @@
 import bisect
+import json
 from datetime import timedelta
 from typing import Any
 
-import json
 import pyproj
 from geojson import Feature, FeatureCollection
 from geopandas import read_postgis
+from pandas.io.sql import read_sql
 from shapely import wkb
 from shapely.ops import transform, unary_union
+
 from src.db.session import legacy_engine as db_sync_engine
-from pandas.io.sql import read_sql
+
 
 class CRUDIndicator:
     async def count_pt_service_stations(
@@ -88,19 +90,25 @@ class CRUDIndicator:
             station_group = min(station_groups)  # the highest priority (e.g A )
             if station_group_trip_count == 0:
                 continue
-            station_group_trip_time_frequency = time_window / (station_group_trip_count / 2)
+            station_group_trip_time_frequency = time_window / (
+                station_group_trip_count / 2
+            )
             # - find station category based on time frequency and group
             time_interval = bisect.bisect_left(
                 station_config["time_frequency"], station_group_trip_time_frequency
             )
             if time_interval == len(station_config["time_frequency"]):
                 continue  # no category found
-            station_category = station_config["categories"][time_interval - 1].get(station_group)
+            station_category = station_config["categories"][time_interval - 1].get(
+                station_group
+            )
 
             if not station_category:
                 continue
             # - find station classification based on category
-            station_classification = station_config["classification"][str(station_category)]
+            station_classification = station_config["classification"][
+                str(station_category)
+            ]
             for buffer_dist, classification in station_classification.items():
 
                 buffer_geom = station_geom.buffer(int(buffer_dist))
@@ -112,7 +120,9 @@ class CRUDIndicator:
 
         features = []
         agg_union = None
-        for classification, shapes in dict(sorted(classificiation_buffers.items())).items():
+        for classification, shapes in dict(
+            sorted(classificiation_buffers.items())
+        ).items():
             union_geom = unary_union(shapes)
             difference_geom = union_geom
             if agg_union:

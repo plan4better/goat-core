@@ -315,8 +315,8 @@ style_starting = {
 }
 
 custom_styles = {
-    DefaultResultLayerName.oev_gueteklasse: style_oev_gueteklassen_point,
-    DefaultResultLayerName.oev_gueteklasse_station: style_oev_gueteklassen_polygon,
+    DefaultResultLayerName.oev_gueteklasse: style_oev_gueteklassen_polygon,
+    DefaultResultLayerName.oev_gueteklasse_station: style_oev_gueteklassen_point,
     DefaultResultLayerName.isochrone_starting_points: style_starting,
     DefaultResultLayerName.nearby_station_access_starting_points: style_starting,
 }

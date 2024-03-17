@@ -290,6 +290,16 @@ class CRUDToolBase(CRUDFailedJob):
                         breaks=breaks,
                         query=None,
                     )
+                    # Get unique breaks
+                    breaks_arr = list(set(color_scale_breaks["breaks"]))
+                    # Sort list
+                    breaks_arr.sort()
+                    # Remove of min or max in breaks
+                    if color_scale_breaks["min"] in breaks_arr:
+                        breaks_arr.remove(color_scale_breaks["min"])
+                    if color_scale_breaks["max"] in breaks_arr:
+                        breaks_arr.remove(color_scale_breaks["max"])
+                    color_scale_breaks["breaks"] = breaks_arr
                     # Get properties
                     properties = get_tool_style_with_breaks(
                         feature_geometry_type=layer.feature_layer_geometry_type,

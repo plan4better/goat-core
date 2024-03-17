@@ -77,9 +77,8 @@ class INearbyStationAccess(BaseModel):
         return {
             DefaultResultLayerName.nearby_station_access: {
                 "color_range_type": ColorRangeType.sequential,
-                "color_field": {"name": "travel_cost", "type": "number"},
+                "color_field": {"name": "access_time", "type": "number"},
                 "color_scale": "quantile",
-                "breaks": self.travel_cost.steps,
             }
         }
 
