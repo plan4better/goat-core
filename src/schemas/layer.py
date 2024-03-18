@@ -241,7 +241,7 @@ class FeatureToolAttributesBase(BaseModel):
 
 
 feature_layer_tool_attributes_example = {
-    "tool_type": "isochrone",
+    "tool_type": "catchment_area",
 }
 
 

@@ -1,22 +1,21 @@
 from typing import List
 from pydantic import BaseModel, Field
 from src.schemas.colors import ColorRangeType
-from src.schemas.isochrone import (
-    IsochroneRoutingModeActiveMobility,
-    IsochroneRoutingModePT,
-)
 from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import (
-    IsochroneStartingPointsBase,
+    CatchmentAreaStartingPointsBase,
     PTTimeWindow,
     check_starting_points,
     input_layer_type_point,
     DefaultResultLayerName,
 )
+from src.schemas.catchment_area import (
+    CatchmentAreaRoutingModeActiveMobility,
+    CatchmentAreaRoutingModePT,
+)
 
 
-
-class IStartingPointNearbyStationAccess(IsochroneStartingPointsBase):
+class IStartingPointNearbyStationAccess(CatchmentAreaStartingPointsBase):
     """Model for the starting points of the nearby station endpoint."""
 
     check_starting_points = check_starting_points(1)
@@ -30,7 +29,7 @@ class INearbyStationAccess(BaseModel):
         title="Starting Points",
         description="The starting point for the nearby station calculation.",
     )
-    access_mode: IsochroneRoutingModeActiveMobility = Field(
+    access_mode: CatchmentAreaRoutingModeActiveMobility = Field(
         ...,
         title="Access Mode",
         description="The access mode of the active mobility.",
@@ -49,7 +48,7 @@ class INearbyStationAccess(BaseModel):
         ge=1,
         le=15,
     )
-    mode: List[IsochroneRoutingModePT] = Field(
+    mode: List[CatchmentAreaRoutingModePT] = Field(
         ...,
         title="Mode",
         description="The mode of the public transport.",
@@ -57,7 +56,7 @@ class INearbyStationAccess(BaseModel):
     time_window: PTTimeWindow = Field(
         ...,
         title="Time Window",
-        description="The time window of the isochrone.",
+        description="The time window of the catchment area.",
     )
 
     @property

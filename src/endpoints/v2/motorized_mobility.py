@@ -1,18 +1,18 @@
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Body, Depends
 from src.core.tool import start_calculation
-from src.crud.crud_isochrone import CRUDIsochronePT
+from src.crud.crud_catchment_area import CRUDCatchmentAreaPT
 from src.crud.crud_trip_count_station import CRUDTripCountStation
 from src.crud.crud_oev_gueteklasse import CRUDOevGueteklasse
 from src.crud.crud_nearby_station_access import CRUDNearbyStationAccess
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_http_client, get_user_id
 from src.schemas.job import JobType
-from src.schemas.isochrone import (
-    IIsochronePT,
-    IIsochroneCar,
-    request_examples_isochrone_pt,
-    request_examples_isochrone_car,
+from src.schemas.catchment_area import (
+    ICatchmentAreaPT,
+    ICatchmentAreaCar,
+    request_examples_catchment_area_pt,
+    request_examples_catchment_area_car,
 )
 from src.schemas.oev_gueteklasse import (
     IOevGueteklasse,
@@ -36,25 +36,25 @@ router = APIRouter()
 
 
 @router.post(
-    "/pt/isochrone",
-    summary="Compute isochrones for public transport.",
+    "/pt/catchment-area",
+    summary="Compute catchment areas for public transport.",
     response_model=IToolResponse,
     status_code=201,
 )
-async def compute_pt_isochrone(
+async def compute_pt_catchment_area(
     *,
     common: CommonToolParams = Depends(),
-    params: IIsochronePT = Body(
+    params: ICatchmentAreaPT = Body(
         ...,
-        examples=request_examples_isochrone_pt,
-        description="The isochrone parameters.",
+        examples=request_examples_catchment_area_pt,
+        description="The catchment area parameters.",
     ),
 ):
-    """Compute isochrones for public transport."""
+    """Compute catchment areas for public transport."""
     return await start_calculation(
-        job_type=JobType.isochrone_pt,
-        tool_class=CRUDIsochronePT,
-        crud_method="run_isochrone",
+        job_type=JobType.catchment_area_pt,
+        tool_class=CRUDCatchmentAreaPT,
+        crud_method="run_catchment_area",
         async_session=common.async_session,
         user_id=common.user_id,
         background_tasks=common.background_tasks,
@@ -65,22 +65,22 @@ async def compute_pt_isochrone(
 
 
 @router.post(
-    "/car/isochrone",
-    summary="Compute isochrones for car.",
+    "/car/catchment-area",
+    summary="Compute catchment areas for car.",
     response_model=IToolResponse,
     status_code=201,
 )
-async def compute_car_isochrone(
+async def compute_car_catchment_area(
     *,
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID = Depends(get_user_id),
-    params: IIsochroneCar = Body(
+    params: ICatchmentAreaCar = Body(
         ...,
-        examples=request_examples_isochrone_car,
-        description="The isochrone parameters.",
+        examples=request_examples_catchment_area_car,
+        description="The catchment area parameters.",
     ),
 ):
-    """Compute isochrones for car."""
+    """Compute catchment areas for car."""
     return {"job_id": uuid4()}
 
 
@@ -150,7 +150,7 @@ async def compute_nearby_station_access(
     params: INearbyStationAccess = Body(
         ...,
         examples=request_example_nearby_station_access,
-        description="The isochrone parameters.",
+        description="The catchment area parameters.",
     ),
 ):
     """Get public transport stops and their trips that are accessible by walking/cycling."""
@@ -184,7 +184,7 @@ async def compute_motorized_mobility_heatmap_gravity(
 
     return await start_calculation(
         job_type=JobType.heatmap_gravity_motorized_mobility,
-        tool_class=CRUDIsochronePT,
+        tool_class=CRUDCatchmentAreaPT,
         crud_method="run_heatmap",
         async_session=common.async_session,
         user_id=common.user_id,
@@ -213,7 +213,7 @@ async def compute_motorized_mobility_heatmap_closest_average(
 
     return await start_calculation(
         job_type=JobType.heatmap_closest_average_motorized_mobility,
-        tool_class=CRUDIsochronePT,
+        tool_class=CRUDCatchmentAreaPT,
         crud_method="run_heatmap",
         async_session=common.async_session,
         user_id=common.user_id,
@@ -242,7 +242,7 @@ async def compute_motorized_mobility_heatmap_connectivity(
 
     return await start_calculation(
         job_type=JobType.heatmap_connectivity_motorized_mobility,
-        tool_class=CRUDIsochronePT,
+        tool_class=CRUDCatchmentAreaPT,
         crud_method="run_heatmap",
         async_session=common.async_session,
         user_id=common.user_id,

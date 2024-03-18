@@ -4,17 +4,17 @@ from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
 from src.core.tool import CRUDToolBase
 from src.jsoline import generate_jsolines
-from src.schemas.isochrone import (
-    IIsochroneActiveMobility,
-    IIsochronePT,
-    IIsochroneCar,
-    IsochroneNearbyStationAccess,
-    IsochroneTravelTimeCostActiveMobility,
+from src.schemas.catchment_area import (
+    ICatchmentAreaActiveMobility,
+    ICatchmentAreaPT,
+    ICatchmentAreaCar,
+    CatchmentAreaNearbyStationAccess,
+    CatchmentAreaTravelTimeCostActiveMobility,
 )
 from src.schemas.error import (
     OutOfGeofenceError,
     R5EndpointError,
-    R5IsochroneComputeError,
+    R5CatchmentAreaComputeError,
     RoutingEndpointError,
     SQLError,
 )
@@ -22,12 +22,12 @@ from src.schemas.job import JobStatusType
 from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
 from src.schemas.toolbox_base import (
     DefaultResultLayerName,
-    IsochroneGeometryTypeMapping,
+    CatchmentAreaGeometryTypeMapping,
 )
 from src.utils import decode_r5_grid
 
 
-class CRUDIsochroneBase(CRUDToolBase):
+class CRUDCatchmentAreaBase(CRUDToolBase):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
         self.table_starting_points = (
@@ -35,7 +35,7 @@ class CRUDIsochroneBase(CRUDToolBase):
         )
 
     async def create_layer_starting_points(
-        self, layer_name: DefaultResultLayerName, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT | IsochroneNearbyStationAccess
+        self, layer_name: DefaultResultLayerName, params: ICatchmentAreaActiveMobility | ICatchmentAreaCar | ICatchmentAreaPT | CatchmentAreaNearbyStationAccess
     ) -> IFeatureLayerToolCreate:
 
         # Create layer object
@@ -93,7 +93,7 @@ class CRUDIsochroneBase(CRUDToolBase):
         return layer
 
     async def get_lats_lons(
-        self, layer_name: DefaultResultLayerName, params: IIsochroneActiveMobility | IIsochroneCar | IIsochronePT | IsochroneNearbyStationAccess
+        self, layer_name: DefaultResultLayerName, params: ICatchmentAreaActiveMobility | ICatchmentAreaCar | ICatchmentAreaPT | CatchmentAreaNearbyStationAccess
     ):
         # Check if starting points are a layer else create layer
         if params.starting_points.layer_project_id:
@@ -124,7 +124,7 @@ class CRUDIsochroneBase(CRUDToolBase):
         }
 
 
-class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
+class CRUDCatchmentAreaActiveMobility(CRUDCatchmentAreaBase):
     def __init__(
         self,
         job_id,
@@ -138,17 +138,17 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
 
         self.http_client = http_client
 
-    async def isochrone(
+    async def catchment_area(
         self,
-        params: IIsochroneActiveMobility | IsochroneNearbyStationAccess,
+        params: ICatchmentAreaActiveMobility | CatchmentAreaNearbyStationAccess,
         result_params: dict = None,
     ):
-        """Compute active mobility isochrone using GOAT Routing endpoint."""
+        """Compute active mobility catchment area using GOAT Routing endpoint."""
 
         # Fetch starting points
         starting_points = await self.get_lats_lons(
             layer_name=(
-                DefaultResultLayerName.isochrone_starting_points
+                DefaultResultLayerName.catchment_area_starting_points
                 if not result_params else
                 result_params["starting_points_layer_name"]
             ),
@@ -159,18 +159,18 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
         layer_starting_points = starting_points["layer_starting_points"]
 
         if not result_params:
-            # Create feature layer to store computed isochrone output
-            layer_isochrone = IFeatureLayerToolCreate(
-                name=DefaultResultLayerName.isochrone_active_mobility.value,
-                feature_layer_geometry_type=IsochroneGeometryTypeMapping[
-                    params.isochrone_type.value
+            # Create feature layer to store computed catchment area output
+            layer_catchment_area = IFeatureLayerToolCreate(
+                name=DefaultResultLayerName.catchment_area_active_mobility.value,
+                feature_layer_geometry_type=CatchmentAreaGeometryTypeMapping[
+                    params.catchment_area_type.value
                 ],
                 attribute_mapping={"integer_attr1": "travel_cost"},
                 tool_type=params.tool_type.value,
                 job_id=self.job_id,
             )
-            result_table = f"{settings.USER_DATA_SCHEMA}.{layer_isochrone.feature_layer_geometry_type.value}_{str(self.user_id).replace('-', '')}"
-            layer_id = layer_isochrone.id
+            result_table = f"{settings.USER_DATA_SCHEMA}.{layer_catchment_area.feature_layer_geometry_type.value}_{str(self.user_id).replace('-', '')}"
+            layer_id = layer_catchment_area.id
         else:
             layer_id = result_params["layer_id"]
 
@@ -187,13 +187,13 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
                     "steps": params.travel_cost.steps,
                     "speed": params.travel_cost.speed,
                 }
-                if type(params.travel_cost) == IsochroneTravelTimeCostActiveMobility
+                if type(params.travel_cost) == CatchmentAreaTravelTimeCostActiveMobility
                 else {
                     "max_distance": params.travel_cost.max_distance,
                     "steps": params.travel_cost.steps,
                 }
             ),
-            "isochrone_type": params.isochrone_type.value,
+            "catchment_area_type": params.catchment_area_type.value,
             "polygon_difference": params.polygon_difference,
             "result_table": (
                 result_table if not result_params else result_params["result_table"]
@@ -204,9 +204,9 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
         try:
             # Call GOAT Routing endpoint multiple times for upto 20 seconds / 10 retries
             for i in range(settings.CRUD_NUM_RETRIES):
-                # Call GOAT Routing endpoint to compute isochrone
+                # Call GOAT Routing endpoint to compute catchment area
                 response = await self.http_client.post(
-                    url=f"{settings.GOAT_ROUTING_URL}/isochrone",
+                    url=f"{settings.GOAT_ROUTING_URL}/catchment-area",
                     json=request_payload,
                     headers={"Authorization": settings.GOAT_ROUTING_AUTHORIZATION},
                 )
@@ -232,7 +232,7 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
         if not result_params:
             # Create new layers.
             await self.create_feature_layer_tool(
-                layer_in=layer_isochrone,
+                layer_in=layer_catchment_area,
                 params=params,
             )
 
@@ -245,20 +245,20 @@ class CRUDIsochroneActiveMobility(CRUDIsochroneBase):
 
         return {
             "status": JobStatusType.finished.value,
-            "msg": "Active mobility isochrone was successfully computed.",
+            "msg": "Active mobility catchment area was successfully computed.",
         }
 
-    @job_log(job_step_name="isochrone")
-    async def isochrone_job(self, params: IIsochroneActiveMobility):
-        return await self.isochrone(params=params)
+    @job_log(job_step_name="catchment_area")
+    async def catchment_area_job(self, params: ICatchmentAreaActiveMobility):
+        return await self.catchment_area(params=params)
 
     @run_background_or_immediately(settings)
     @job_init()
-    async def run_isochrone(self, params: IIsochroneActiveMobility):
-        return await self.isochrone_job(params=params)
+    async def run_catchment_area(self, params: ICatchmentAreaActiveMobility):
+        return await self.catchment_area_job(params=params)
 
 
-class CRUDIsochronePT(CRUDIsochroneBase):
+class CRUDCatchmentAreaPT(CRUDCatchmentAreaBase):
     def __init__(
         self,
         job_id,
@@ -272,13 +272,13 @@ class CRUDIsochronePT(CRUDIsochroneBase):
 
         self.http_client = http_client
 
-    async def write_isochrone_result(
-        self, isochrone_type, layer_id, result_table, shapes, grid
+    async def write_catchment_area_result(
+        self, catchment_area_type, layer_id, result_table, shapes, grid
     ):
-        """Save the result of the isochrone computation to the database."""
+        """Save the result of the catchment area computation to the database."""
 
-        if isochrone_type == "polygon":
-            # Save isochrone geometry data (shapes)
+        if catchment_area_type == "polygon":
+            # Save catchment area geometry data (shapes)
             shapes = shapes["incremental"]
             insert_string = ""
             for i in shapes.index:
@@ -291,40 +291,40 @@ class CRUDIsochronePT(CRUDIsochroneBase):
             """
             await self.async_session.execute(insert_string)
         else:
-            # Save isochrone grid data
+            # Save catchment area grid data
             pass
 
-    @job_log(job_step_name="isochrone")
-    async def isochrone(
+    @job_log(job_step_name="catchment_area")
+    async def catchment_area(
         self,
-        params: IIsochronePT,
+        params: ICatchmentAreaPT,
     ):
-        """Compute public transport isochrone using R5 routing endpoint."""
+        """Compute public transport catchment area using R5 routing endpoint."""
 
         # Fetch starting points from previously created layer if required
         starting_pojnts = await self.get_lats_lons(
-            layer_name=DefaultResultLayerName.isochrone_starting_points,
+            layer_name=DefaultResultLayerName.catchment_area_starting_points,
             params=params,
         )
         lats = starting_pojnts["lats"]
         lons = starting_pojnts["lons"]
         layer_starting_points = starting_pojnts["layer_starting_points"]
 
-        # Create feature layer to store computed isochrone output
-        layer_isochrone = IFeatureLayerToolCreate(
-            name=DefaultResultLayerName.isochrone_pt.value,
-            feature_layer_geometry_type=IsochroneGeometryTypeMapping[
-                params.isochrone_type.value
+        # Create feature layer to store computed catchment area output
+        layer_catchment_area = IFeatureLayerToolCreate(
+            name=DefaultResultLayerName.catchment_area_pt.value,
+            feature_layer_geometry_type=CatchmentAreaGeometryTypeMapping[
+                params.catchment_area_type.value
             ],
             attribute_mapping={"integer_attr1": "travel_cost"},
             tool_type=params.tool_type.value,
             job_id=self.job_id,
         )
-        result_table = f"{settings.USER_DATA_SCHEMA}.{layer_isochrone.feature_layer_geometry_type.value}_{str(self.user_id).replace('-', '')}"
+        result_table = f"{settings.USER_DATA_SCHEMA}.{layer_catchment_area.feature_layer_geometry_type.value}_{str(self.user_id).replace('-', '')}"
 
-        # Compute isochrone for each starting point
+        # Compute catchment area for each starting point
         for i in range(0, len(params.starting_points.latitude)):
-            # Identify relevant R5 region & bundle for this isochrone starting point
+            # Identify relevant R5 region & bundle for this catchment area starting point
             sql_get_region_mapping = f"""
                 SELECT r5_region_id, r5_bundle_id, r5_host
                 FROM {settings.REGION_MAPPING_PT_TABLE}
@@ -409,7 +409,7 @@ class CRUDIsochronePT(CRUDIsochroneBase):
             try:
                 # Call R5 endpoint multiple times for upto 20 seconds / 10 retries
                 for i in range(settings.CRUD_NUM_RETRIES):
-                    # Call R5 endpoint to compute isochrone
+                    # Call R5 endpoint to compute catchment area
                     response = await self.http_client.post(
                         url=f"{r5_host}/api/analysis",
                         json=request_payload,
@@ -432,41 +432,41 @@ class CRUDIsochronePT(CRUDIsochroneBase):
             except Exception as e:
                 raise R5EndpointError(f"Error while calling the R5 endpoint: {str(e)}")
 
-            isochrone_grid = None
-            isochrone_shapes = None
+            catchment_area_grid = None
+            catchment_area_shapes = None
             try:
                 # Decode R5 response data
-                isochrone_grid = decode_r5_grid(result)
+                catchment_area_grid = decode_r5_grid(result)
 
-                # Convert grid data returned by R5 to valid isochrone geometry
-                isochrone_shapes = generate_jsolines(
-                    grid=isochrone_grid,
+                # Convert grid data returned by R5 to valid catchment area geometry
+                catchment_area_shapes = generate_jsolines(
+                    grid=catchment_area_grid,
                     travel_time=params.travel_cost.max_traveltime,
                     percentile=5,
                     steps=params.travel_cost.steps,
                 )
             except Exception as e:
-                raise R5IsochroneComputeError(
-                    f"Error while processing R5 isochrone grid: {str(e)}"
+                raise R5CatchmentAreaComputeError(
+                    f"Error while processing R5 catchment area grid: {str(e)}"
                 )
 
             try:
                 # Save result to database
-                await self.write_isochrone_result(
-                    isochrone_type=params.isochrone_type.value,
-                    layer_id=str(layer_isochrone.id),
+                await self.write_catchment_area_result(
+                    catchment_area_type=params.catchment_area_type.value,
+                    layer_id=str(layer_catchment_area.id),
                     result_table=result_table,
-                    shapes=isochrone_shapes,
-                    grid=isochrone_grid,
+                    shapes=catchment_area_shapes,
+                    grid=catchment_area_grid,
                 )
             except Exception as e:
                 raise SQLError(
-                    f"Error while saving R5 isochrone result to database: {str(e)}"
+                    f"Error while saving R5 catchment area result to database: {str(e)}"
                 )
 
             # Create new layers.
             await self.create_feature_layer_tool(
-                layer_in=layer_isochrone,
+                layer_in=layer_catchment_area,
                 params=params,
             )
             # Create new layer if starting points are not a layer
@@ -478,10 +478,10 @@ class CRUDIsochronePT(CRUDIsochroneBase):
 
         return {
             "status": JobStatusType.finished.value,
-            "msg": "Public transport isochrone was successfully computed.",
+            "msg": "Public transport catchment area was successfully computed.",
         }
 
     @run_background_or_immediately(settings)
     @job_init()
-    async def run_isochrone(self, params: IIsochronePT):
-        return await self.isochrone(params=params)
+    async def run_catchment_area(self, params: ICatchmentAreaPT):
+        return await self.catchment_area(params=params)

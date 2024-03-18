@@ -8,7 +8,7 @@ from src.schemas.colors import ColorRangeType
 
 from typing import List, Optional
 from src.schemas.toolbox_base import (
-    IsochroneStartingPointsBase,
+    CatchmentAreaStartingPointsBase,
     PTTimeWindow,
     input_layer_type_point,
     check_starting_points,
@@ -16,27 +16,25 @@ from src.schemas.toolbox_base import (
 )
 
 
-"""Isochrone starting point validators."""
+"""Catchment area starting point validators."""
 
-
-class IsochroneStartingPointsActiveMobility(IsochroneStartingPointsBase):
-    """Model for the active mobility isochrone starting points."""
+class CatchmentAreaStartingPointsActiveMobility(CatchmentAreaStartingPointsBase):
+    """Model for the active mobility catchment area starting points."""
 
     # Check that the starting points for active mobility are below 1000
     check_starting_points = check_starting_points(1000)
 
 
-class IsochroneStartingPointsMotorizedMobility(IsochroneStartingPointsBase):
-    """Model for the active mobility isochrone starting points."""
+class CatchmentAreaStartingPointsMotorizedMobility(CatchmentAreaStartingPointsBase):
+    """Model for the active mobility catchment area starting points."""
 
     # Check that the starting points for motorized mobility is 1
     check_starting_points = check_starting_points(1)
 
 
-"""Isochrone routing mode schemas."""
+"""Catchment area routing mode schemas."""
 
-
-class IsochroneRoutingModeActiveMobility(str, Enum):
+class CatchmentAreaRoutingModeActiveMobility(str, Enum):
     """Routing active mobility type schema."""
 
     walking = "walking"
@@ -44,7 +42,7 @@ class IsochroneRoutingModeActiveMobility(str, Enum):
     pedelec = "pedelec"
 
 
-class IsochroneRoutingModePT(str, Enum):
+class CatchmentAreaRoutingModePT(str, Enum):
     """Routing public transport mode schema."""
 
     bus = "bus"
@@ -57,14 +55,13 @@ class IsochroneRoutingModePT(str, Enum):
     funicular = "funicular"
 
 
-class IsochroneRoutingEgressModePT(str, Enum):
+class CatchmentAreaRoutingEgressModePT(str, Enum):
     """Routing public transport egress mode schema."""
-
     walk = "walk"
     bicycle = "bicycle"
 
 
-class IsochroneRoutingAccessModePT(str, Enum):
+class CatchmentAreaRoutingAccessModePT(str, Enum):
     """Routing public transport access mode schema."""
 
     walk = "walk"
@@ -72,36 +69,35 @@ class IsochroneRoutingAccessModePT(str, Enum):
     car = "car"
 
 
-class IsochroneRoutingModeConfigPT(BaseModel):
+class CatchmentAreaRoutingModeConfigPT(BaseModel):
     """Routing public transport type schema."""
 
-    mode: List[IsochroneRoutingModePT] = Field(
+    mode: List[CatchmentAreaRoutingModePT] = Field(
         ...,
         title="Mode",
         description="The mode of the public transport.",
     )
-    egress_mode: IsochroneRoutingEgressModePT = Field(
+    egress_mode: CatchmentAreaRoutingEgressModePT = Field(
         ...,
         title="Egress Mode",
         description="The egress mode of the public transport.",
     )
-    access_mode: IsochroneRoutingAccessModePT = Field(
+    access_mode: CatchmentAreaRoutingAccessModePT = Field(
         ...,
         title="Access Mode",
         description="The access mode of the public transport.",
     )
 
 
-class IsochroneRoutingTypeCar(str, Enum):
+class CatchmentAreaRoutingTypeCar(str, Enum):
     """Routing car type schema."""
 
     car_peak = "car_peak"
 
 
-"""Isochrone travel cost schemas."""
+"""Catchment area travel cost schemas."""
 
-
-class IsochroneTravelTimeCostActiveMobility(BaseModel):
+class CatchmentAreaTravelTimeCostActiveMobility(BaseModel):
     """Travel time cost schema."""
 
     max_traveltime: int = Field(
@@ -135,7 +131,7 @@ class IsochroneTravelTimeCostActiveMobility(BaseModel):
 
 
 # TODO: Check how to treat miles
-class IsochroneTravelDistanceCostActiveMobility(BaseModel):
+class CatchmentAreaTravelDistanceCostActiveMobility(BaseModel):
     """Travel distance cost schema."""
 
     max_distance: int = Field(
@@ -161,7 +157,7 @@ class IsochroneTravelDistanceCostActiveMobility(BaseModel):
         return v
 
 
-class IsochroneTravelTimeCostMotorizedMobility(BaseModel):
+class CatchmentAreaTravelTimeCostMotorizedMobility(BaseModel):
     """Travel time cost schema."""
 
     max_traveltime: int = Field(
@@ -178,19 +174,18 @@ class IsochroneTravelTimeCostMotorizedMobility(BaseModel):
     )
 
 
-"""Isochrone decay function schemas."""
+"""Catchment area decay function schemas."""
 
-
-class IsochroneDecayFunctionTypePT(Enum):
+class CatchmentAreaDecayFunctionTypePT(Enum):
     LOGISTIC = "logistic"
     LINEAR = "linear"
     EXPONENTIAL = "exponential"
     STEP = "step"
 
 
-class IsochroneDecayFunctionPT(BaseModel):
-    type: Optional[IsochroneDecayFunctionTypePT] = Field(
-        IsochroneDecayFunctionTypePT.LOGISTIC, description="Decay function type"
+class CatchmentAreaDecayFunctionPT(BaseModel):
+    type: Optional[CatchmentAreaDecayFunctionTypePT] = Field(
+        CatchmentAreaDecayFunctionTypePT.LOGISTIC, description="Decay function type"
     )
     standard_deviation_minutes: Optional[int] = Field(
         12, description="Standard deviation in minutes"
@@ -198,57 +193,55 @@ class IsochroneDecayFunctionPT(BaseModel):
     width_minutes: Optional[int] = Field(10, description="Width in minutes")
 
 
-"""Isochrone type schemas."""
+"""Catchment area type schemas."""
 
-
-class IsochroneTypeActiveMobility(str, Enum):
-    """Isochrone type schema for active mobility."""
+class CatchmentAreaTypeActiveMobility(str, Enum):
+    """Catchment area type schema for active mobility."""
 
     polygon = "polygon"
     network = "network"
     rectangular_grid = "rectangular_grid"
 
 
-class IsochroneTypePT(str, Enum):
-    """Isochrone type schema for public transport."""
+class CatchmentAreaTypePT(str, Enum):
+    """Catchment area type schema for public transport."""
 
     polygon = "polygon"
     rectangular_grid = "rectangular_grid"
 
 
-"""User-configured isochrone payload schemas."""
+"""User-configured catchment area payload schemas."""
 
+class ICatchmentAreaActiveMobility(BaseModel):
+    """Model for the active mobility catchment area"""
 
-class IIsochroneActiveMobility(BaseModel):
-    """Model for the active mobility isochrone"""
-
-    starting_points: IsochroneStartingPointsActiveMobility = Field(
+    starting_points: CatchmentAreaStartingPointsActiveMobility = Field(
         ...,
         title="Starting Points",
-        description="The starting points of the isochrone.",
+        description="The starting points of the catchment area.",
     )
-    routing_type: IsochroneRoutingModeActiveMobility = Field(
+    routing_type: CatchmentAreaRoutingModeActiveMobility = Field(
         ...,
         title="Routing Type",
-        description="The routing type of the isochrone.",
+        description="The routing type of the catchment area.",
     )
     travel_cost: (
-        IsochroneTravelTimeCostActiveMobility
-        | IsochroneTravelDistanceCostActiveMobility
+        CatchmentAreaTravelTimeCostActiveMobility
+        | CatchmentAreaTravelDistanceCostActiveMobility
     ) = Field(
         ...,
         title="Travel Cost",
-        description="The travel cost of the isochrone.",
+        description="The travel cost of the catchment area.",
     )
     scenario_id: UUID | None = Field(
         None,
         title="Scenario ID",
         description="The ID of the scenario that is used for the routing.",
     )
-    isochrone_type: IsochroneTypeActiveMobility = Field(
+    catchment_area_type: CatchmentAreaTypeActiveMobility = Field(
         ...,
         title="Return Type",
-        description="The return type of the isochrone.",
+        description="The return type of the catchment area.",
     )
     polygon_difference: bool | None = Field(
         None,
@@ -258,11 +251,11 @@ class IIsochroneActiveMobility(BaseModel):
 
     @property
     def tool_type(self):
-        return ToolType.isochrone_active_mobility
+        return ToolType.catchment_area_active_mobility
 
     @property
     def geofence_table(self):
-        mode = ToolType.isochrone_active_mobility.value.replace("isochrone_", "")
+        mode = ToolType.catchment_area_active_mobility.value.replace("catchment_area_", "")
         return f"basic.geofence_{mode}"
 
     @property
@@ -272,7 +265,7 @@ class IIsochroneActiveMobility(BaseModel):
     @property
     def properties_base(self):
         return {
-            DefaultResultLayerName.isochrone_active_mobility: {
+            DefaultResultLayerName.catchment_area_active_mobility: {
                 "color_range_type": ColorRangeType.sequential,
                 "color_field": {"name": "travel_cost", "type": "number"},
                 "color_scale": "ordinal",
@@ -280,39 +273,39 @@ class IIsochroneActiveMobility(BaseModel):
         }
 
 
-class IIsochronePT(BaseModel):
-    """Model for the public transport isochrone"""
+class ICatchmentAreaPT(BaseModel):
+    """Model for the public transport catchment area"""
 
-    starting_points: IsochroneStartingPointsMotorizedMobility = Field(
+    starting_points: CatchmentAreaStartingPointsMotorizedMobility = Field(
         ...,
         title="Starting Points",
-        description="The starting points of the isochrone.",
+        description="The starting points of the catchment area.",
     )
-    routing_type: IsochroneRoutingModeConfigPT = Field(
+    routing_type: CatchmentAreaRoutingModeConfigPT = Field(
         ...,
         title="Routing Type",
-        description="The routing type of the isochrone.",
+        description="The routing type of the catchment area.",
     )
-    travel_cost: IsochroneTravelTimeCostMotorizedMobility = Field(
+    travel_cost: CatchmentAreaTravelTimeCostMotorizedMobility = Field(
         ...,
         title="Travel Cost",
-        description="The travel cost of the isochrone.",
+        description="The travel cost of the catchment area.",
     )
     time_window: PTTimeWindow = Field(
         ...,
         title="Time Window",
-        description="The time window of the isochrone.",
+        description="The time window of the catchment area.",
     )
-    isochrone_type: IsochroneTypePT = Field(
+    catchment_area_type: CatchmentAreaTypePT = Field(
         ...,
         title="Return Type",
-        description="The return type of the isochrone.",
+        description="The return type of the catchment area.",
     )
 
-    decay_function: IsochroneDecayFunctionPT = Field(
-        IsochroneDecayFunctionPT(),
+    decay_function: CatchmentAreaDecayFunctionPT = Field(
+        CatchmentAreaDecayFunctionPT(),
         title="Decay Function",
-        description="The decay function of the isochrone.",
+        description="The decay function of the catchment area.",
     )
 
     # Defaults - not currently user configurable
@@ -328,11 +321,11 @@ class IIsochronePT(BaseModel):
 
     @property
     def tool_type(self):
-        return ToolType.isochrone_pt
+        return ToolType.catchment_area_pt
 
     @property
     def geofence_table(self):
-        mode = ToolType.isochrone_pt.value.replace("isochrone_", "")
+        mode = ToolType.catchment_area_pt.value.replace("catchment_area_", "")
         return f"basic.geofence_{mode}"
 
     @property
@@ -342,7 +335,7 @@ class IIsochronePT(BaseModel):
     @property
     def properties_base(self):
         return {
-            DefaultResultLayerName.isochrone_pt: {
+            DefaultResultLayerName.catchment_area_pt: {
                 "color_range_type": ColorRangeType.sequential,
                 "color_field": {"name": "travel_cost", "type": "number"},
                 "color_scale": "ordinal",
@@ -350,32 +343,32 @@ class IIsochronePT(BaseModel):
         }
 
 
-class IIsochroneCar(BaseModel):
-    """Model for the car isochrone"""
+class ICatchmentAreaCar(BaseModel):
+    """Model for the car catchment area"""
 
-    starting_points: IsochroneStartingPointsMotorizedMobility = Field(
+    starting_points: CatchmentAreaStartingPointsMotorizedMobility = Field(
         ...,
         title="Starting Points",
-        description="The starting points of the isochrone.",
+        description="The starting points of the catchment area.",
     )
-    routing_type: IsochroneRoutingTypeCar = Field(
+    routing_type: CatchmentAreaRoutingTypeCar = Field(
         ...,
         title="Routing Type",
-        description="The routing type of the isochrone.",
+        description="The routing type of the catchment area.",
     )
-    travel_cost: IsochroneTravelTimeCostMotorizedMobility = Field(
+    travel_cost: CatchmentAreaTravelTimeCostMotorizedMobility = Field(
         ...,
         title="Travel Cost",
-        description="The travel cost of the isochrone.",
+        description="The travel cost of the catchment area.",
     )
 
     @property
     def tool_type(self):
-        return ToolType.isochrone_car
+        return ToolType.catchment_area_car
 
     @property
     def geofence_table(self):
-        mode = ToolType.isochrone_car.value.value.replace("isochrone_", "")
+        mode = ToolType.catchment_area_car.value.value.replace("catchment_area_", "")
         return f"basic.geofence_{mode}"
 
     @property
@@ -385,7 +378,7 @@ class IIsochroneCar(BaseModel):
     @property
     def properties_base(self):
         return {
-            DefaultResultLayerName.isochrone_car: {
+            DefaultResultLayerName.catchment_area_car: {
                 "color_range_type": ColorRangeType.sequential,
                 "color_field": {"name": "travel_cost", "type": "number"},
                 "color_scale": "ordinal",
@@ -393,36 +386,36 @@ class IIsochroneCar(BaseModel):
         }
 
 
-class IsochroneNearbyStationAccess(BaseModel):
-    """Model for the nearby stations (active mobility) isochrone"""
+class CatchmentAreaNearbyStationAccess(BaseModel):
+    """Model for the nearby stations (active mobility) catchment area"""
 
-    starting_points: IsochroneStartingPointsActiveMobility = Field(
+    starting_points: CatchmentAreaStartingPointsActiveMobility = Field(
         ...,
         title="Starting Points",
-        description="The starting points of the isochrone.",
+        description="The starting points of the catchment area.",
     )
-    routing_type: IsochroneRoutingModeActiveMobility = Field(
+    routing_type: CatchmentAreaRoutingModeActiveMobility = Field(
         ...,
         title="Routing Type",
-        description="The routing type of the isochrone.",
+        description="The routing type of the catchment area.",
     )
     travel_cost: (
-        IsochroneTravelTimeCostActiveMobility
-        | IsochroneTravelDistanceCostActiveMobility
+        CatchmentAreaTravelTimeCostActiveMobility
+        | CatchmentAreaTravelDistanceCostActiveMobility
     ) = Field(
         ...,
         title="Travel Cost",
-        description="The travel cost of the isochrone.",
+        description="The travel cost of the catchment area.",
     )
     scenario_id: UUID | None = Field(
         None,
         title="Scenario ID",
         description="The ID of the scenario that is used for the routing.",
     )
-    isochrone_type: IsochroneTypeActiveMobility = Field(
+    catchment_area_type: CatchmentAreaTypeActiveMobility = Field(
         ...,
         title="Return Type",
-        description="The return type of the isochrone.",
+        description="The return type of the catchment area.",
     )
     polygon_difference: bool | None = Field(
         None,
@@ -432,11 +425,11 @@ class IsochroneNearbyStationAccess(BaseModel):
 
     @property
     def tool_type(self):
-        return ToolType.isochrone_nearby_station_access
+        return ToolType.catchment_area_nearby_station_access
 
     @property
     def geofence_table(self):
-        mode = ToolType.isochrone_pt.value.replace("isochrone_", "")
+        mode = ToolType.catchment_area_pt.value.replace("catchment_area_", "")
         return f"basic.geofence_{mode}"
 
     @property
@@ -455,10 +448,10 @@ class IsochroneNearbyStationAccess(BaseModel):
         }
 
 
-request_examples_isochrone_active_mobility = {
-    "isochrone_active_mobility": {
+request_examples_catchment_area_active_mobility = {
+    "catchment_area_active_mobility": {
         "single_point_walking": {
-            "summary": "Single point isochrone walking",
+            "summary": "Single point catchment area walking",
             "value": {
                 "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
                 "routing_type": "walking",
@@ -467,12 +460,12 @@ request_examples_isochrone_active_mobility = {
                     "steps": 10,
                     "speed": 5,
                 },
-                "isochrone_type": "polygon",
+                "catchment_area_type": "polygon",
                 "polygon_difference": True,
             },
         },
         "single_point_cycling": {
-            "summary": "Single point isochrone cycling",
+            "summary": "Single point catchment area cycling",
             "value": {
                 "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
                 "routing_type": "bicycle",
@@ -481,12 +474,12 @@ request_examples_isochrone_active_mobility = {
                     "steps": 5,
                     "speed": 15,
                 },
-                "isochrone_type": "polygon",
+                "catchment_area_type": "polygon",
                 "polygon_difference": True,
             },
         },
         "single_point_walking_scenario": {
-            "summary": "Single point isochrone walking",
+            "summary": "Single point catchment area walking",
             "value": {
                 "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
                 "routing_type": "walking",
@@ -496,12 +489,12 @@ request_examples_isochrone_active_mobility = {
                     "speed": 5,
                 },
                 "scenario_id": "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
-                "isochrone_type": "polygon",
+                "catchment_area_type": "polygon",
                 "polygon_difference": True,
             },
         },
         "multi_point_walking": {
-            "summary": "Multi point isochrone walking",
+            "summary": "Multi point catchment area walking",
             "value": {
                 "starting_points": {
                     "latitude": [
@@ -538,7 +531,7 @@ request_examples_isochrone_active_mobility = {
             },
         },
         "multi_point_cycling": {
-            "summary": "Multi point isochrone cycling",
+            "summary": "Multi point catchment area cycling",
             "value": {
                 "starting_points": {
                     "latitude": [
@@ -575,7 +568,7 @@ request_examples_isochrone_active_mobility = {
             },
         },
         "layer_based_walking": {
-            "summary": "Layer based isochrone walking",
+            "summary": "Layer based catchment area walking",
             "value": {
                 "starting_points": {
                     "layer_id": "39e16c27-2b03-498e-8ccc-68e798c64b8d"  # Sample UUID for the layer
@@ -592,10 +585,10 @@ request_examples_isochrone_active_mobility = {
 }
 
 
-request_examples_isochrone_pt = {
-    # 1. Isochrone for public transport with all modes
+request_examples_catchment_area_pt = {
+    # 1. Catchment area for public transport with all modes
     "all_modes_pt": {
-        "summary": "Isochrone using all PT modes",
+        "summary": "Catchment area using all PT modes",
         "value": {
             "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
             "routing_type": {
@@ -610,12 +603,12 @@ request_examples_isochrone_pt = {
             },
             "travel_cost": {"max_traveltime": 40, "steps": 10},
             "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
-            "isochrone_type": "polygon",
+            "catchment_area_type": "polygon",
         },
     },
-    # 2. Isochrone for public transport excluding bus mode
+    # 2. Catchment area for public transport excluding bus mode
     "exclude_bus_mode_pt": {
-        "summary": "Isochrone excluding bus mode",
+        "summary": "Catchment area excluding bus mode",
         "value": {
             "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
             "routing_type": {
@@ -629,25 +622,25 @@ request_examples_isochrone_pt = {
             },
             "travel_cost": {"max_traveltime": 35, "steps": 5},
             "time_window": {"weekday": "weekday", "from_time": 25200, "to_time": 32400},
-            "isochrone_type": "polygon",
+            "catchment_area_type": "polygon",
         },
     },
 }
 
 
-request_examples_isochrone_car = {
-    # 1. Isochrone for car
+request_examples_catchment_area_car = {
+    # 1. Catchment area for car
     "single_point_car": {
-        "summary": "Isochrone for a single starting point using car",
+        "summary": "Catchment area for a single starting point using car",
         "value": {
             "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
             "routing_type": "car_peak",
             "travel_cost": {"max_traveltime": 30, "steps": 10},
         },
     },
-    # 2. Multiisochrone for car
+    # 2. Multi catchment area for car
     "multi_point_car": {
-        "summary": "Isochrone for multiple starting points using car",
+        "summary": "Catchment area for multiple starting points using car",
         "value": {
             "starting_points": {
                 "latitude": [52.5200, 52.5250, 52.5300],

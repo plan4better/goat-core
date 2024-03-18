@@ -1,34 +1,34 @@
 import pytest
 from pydantic import ValidationError
-from src.schemas.toolbox_base import InputLayerType, LayerType, FeatureGeometryType, IsochroneStartingPointsBase
+from src.schemas.toolbox_base import InputLayerType, LayerType, FeatureGeometryType, CatchmentAreaStartingPointsBase
 
 
-def test_isochrone_starting_points_base_both_coords_and_layer_id():
+def test_catchment_area_starting_points_base_both_coords_and_layer_id():
     # Test that providing both coordinates and layer_project_id raises a ValidationError
     with pytest.raises(ValidationError):
-        IsochroneStartingPointsBase(latitude=[0.0], longitude=[0.0], layer_project_id=1)
+        CatchmentAreaStartingPointsBase(latitude=[0.0], longitude=[0.0], layer_project_id=1)
 
-def test_isochrone_starting_points_base_coords_length_mismatch():
+def test_catchment_area_starting_points_base_coords_length_mismatch():
     # Test that providing latitude and longitude of different lengths raises a ValidationError
     with pytest.raises(ValidationError):
-        IsochroneStartingPointsBase(latitude=[0.0], longitude=[0.0, 1.0])
+        CatchmentAreaStartingPointsBase(latitude=[0.0], longitude=[0.0, 1.0])
 
-def test_isochrone_starting_points_base_coords_out_of_bounds():
+def test_catchment_area_starting_points_base_coords_out_of_bounds():
     # Test that providing latitude and/or longitude out of bounds raises a ValidationError
     with pytest.raises(ValidationError):
-        IsochroneStartingPointsBase(latitude=[-91.0], longitude=[0.0])
+        CatchmentAreaStartingPointsBase(latitude=[-91.0], longitude=[0.0])
     with pytest.raises(ValidationError):
-        IsochroneStartingPointsBase(latitude=[0.0], longitude=[-181.0])
+        CatchmentAreaStartingPointsBase(latitude=[0.0], longitude=[-181.0])
 
-def test_isochrone_starting_points_base_no_coords_or_layer_id():
+def test_catchment_area_starting_points_base_no_coords_or_layer_id():
     # Test that not providing either coordinates or layer_project_id raises a ValidationError
     with pytest.raises(ValidationError):
-        IsochroneStartingPointsBase(latitude=None, longitude=None, layer_project_id=None)
+        CatchmentAreaStartingPointsBase(latitude=None, longitude=None, layer_project_id=None)
 
-def test_isochrone_starting_points_base_valid_input():
+def test_catchment_area_starting_points_base_valid_input():
     # Test that valid input does not raise a ValidationError
-    IsochroneStartingPointsBase(latitude=[0.0], longitude=[0.0])
-    IsochroneStartingPointsBase(layer_project_id=1)
+    CatchmentAreaStartingPointsBase(latitude=[0.0], longitude=[0.0])
+    CatchmentAreaStartingPointsBase(layer_project_id=1)
 
 def test_input_layer_type_feature_layer():
     # Test that when layer_type is feature, feature_layer_geometry_types cannot be null

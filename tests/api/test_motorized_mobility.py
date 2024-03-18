@@ -7,13 +7,13 @@ from tests.utils import check_job_status
 
 
 @pytest.mark.asyncio
-async def test_compute_isochrone_pt(client: AsyncClient, fixture_isochrone_pt):
-    assert fixture_isochrone_pt["job_id"] is not None
+async def test_compute_catchment_area_pt(client: AsyncClient, fixture_catchment_area_pt):
+    assert fixture_catchment_area_pt["job_id"] is not None
 
 
 @pytest.mark.asyncio
-async def test_compute_isochrone_car(client: AsyncClient, fixture_isochrone_car):
-    assert fixture_isochrone_car["job_id"] is not None
+async def test_compute_catchment_area_car(client: AsyncClient, fixture_catchment_area_car):
+    assert fixture_catchment_area_car["job_id"] is not None
 
 
 @pytest.mark.asyncio
@@ -76,7 +76,7 @@ async def test_trip_count_station(
     assert job["status_simple"] == "finished"
 
 
-async def test_single_isochrone_public_transport(
+async def test_single_catchment_area_public_transport(
     client: AsyncClient, fixture_create_project
 ):
     project_id = fixture_create_project["id"]
@@ -105,10 +105,10 @@ async def test_single_isochrone_public_transport(
             "from_time": 25200,  # 7 AM
             "to_time": 39600,  # 9 AM
         },
-        "isochrone_type": "polygon",
+        "catchment_area_type": "polygon",
     }
     response = await client.post(
-        f"{settings.API_V2_STR}/motorized-mobility/pt/isochrone?project_id={project_id}",
+        f"{settings.API_V2_STR}/motorized-mobility/pt/catchment-area?project_id={project_id}",
         json=params,
     )
     assert response.status_code == 201

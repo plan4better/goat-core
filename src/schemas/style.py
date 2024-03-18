@@ -2,8 +2,6 @@ import random
 from src.db.models.layer import FeatureGeometryType
 from src.schemas.colors import diverging_colors, color_ranges, ColorRangeType
 from src.utils import hex_to_rgb
-from src.schemas.tool import ToolType
-from src.core.config import settings
 from src.schemas.toolbox_base import DefaultResultLayerName
 
 
@@ -317,6 +315,6 @@ style_starting = {
 custom_styles = {
     DefaultResultLayerName.oev_gueteklasse: style_oev_gueteklassen_polygon,
     DefaultResultLayerName.oev_gueteklasse_station: style_oev_gueteklassen_point,
-    DefaultResultLayerName.isochrone_starting_points: style_starting,
+    DefaultResultLayerName.catchment_area_starting_points: style_starting,
     DefaultResultLayerName.nearby_station_access_starting_points: style_starting,
 }

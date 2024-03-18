@@ -9,9 +9,9 @@ class JobType(str, Enum):
 
     file_import = "file_import"
     join = "join"
-    isochrone_active_mobility = "isochrone_active_mobility"
-    isochrone_pt = "isochrone_pt"
-    isochrone_car = "isochrone_car"
+    catchment_area_active_mobility = "catchment_area_active_mobility"
+    catchment_area_pt = "catchment_area_pt"
+    catchment_area_car = "catchment_area_car"
     oev_gueteklasse = "oev_gueteklasse"
     aggregate_point = "aggregate_point"
     aggregate_polygon = "aggregate_polygon"
@@ -85,19 +85,19 @@ class JobStatusAggregationPolygon(BaseModel):
     aggregation: JobStep = {}
 
 
-class JobStatusIsochroneBase(BaseModel):
-    isochrone: JobStep = {}
+class JobStatusCatchmentAreaBase(BaseModel):
+    catchment_area: JobStep = {}
 
 
-class JobStatusIsochroneActiveMobility(JobStatusIsochroneBase):
+class JobStatusCatchmentAreaActiveMobility(JobStatusCatchmentAreaBase):
     pass
 
 
-class JobStatusIsochronePT(JobStatusIsochroneBase):
+class JobStatusCatchmentAreaPT(JobStatusCatchmentAreaBase):
     pass
 
 
-class JobStatusIsochroneCar(JobStatusIsochroneBase):
+class JobStatusCatchmentAreaCar(JobStatusCatchmentAreaBase):
     pass
 
 
@@ -150,9 +150,9 @@ job_mapping = {
     JobType.oev_gueteklasse: JobStatusOevGueteklasse,
     JobType.aggregate_point: JobStatusAggregationPoint,
     JobType.aggregate_polygon: JobStatusAggregationPolygon,
-    JobType.isochrone_active_mobility: JobStatusIsochroneActiveMobility,
-    JobType.isochrone_pt: JobStatusIsochronePT,
-    JobType.isochrone_car: JobStatusIsochroneCar,
+    JobType.catchment_area_active_mobility: JobStatusCatchmentAreaActiveMobility,
+    JobType.catchment_area_pt: JobStatusCatchmentAreaPT,
+    JobType.catchment_area_car: JobStatusCatchmentAreaCar,
     JobType.buffer: JobStatusBuffer,
     JobType.trip_count_station: JobStatusTripCountStation,
     JobType.origin_destination: JobStatusOriginDestination,

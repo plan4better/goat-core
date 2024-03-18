@@ -9,7 +9,7 @@ from tests.utils import check_job_status
 
 
 @pytest.mark.asyncio
-async def test_single_isochrone_active_mobility_layer(
+async def test_single_catchment_area_active_mobility_layer(
     client: AsyncClient,
     db_session: AsyncSession,
     fixture_add_aggregate_point_layer_to_project,
@@ -19,7 +19,7 @@ async def test_single_isochrone_active_mobility_layer(
         "source_layer_project_id"
     ]
 
-    # Produce isochrone request payload
+    # Produce catchment area request payload
     params = {
         "starting_points": {"layer_project_id": layer_project_id},
         "routing_type": "walking",
@@ -28,11 +28,11 @@ async def test_single_isochrone_active_mobility_layer(
             "steps": 5,
             "speed": 5,
         },
-        "isochrone_type": "polygon",
+        "catchment_area_type": "polygon",
         "polygon_difference": True,
     }
     response = await client.post(
-        f"{settings.API_V2_STR}/active-mobility/isochrone?project_id={project_id}",
+        f"{settings.API_V2_STR}/active-mobility/catchment-area?project_id={project_id}",
         json=params,
     )
     assert response.status_code == 201
@@ -43,7 +43,7 @@ async def test_single_isochrone_active_mobility_layer(
 
 
 @pytest.mark.asyncio
-async def test_single_isochrone_active_mobility_lat_lon(
+async def test_single_catchment_area_active_mobility_lat_lon(
     client: AsyncClient,
     db_session: AsyncSession,
     fixture_create_project,
@@ -52,7 +52,7 @@ async def test_single_isochrone_active_mobility_lat_lon(
     project_id = fixture_create_project["id"]
     fixture_create_user["id"]
 
-    # Produce isochrone request payload
+    # Produce catchment area request payload
     max_traveltime = 30
     steps = 5
     params = {
@@ -66,11 +66,11 @@ async def test_single_isochrone_active_mobility_lat_lon(
             "steps": steps,
             "speed": 5,
         },
-        "isochrone_type": "polygon",
+        "catchment_area_type": "polygon",
         "polygon_difference": True,
     }
     response = await client.post(
-        f"{settings.API_V2_STR}/active-mobility/isochrone?project_id={project_id}",
+        f"{settings.API_V2_STR}/active-mobility/catchment-area?project_id={project_id}",
         json=params,
     )
     assert response.status_code == 201
@@ -79,7 +79,7 @@ async def test_single_isochrone_active_mobility_lat_lon(
     # Check if job is finished
     assert job["status_simple"] == "finished"
 
-    # Check if the resulting isochrone was actually saved to the database
+    # Check if the resulting catchment area was actually saved to the database
     # And if the number of rows in the table equals the expected number of incremental polygons
     # TODO: This was turned off as reading from the table needs to include also the layer_id. AS the table contains data from multiple layers.
     # result_table = (
@@ -92,7 +92,7 @@ async def test_single_isochrone_active_mobility_lat_lon(
 
 
 @pytest.mark.asyncio
-async def test_single_isochrone_active_mobility_dynamic(
+async def test_single_catchment_area_active_mobility_dynamic(
     client: AsyncClient,
     db_session: AsyncSession,
     fixture_create_project,
@@ -118,7 +118,7 @@ async def test_single_isochrone_active_mobility_dynamic(
         )
     ).fetchall()[0]
 
-    # Produce a random isochrone request payload
+    # Produce a random catchment area request payload
     max_traveltime = random.randint(5, 30)
     steps = random.randint(1, int(max_traveltime / 2))
     params = {
@@ -129,11 +129,11 @@ async def test_single_isochrone_active_mobility_dynamic(
             "steps": steps,
             "speed": random.randint(1, 25),
         },
-        "isochrone_type": "polygon",
+        "catchment_area_type": "polygon",
         "polygon_difference": True,
     }
     response = await client.post(
-        f"{settings.API_V2_STR}/active-mobility/isochrone?project_id={project_id}",
+        f"{settings.API_V2_STR}/active-mobility/catchment-area?project_id={project_id}",
         json=params,
     )
     assert response.status_code == 201
@@ -142,7 +142,7 @@ async def test_single_isochrone_active_mobility_dynamic(
     # Check if job is finished
     assert job["status_simple"] == "finished"
 
-    # Check if the resulting isochrone was actually saved to the database
+    # Check if the resulting catchment area was actually saved to the database
     # And if the number of rows in the table equals the expected number of incremental polygons
     result_table = (
         f"{settings.USER_DATA_SCHEMA}.polygon_{str(user_id).replace('-', '')}"
@@ -152,4 +152,4 @@ async def test_single_isochrone_active_mobility_dynamic(
     )
     assert num_rows == (max_traveltime / steps)
 
-    # TODO: We could also measure the area of the isochrone and see if it corresponds to an expected value.
+    # TODO: We could also measure the area of the catchment area and see if it corresponds to an expected value.
