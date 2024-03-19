@@ -39,23 +39,44 @@ class CRUDOevGueteklasse(CRUDToolBase):
         where_query = build_where_clause([reference_layer_project.where_query])
         query = f"""
             INSERT INTO {self.table_stations}({', '.join(station_category_layer.attribute_mapping.keys())}, layer_id, geom)
-            WITH stations AS (
+            WITH child_stops AS (
+                SELECT *
+                FROM temporal.count_public_transport_services_station (
+                    '{reference_layer_project.table_name}',
+                    :where_query,
+                    '{str(timedelta(seconds=params.time_window.from_time))}',
+                    '{str(timedelta(seconds=params.time_window.to_time))}',
+                    {params.time_window.weekday_integer}
+                )
+            ),
+            stations AS (
                 SELECT stop_id, stop_name, (oev_gueteklasse ->> 'frequency')::float AS frequency,
                 (oev_gueteklasse ->> '_class')::integer AS _class, '{str(station_category_layer.id)}'::uuid AS layer_id, geom AS geom
                 FROM (
-                    SELECT *, (COUNT(parent_station) OVER (PARTITION BY parent_station))::smallint as child_count
-                    FROM basic.count_public_transport_services_station (
-                        '{reference_layer_project.table_name}',
-                        :where_query,
-                        '{str(timedelta(seconds=params.time_window.from_time))}',
-                        '{str(timedelta(seconds=params.time_window.to_time))}',
-                        {params.time_window.weekday_integer}
-                    )
-                ) s, LATERAL basic.oev_guetklasse_station_category(child_count, trip_cnt, '{json.dumps(params.station_config.dict())}'::jsonb,
-                {params.time_window.from_time}, {params.time_window.to_time}) oev_gueteklasse
+                    SELECT parent_station.stop_id, parent_station.stop_name, grouped.trip_cnt_list, parent_station.geom
+                    FROM (
+                        SELECT parent_station, array_agg(trip_cnt) AS trip_cnt_list, h3_3
+                        FROM child_stops
+                        WHERE parent_station IS NOT NULL
+                        GROUP BY parent_station, h3_3
+                    ) grouped,
+                    basic.stops parent_station
+                    WHERE parent_station.h3_3 = grouped.h3_3
+                    AND parent_station.stop_id = grouped.parent_station
+                    UNION ALL
+                    SELECT stop_id, stop_name, ARRAY[trip_cnt] AS trip_cnt_list, geom
+                    FROM child_stops
+                    WHERE parent_station IS NULL
+                ) services_count,
+                LATERAL temporal.oev_guetklasse_station_category(
+                    trip_cnt_list,
+                    '{json.dumps(params.station_config.dict())}'::jsonb,
+                    {params.time_window.from_time},
+                    {params.time_window.to_time}
+                ) oev_gueteklasse
             )
             SELECT *
-            FROM stations
+            FROM stations;
         """
         await self.async_session.execute(query, {"where_query": where_query})
         await self.async_session.commit()
