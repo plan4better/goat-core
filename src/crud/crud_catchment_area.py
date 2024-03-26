@@ -1,5 +1,7 @@
 import asyncio
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
 from src.core.tool import CRUDToolBase
@@ -27,6 +29,61 @@ from src.schemas.toolbox_base import (
 from src.utils import decode_r5_grid
 
 
+async def call_routing_endpoint(request_payload: dict, http_client: AsyncClient):
+    try:
+        # Call GOAT Routing endpoint multiple times for upto 20 seconds / 10 retries
+        for i in range(settings.CRUD_NUM_RETRIES):
+            # Call GOAT Routing endpoint to compute catchment area
+            response = await http_client.post(
+                url=f"{settings.GOAT_ROUTING_URL}/catchment-area",
+                json=request_payload,
+                headers={"Authorization": settings.GOAT_ROUTING_AUTHORIZATION},
+            )
+            if response.status_code == 202:
+                # Endpoint is still processing request, retry shortly
+                if i == settings.CRUD_NUM_RETRIES - 1:
+                    raise Exception(
+                        "GOAT routing endpoint took too long to process request."
+                    )
+                await asyncio.sleep(settings.CRUD_RETRY_INTERVAL)
+                continue
+            elif response.status_code == 201:
+                # Endpoint has finished processing request, break
+                break
+            else:
+                raise Exception(response.text)
+    except Exception as e:
+        raise RoutingEndpointError(
+            f"Error while calling the routing endpoint: {str(e)}"
+        )
+
+
+async def create_temp_isochrone_table(async_session: AsyncSession, job_id: UUID):
+    try:
+        # Create result table to store catchment area geometry
+        catchment_area_table = f"temporal.temp_{str(job_id).replace('-', '')}"
+        # Drop table if exists
+        sql_drop_temp_table = f"""
+            DROP TABLE IF EXISTS {catchment_area_table};
+        """
+        await async_session.execute(sql_drop_temp_table)
+        sql_create_temp_table = f"""
+            CREATE TABLE {catchment_area_table} (
+                id serial,
+                layer_id text,
+                geom geometry,
+                integer_attr1 smallint
+            );
+        """
+        await async_session.execute(sql_create_temp_table)
+        await async_session.commit()
+    except Exception as e:
+        await async_session.rollback()
+        raise SQLError(e)
+
+    return catchment_area_table
+
+
 class CRUDCatchmentAreaBase(CRUDToolBase):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
@@ -35,7 +92,14 @@ class CRUDCatchmentAreaBase(CRUDToolBase):
         )
 
     async def create_layer_starting_points(
-        self, layer_name: DefaultResultLayerName, params: ICatchmentAreaActiveMobility | ICatchmentAreaCar | ICatchmentAreaPT | CatchmentAreaNearbyStationAccess
+        self,
+        layer_name: DefaultResultLayerName,
+        params: (
+            ICatchmentAreaActiveMobility
+            | ICatchmentAreaCar
+            | ICatchmentAreaPT
+            | CatchmentAreaNearbyStationAccess
+        ),
     ) -> IFeatureLayerToolCreate:
 
         # Create layer object
@@ -93,7 +157,14 @@ class CRUDCatchmentAreaBase(CRUDToolBase):
         return layer
 
     async def get_lats_lons(
-        self, layer_name: DefaultResultLayerName, params: ICatchmentAreaActiveMobility | ICatchmentAreaCar | ICatchmentAreaPT | CatchmentAreaNearbyStationAccess
+        self,
+        layer_name: DefaultResultLayerName,
+        params: (
+            ICatchmentAreaActiveMobility
+            | ICatchmentAreaCar
+            | ICatchmentAreaPT
+            | CatchmentAreaNearbyStationAccess
+        ),
     ):
         # Check if starting points are a layer else create layer
         if params.starting_points.layer_project_id:
@@ -102,8 +173,7 @@ class CRUDCatchmentAreaBase(CRUDToolBase):
             table_name = layer_starting_points["layer_project_id"].table_name
         else:
             layer_starting_points = await self.create_layer_starting_points(
-                layer_name=layer_name,
-                params=params
+                layer_name=layer_name, params=params
             )
             where_query = f"layer_id = '{layer_starting_points.id}'"
             table_name = self.table_starting_points
@@ -149,10 +219,10 @@ class CRUDCatchmentAreaActiveMobility(CRUDCatchmentAreaBase):
         starting_points = await self.get_lats_lons(
             layer_name=(
                 DefaultResultLayerName.catchment_area_starting_points
-                if not result_params else
-                result_params["starting_points_layer_name"]
+                if not result_params
+                else result_params["starting_points_layer_name"]
             ),
-            params=params
+            params=params,
         )
         lats = starting_points["lats"]
         lons = starting_points["lons"]
@@ -201,32 +271,7 @@ class CRUDCatchmentAreaActiveMobility(CRUDCatchmentAreaBase):
             "layer_id": str(layer_id),
         }
 
-        try:
-            # Call GOAT Routing endpoint multiple times for upto 20 seconds / 10 retries
-            for i in range(settings.CRUD_NUM_RETRIES):
-                # Call GOAT Routing endpoint to compute catchment area
-                response = await self.http_client.post(
-                    url=f"{settings.GOAT_ROUTING_URL}/catchment-area",
-                    json=request_payload,
-                    headers={"Authorization": settings.GOAT_ROUTING_AUTHORIZATION},
-                )
-                if response.status_code == 202:
-                    # Endpoint is still processing request, retry shortly
-                    if i == settings.CRUD_NUM_RETRIES - 1:
-                        raise Exception(
-                            "GOAT routing endpoint took too long to process request."
-                        )
-                    await asyncio.sleep(settings.CRUD_RETRY_INTERVAL)
-                    continue
-                elif response.status_code == 201:
-                    # Endpoint has finished processing request, break
-                    break
-                else:
-                    raise Exception(response.text)
-        except Exception as e:
-            raise RoutingEndpointError(
-                f"Error while calling the routing endpoint: {str(e)}"
-            )
+        await call_routing_endpoint(request_payload, self.http_client)
 
         # Create layers only if result_params are not provided
         if not result_params:

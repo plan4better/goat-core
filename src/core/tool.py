@@ -409,7 +409,7 @@ class CRUDToolBase(CRUDFailedJob):
             raise AreaSizeError(
                 f"The operation cannot be performed on more than {MaxFeaturePolygonArea[tool_type.value].value} km2."
             )
-        return
+        return area
 
     async def check_reference_area_geofence(
         self,
