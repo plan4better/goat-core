@@ -36,10 +36,10 @@ if TYPE_CHECKING:
 class ToolType(str, Enum):
     """Indicator types."""
 
-    isochrone_active_mobility = "isochrone_active_mobility"
-    isochrone_pt = "isochrone_pt"
-    isochrone_car = "isochrone_car"
-    isochrone_nearby_station_access = "isochrone_nearby_station_access"
+    catchment_area_active_mobility = "catchment_area_active_mobility"
+    catchment_area_pt = "catchment_area_pt"
+    catchment_area_car = "catchment_area_car"
+    catchment_area_nearby_station_access = "catchment_area_nearby_station_access"
     oev_gueteklasse = "oev_gueteklasse"
     trip_count_station = "trip_count_station"
     join = "join"

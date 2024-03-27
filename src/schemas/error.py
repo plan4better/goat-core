@@ -110,19 +110,19 @@ class Ogr2OgrError(Exception):
 
 
 class RoutingEndpointError(Exception):
-    """Raised when the routing endpoint fails to compute an isochrone."""
+    """Raised when the routing endpoint fails to compute an catchment area."""
 
     pass
 
 
 class R5EndpointError(Exception):
-    """Raised when the R5 endpoint fails to compute an isochrone."""
+    """Raised when the R5 endpoint fails to compute an catchment area."""
 
     pass
 
 
-class R5IsochroneComputeError(Exception):
-    """Raised when the isochrone data returned by R5 is invalid."""
+class R5CatchmentAreaComputeError(Exception):
+    """Raised when the catchment area data returned by R5 is invalid."""
 
     pass
 
@@ -162,7 +162,7 @@ ERROR_MAPPING = {
     Ogr2OgrError: status.HTTP_500_INTERNAL_SERVER_ERROR,
     RoutingEndpointError: status.HTTP_500_INTERNAL_SERVER_ERROR,
     R5EndpointError: status.HTTP_500_INTERNAL_SERVER_ERROR,
-    R5IsochroneComputeError: status.HTTP_500_INTERNAL_SERVER_ERROR,
+    R5CatchmentAreaComputeError: status.HTTP_500_INTERNAL_SERVER_ERROR,
     OperationNotSupportedError: status.HTTP_422_UNPROCESSABLE_ENTITY,
     ColumnNotFoundError: status.HTTP_404_NOT_FOUND,
 }

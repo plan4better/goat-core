@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Body, Depends
 
 from src.core.tool import start_calculation
-from src.crud.crud_isochrone import CRUDIsochroneActiveMobility
+from src.crud.crud_catchment_area import CRUDCatchmentAreaActiveMobility
 from src.endpoints.deps import get_http_client
-from src.schemas.isochrone import (
-    IIsochroneActiveMobility,
-    request_examples_isochrone_active_mobility as active_mobility_request_examples,
+from src.schemas.catchment_area import (
+    ICatchmentAreaActiveMobility,
+    request_examples_catchment_area_active_mobility as active_mobility_request_examples,
 )
 from src.schemas.heatmap import (
     IHeatmapGravityActive,
@@ -28,26 +28,26 @@ router = APIRouter()
 
 
 @router.post(
-    "/isochrone",
-    summary="Compute isochrones for active mobility",
+    "/catchment-area",
+    summary="Compute catchment areas for active mobility",
     response_model=IToolResponse,
     status_code=201,
 )
-async def compute_active_mobility_isochrone(
+async def compute_active_mobility_catchment_area(
     *,
     common: CommonToolParams = Depends(),
-    params: IIsochroneActiveMobility = Body(
+    params: ICatchmentAreaActiveMobility = Body(
         ...,
-        examples=active_mobility_request_examples["isochrone_active_mobility"],
-        description="The isochrone parameters.",
+        examples=active_mobility_request_examples["catchment_area_active_mobility"],
+        description="The catchment area parameters.",
     ),
 ):
-    """Compute isochrones for active mobility."""
+    """Compute catchment areas for active mobility."""
 
     return await start_calculation(
-        job_type=JobType.isochrone_active_mobility,
-        tool_class=CRUDIsochroneActiveMobility,
-        crud_method="run_isochrone",
+        job_type=JobType.catchment_area_active_mobility,
+        tool_class=CRUDCatchmentAreaActiveMobility,
+        crud_method="run_catchment_area",
         async_session=common.async_session,
         user_id=common.user_id,
         background_tasks=common.background_tasks,

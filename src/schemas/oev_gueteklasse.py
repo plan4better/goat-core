@@ -1,5 +1,5 @@
 from typing import List
-
+from enum import Enum
 from pydantic import BaseModel, Field
 from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import (
@@ -9,6 +9,9 @@ from src.schemas.toolbox_base import (
 )
 from src.schemas.colors import ColorRangeType
 
+class CatchmentType(Enum):
+    buffer = "buffer"
+    network = "network"
 
 class OevGueteklasseStationConfig(BaseModel):
     groups: dict = Field(
@@ -49,6 +52,11 @@ class IOevGueteklasse(BaseModel):
         title="Station Config",
         description="The station config of the ÖV-Güteklasse.",
     )
+    catchment_type: CatchmentType = Field(
+        CatchmentType.buffer,
+        title="Catchment Type",
+        description="The catchment type of the ÖV-Güteklasse.",
+    ) 
 
     @property
     def tool_type(self):

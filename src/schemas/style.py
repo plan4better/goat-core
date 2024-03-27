@@ -2,8 +2,6 @@ import random
 from src.db.models.layer import FeatureGeometryType
 from src.schemas.colors import diverging_colors, color_ranges, ColorRangeType
 from src.utils import hex_to_rgb
-from src.schemas.tool import ToolType
-from src.core.config import settings
 from src.schemas.toolbox_base import DefaultResultLayerName
 
 
@@ -192,12 +190,12 @@ style_oev_gueteklassen_polygon = {
         "colors": ["#199741", "#8BCC62", "#DCF09E", "#FFDF9A", "#F69053", "#E4696A"],
         "category": "Custom",
         "color_map": [
-            [["1"], "#199741"],
-            [["2"], "#8BCC62"],
-            [["3"], "#DCF09E"],
-            [["4"], "#FFDF9A"],
-            [["5"], "#F69053"],
-            [["6"], "#E4696A"],
+            [["A"], "#199741"],
+            [["B"], "#8BCC62"],
+            [["C"], "#DCF09E"],
+            [["D"], "#FFDF9A"],
+            [["E"], "#F69053"],
+            [["F"], "#E4696A"],
         ],
     },
     "color_scale": "ordinal",
@@ -223,7 +221,7 @@ style_oev_gueteklassen_point = {
     "max_zoom": 22,
     "min_zoom": 1,
     "visibility": True,
-    "color_field": {"name": "pt_class", "type": "number"},
+    "color_field": {"name": "station_category", "type": "number"},
     "color_range": {
         "name": "Custom",
         "type": "custom",
@@ -317,6 +315,6 @@ style_starting = {
 custom_styles = {
     DefaultResultLayerName.oev_gueteklasse: style_oev_gueteklassen_polygon,
     DefaultResultLayerName.oev_gueteklasse_station: style_oev_gueteklassen_point,
-    DefaultResultLayerName.isochrone_starting_points: style_starting,
+    DefaultResultLayerName.catchment_area_starting_points: style_starting,
     DefaultResultLayerName.nearby_station_access_starting_points: style_starting,
 }

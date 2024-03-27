@@ -36,10 +36,10 @@ class DefaultResultLayerName(str, Enum):
     """Default result layer name schema."""
 
     join = "Join"
-    isochrone_starting_points = "Start - Catchment"
-    isochrone_active_mobility = "Catchment Area"
-    isochrone_pt = "Catchment Area"
-    isochrone_car = "Catchment Area"
+    catchment_area_starting_points = "Start - Catchment"
+    catchment_area_active_mobility = "Catchment Area"
+    catchment_area_pt = "Catchment Area"
+    catchment_area_car = "Catchment Area"
     oev_gueteklasse = "ÖV-Güteklassen"
     oev_gueteklasse_station = "ÖV-Güteklasse Station"
     trip_count_station = "Trip Count Station"
@@ -63,7 +63,7 @@ class MaxFeatureCnt(int, Enum):
 
     area_statistics = 100000
     join = 100000
-    isochrone_active_mobility = 1000
+    catchment_area_active_mobility = 1000
     oev_gueteklasse = 10000
     aggregate_point = 1000000
     aggregate_polygon = 100000
@@ -94,22 +94,22 @@ class MaxFeaturePolygonArea(int, Enum):
 class GeofenceTable(str, Enum):
     """Geofence tool table mapping."""
 
-    isochrone_active_mobility = "basic.geofence_active_mobility"
-    isochrone_pt = "basic.geofence_pt"
-    isochrone_car = "basic.geofence_car"
+    catchment_area_active_mobility = "basic.geofence_active_mobility"
+    catchment_area_pt = "basic.geofence_pt"
+    catchment_area_car = "basic.geofence_car"
     oev_gueteklasse = "basic.geofence_pt"
 
 
-class IsochroneType(str, Enum):
-    """Isochrone type schema."""
+class CatchmentAreaType(str, Enum):
+    """Catchment area type schema."""
 
     polygon = "polygon"
     network = "network"
     rectangular_grid = "rectangular_grid"
 
 
-class IsochroneGeometryTypeMapping(str, Enum):
-    """Isochrone geometry type mapping schema."""
+class CatchmentAreaGeometryTypeMapping(str, Enum):
+    """Catchment area geometry type mapping schema."""
 
     polygon = FeatureGeometryType.polygon.value
     network = FeatureGeometryType.line.value
@@ -126,18 +126,18 @@ class IToolResponse(BaseModel):
     )
 
 
-class IsochroneStartingPointsBase(BaseModel):
-    """Base model for isochrone attributes."""
+class CatchmentAreaStartingPointsBase(BaseModel):
+    """Base model for catchment area attributes."""
 
     latitude: List[float] | None = Field(
         None,
         title="Latitude",
-        description="The latitude of the isochrone center.",
+        description="The latitude of the catchment area center.",
     )
     longitude: List[float] | None = Field(
         None,
         title="Longitude",
-        description="The longitude of the isochrone center.",
+        description="The longitude of the catchment area center.",
     )
     layer_project_id: int | None = Field(
         None,
@@ -199,7 +199,7 @@ class PTSupportedDay(str, Enum):
 class PTTimeWindow(BaseModel):
     weekday: PTSupportedDay = Field(
         title="Weekday",
-        description="The weekday of the isochrone. There are three options: weekday, saturday, sunday.",
+        description="The weekday of the catchment area. There are three options: weekday, saturday, sunday.",
     )
     from_time: int = Field(
         25200,

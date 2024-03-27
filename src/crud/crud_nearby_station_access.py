@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 
 from src.core.tool import CRUDToolBase
@@ -8,13 +9,14 @@ from src.core.config import settings
 from src.schemas.error import SQLError
 from src.schemas.job import JobStatusType
 from src.core.job import job_log, job_init, run_background_or_immediately
-from src.schemas.isochrone import (
-    IsochroneNearbyStationAccess,
-    IsochroneTypeActiveMobility,
-    IsochroneTravelTimeCostActiveMobility,
+from src.schemas.catchment_area import (
+    CatchmentAreaNearbyStationAccess,
+    CatchmentAreaTypeActiveMobility,
+    CatchmentAreaTravelTimeCostActiveMobility,
 )
 from src.endpoints.deps import get_http_client
-from src.crud.crud_isochrone import CRUDIsochroneActiveMobility
+from src.crud.crud_catchment_area import CRUDCatchmentAreaActiveMobility
+from src.schemas.trip_count_station import public_transport_types
 
 
 class CRUDNearbyStationAccess(CRUDToolBase):
@@ -28,7 +30,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
 
     @job_log(job_step_name="nearby_station_access")
     async def nearby_station_access(self, params: INearbyStationAccess):
-        """Computes an isochrone based on provided parameters, then identifies stations within this isochrone area
+        """Computes an catchment area based on provided parameters, then identifies stations within this catchment area area
         and computes the frequency of routes serving these stations."""
 
         # Create feature layer to store computed nearby stations output
@@ -37,6 +39,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             feature_layer_geometry_type=UserDataGeomType.point.value,
             attribute_mapping={
                 "text_attr1": "stop_name",
+                "text_attr2": "dominant_mode",
                 "integer_attr1": "access_time",
                 "integer_attr2": "agg_frequency",
                 "jsonb_attr1": "routes",
@@ -47,10 +50,10 @@ class CRUDNearbyStationAccess(CRUDToolBase):
         result_table = f"{settings.USER_DATA_SCHEMA}.{layer_stations.feature_layer_geometry_type.value}_{str(self.user_id).replace('-', '')}"
 
         try:
-            # Create result table to store isochrone geometry
-            isochrone_table = f"temporal.temp_{str(self.job_id).replace('-', '')}"
+            # Create result table to store catchment area geometry
+            catchment_area_table = f"temporal.temp_{str(self.job_id).replace('-', '')}"
             sql_create_temp_table = f"""
-                CREATE TABLE {isochrone_table} (
+                CREATE TABLE {catchment_area_table} (
                     id serial,
                     layer_id text,
                     geom geometry,
@@ -63,42 +66,48 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             await self.async_session.rollback()
             raise SQLError(e)
 
-        # Create active mobility isochrone request payload
-        isochrone_request = IsochroneNearbyStationAccess(
+        # Create active mobility catchment area request payload
+        catchment_area_request = CatchmentAreaNearbyStationAccess(
             starting_points=params.starting_points,
             routing_type=params.access_mode,
-            travel_cost=IsochroneTravelTimeCostActiveMobility(
+            travel_cost=CatchmentAreaTravelTimeCostActiveMobility(
                 max_traveltime=params.max_traveltime,
                 steps=params.max_traveltime,
                 speed=params.speed,
             ),
-            isochrone_type=IsochroneTypeActiveMobility.polygon,
+            catchment_area_type=CatchmentAreaTypeActiveMobility.polygon,
             polygon_difference=True,
         )
 
-        # Compute isochrone
-        await CRUDIsochroneActiveMobility(
+        # Compute catchment area
+        await CRUDCatchmentAreaActiveMobility(
             job_id=self.job_id,
             background_tasks=self.background_tasks,
             async_session=self.async_session,
             user_id=self.user_id,
             project_id=self.project_id,
             http_client=get_http_client()
-        ).isochrone(
-            params=isochrone_request,
+        ).catchment_area(
+            params=catchment_area_request,
             result_params={
-                "result_table": isochrone_table,
+                "result_table": catchment_area_table,
                 "layer_id": str(layer_stations.id),
                 "starting_points_layer_name": DefaultResultLayerName.nearby_station_access_starting_points,
             },
         )
+
+        # Create mapping for transport modes
+        flat_mode_mapping = {}
+        for outer_key, inner_dict in public_transport_types.items():
+            for inner_key in inner_dict:
+                flat_mode_mapping[str(inner_key)] = outer_key
 
         # Run query to find nearby stations, compute route frequencies and insert into result table
         sql_compute_nearby_station_access = f"""
             WITH stop AS (
                 SELECT stop_id, stop_name, access_time, geom, h3_3, unpacked.KEY AS route_type, unpacked.value AS routes
                 FROM basic.station_route_count(
-                    '{isochrone_table}',
+                    '{catchment_area_table}',
                     '',
                     '{str(timedelta(seconds=params.time_window.from_time))}'::interval,
                     '{str(timedelta(seconds=params.time_window.to_time))}'::interval,
@@ -120,11 +129,16 @@ class CRUDNearbyStationAccess(CRUDToolBase):
                 FROM service s
                 INNER JOIN basic.routes r ON r.route_id = s.route_id
             )
-            INSERT INTO {result_table} (layer_id, geom, text_attr1, integer_attr1, integer_attr2, jsonb_attr1)
-            SELECT '{str(layer_stations.id)}', geom, stop_name, access_time, ROUND({params.time_window.duration_minutes} / sum(trip_cnt)) AS agg_frequency,
+            INSERT INTO {result_table} (layer_id, geom, text_attr1, text_attr2, integer_attr1, integer_attr2, jsonb_attr1)
+            SELECT '{str(layer_stations.id)}', geom, stop_name, dominant_mode.*, access_time, agg_frequency, routes
+            FROM (
+                SELECT geom, stop_name, access_time, ROUND(120 / sum(trip_cnt)) AS agg_frequency,
+                array_agg(DISTINCT route_type) AS route_types,
                 jsonb_agg(jsonb_build_object('route_short_name', route_short_name, 'route_type', route_type, 'frequency', frequency)) AS routes
-            FROM frequency
-            GROUP BY stop_id, stop_name, access_time, geom;
+                FROM frequency
+                GROUP BY stop_id, stop_name, access_time, geom
+            ) sub,
+            LATERAL basic.identify_dominant_mode(route_types, '{json.dumps(flat_mode_mapping)}'::JSONB) dominant_mode;
         """
         try:
             await self.async_session.execute(sql_compute_nearby_station_access)
@@ -134,8 +148,8 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             raise SQLError(e)
 
         try:
-            # Delete temporary isochrone result table
-            await self.async_session.execute(f"DROP TABLE IF EXISTS {isochrone_table};")
+            # Delete temporary catchment area result table
+            await self.async_session.execute(f"DROP TABLE IF EXISTS {catchment_area_table};")
         except Exception as e:
             await self.async_session.rollback()
             raise SQLError(e)
@@ -146,7 +160,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
         )
 
         #TODO: Return the job id.
-        #TO BE DISCUSSED: For the tests we should consider mocking the isochrone request as otherswise it is very hard to test the isochrone in isolation.
+        #TO BE DISCUSSED: For the tests we should consider mocking the catchment area request as otherswise it is very hard to test the catchment area in isolation.
         return {
             "status": JobStatusType.finished.value,
             "msg": "Nearby station access created.",

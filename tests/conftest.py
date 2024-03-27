@@ -14,12 +14,12 @@ from src.core.config import settings
 from src.core.layer import get_user_table
 from src.endpoints.deps import get_db, session_manager
 from src.main import app
-from src.schemas.isochrone import request_examples_isochrone_active_mobility as active_mobility_request_examples
+from src.schemas.catchment_area import request_examples_catchment_area_active_mobility as active_mobility_request_examples
 from src.schemas.layer import LayerType
 from src.schemas.layer import request_examples as layer_request_examples
-from src.schemas.isochrone import (
-    request_examples_isochrone_car,
-    request_examples_isochrone_pt,
+from src.schemas.catchment_area import (
+    request_examples_catchment_area_car,
+    request_examples_catchment_area_pt,
 )
 from src.schemas.project import (
     request_examples as project_request_examples,
@@ -997,17 +997,17 @@ def create_generic_toolbox_fixture(endpoint: str, request_examples: dict):
     return generic_post_fixture
 
 
-fixture_isochrone_active_mobility = create_generic_toolbox_fixture(
-    "/active-mobility/isochrone",
-    active_mobility_request_examples["isochrone_active_mobility"],
+fixture_catchment_area_active_mobility = create_generic_toolbox_fixture(
+    "/active-mobility/catchment-area",
+    active_mobility_request_examples["catchment_area_active_mobility"],
 )
 
-fixture_isochrone_pt = create_generic_toolbox_fixture(
-    "/motorized-mobility/pt/isochrone",
-    request_examples_isochrone_pt,
+fixture_catchment_area_pt = create_generic_toolbox_fixture(
+    "/motorized-mobility/pt/catchment-area",
+    request_examples_catchment_area_pt,
 )
 
-fixture_isochrone_car = create_generic_toolbox_fixture(
-    "/motorized-mobility/car/isochrone",
-    request_examples_isochrone_car,
+fixture_catchment_area_car = create_generic_toolbox_fixture(
+    "/motorized-mobility/car/catchment-area",
+    request_examples_catchment_area_car,
 )
