@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional
+
 import boto3
 from pydantic import BaseSettings, HttpUrl, PostgresDsn, validator
 
@@ -14,6 +15,7 @@ class SyncPostgresDsn(PostgresDsn):
 
 class Settings(BaseSettings):
     TEST_MODE: Optional[bool] = False
+    ENVIRONMENT: Optional[str] = "dev"
     API_V2_STR: str = "/api/v2"
     DATA_DIR: str = "/app/data"
     TEST_DATA_DIR: str = "/app/tests/data"
@@ -22,10 +24,14 @@ class Settings(BaseSettings):
     CUSTOMER_SCHEMA: Optional[str] = "customer"
     REGION_MAPPING_PT_TABLE: Optional[str] = "basic.region_mapping_pt"
 
-    ASYNC_CLIENT_DEFAULT_TIMEOUT: Optional[float] = 5.0 # Default timeout for async http client
-    ASYNC_CLIENT_READ_TIMEOUT: Optional[float] = 15.0 # Read timeout for async http client
-    CRUD_NUM_RETRIES: Optional[int] = 10 # Number of times to retry calling an endpoint
-    CRUD_RETRY_INTERVAL: Optional[int] = 2 # Number of seconds to wait between retries
+    ASYNC_CLIENT_DEFAULT_TIMEOUT: Optional[float] = (
+        5.0  # Default timeout for async http client
+    )
+    ASYNC_CLIENT_READ_TIMEOUT: Optional[float] = (
+        15.0  # Read timeout for async http client
+    )
+    CRUD_NUM_RETRIES: Optional[int] = 10  # Number of times to retry calling an endpoint
+    CRUD_RETRY_INTERVAL: Optional[int] = 2  # Number of seconds to wait between retries
 
     SENTRY_DSN: Optional[HttpUrl] = None
     POSTGRES_SERVER: str
@@ -97,7 +103,9 @@ class Settings(BaseSettings):
     GOAT_ROUTING_AUTHORIZATION: str = None
 
     @validator("GOAT_ROUTING_AUTHORIZATION", pre=True)
-    def goat_routing_authorization(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+    def goat_routing_authorization(
+        cls, v: Optional[str], values: Dict[str, Any]
+    ) -> Any:
         if v:
             return f"Basic {v}"
         return None
@@ -128,8 +136,18 @@ class Settings(BaseSettings):
         )
 
     ASSETS_URL: Optional[str] = None
-    THUMBNAIL_DIR_LAYER: Optional[str] = "img/users/dev/thumbnails/layer"
-    THUMBNAIL_DIR_PROJECT: Optional[str] = "img/users/dev/thumbnails/project"
+    THUMBNAIL_DIR_LAYER: Optional[str] = None
+    THUMBNAIL_DIR_PROJECT: Optional[str] = None
+
+    @validator("THUMBNAIL_DIR_LAYER", "THUMBNAIL_DIR_PROJECT", pre=True)
+    def set_environment_paths(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+        environment = values.get("ENVIRONMENT", "dev")
+        if v == "THUMBNAIL_DIR_LAYER":
+            return f"img/users/{environment}/thumbnails/layer"
+        elif v == "THUMBNAIL_DIR_PROJECT":
+            return f"img/users/{environment}/thumbnails/project"
+        return v
+
     MARKER_DIR: Optional[str] = "icons/maki"
     MARKER_PREFIX: Optional[str] = "goat-marker-"
 
@@ -137,4 +155,5 @@ class Settings(BaseSettings):
         case_sensitive = True
 
 
+settings = Settings()
 settings = Settings()
