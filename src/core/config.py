@@ -137,14 +137,20 @@ class Settings(BaseSettings):
 
     ASSETS_URL: Optional[str] = None
     THUMBNAIL_DIR_LAYER: Optional[str] = None
+
+    @validator("THUMBNAIL_DIR_LAYER", pre=True)
+    def set_thumbnail_dir_layer(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+        environment = values.get("ENVIRONMENT", "dev")
+        if v is None:
+            return f"img/users/{environment}/thumbnails/layer"
+        return v
+
     THUMBNAIL_DIR_PROJECT: Optional[str] = None
 
-    @validator("THUMBNAIL_DIR_LAYER", "THUMBNAIL_DIR_PROJECT", pre=True)
-    def set_environment_paths(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+    @validator("THUMBNAIL_DIR_PROJECT", pre=True)
+    def set_thumbnail_dir_project(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
         environment = values.get("ENVIRONMENT", "dev")
-        if v == "THUMBNAIL_DIR_LAYER":
-            return f"img/users/{environment}/thumbnails/layer"
-        elif v == "THUMBNAIL_DIR_PROJECT":
+        if v is None:
             return f"img/users/{environment}/thumbnails/project"
         return v
 
