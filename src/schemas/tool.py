@@ -2,10 +2,10 @@ from enum import Enum
 
 from pydantic import BaseModel, Field, validator, conlist
 
-from src.schemas.isochrone import IIsochroneActiveMobility
-from src.schemas.isochrone import (
-    IIsochronePT,
-    IIsochroneCar,
+from src.schemas.catchment_area import ICatchmentAreaActiveMobility
+from src.schemas.catchment_area import (
+    ICatchmentAreaPT,
+    ICatchmentAreaCar,
 )
 from src.schemas.oev_gueteklasse import IOevGueteklasse
 from src.schemas.toolbox_base import (
@@ -372,10 +372,10 @@ class IToolParam(BaseModel):
         allowed_types = (
             IJoin,
             IAggregationPoint,
-            IIsochroneActiveMobility,
+            ICatchmentAreaActiveMobility,
             IOevGueteklasse,
-            IIsochroneCar,
-            IIsochronePT,
+            ICatchmentAreaCar,
+            ICatchmentAreaPT,
         )
         if not isinstance(v, allowed_types):
             raise ValueError(f"Input type {type(v).__name__} not allowed")

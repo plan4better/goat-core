@@ -11,7 +11,7 @@ from src.workers.isochrone import task_calculate_isochrone
 from src.db import models
 from src.endpoints.legacy import deps
 from src.resources.enums import IsochroneExportType
-from src.schemas.isochrone import (
+from src.schemas.legacy.isochrone import (
     IsochroneDTO,
     IsochroneMultiCountPois,
     request_examples,

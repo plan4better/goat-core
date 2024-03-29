@@ -22,7 +22,7 @@ from src.schemas.indicators import (
     oev_gueteklasse_config_example,
 )
 
-from src.schemas.isochrone import (
+from src.schemas.legacy.isochrone import (
     IsochroneDTO,
     IsochroneMultiCountPois,
     request_examples,
@@ -60,8 +60,8 @@ async def calculate_isochrone(
     """
     if isochrone_in.scenario.id:
         await deps.check_user_owns_scenario(db, isochrone_in.scenario.id, current_user)
-        
-    # TODO: Check to remove study area bounds from here. We can have it in the downstream function only. Where it is used. 
+
+    # TODO: Check to remove study area bounds from here. We can have it in the downstream function only. Where it is used.
     study_area = await crud.user.get_active_study_area(db, current_user)
     study_area_bounds = study_area["bounds"]
     isochrone_in = json.loads(isochrone_in.json())

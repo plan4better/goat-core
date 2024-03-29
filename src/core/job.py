@@ -13,9 +13,12 @@ from src.schemas.layer import LayerType, UserDataTable
 background_logger = logging.getLogger("Background task")
 background_logger.setLevel(logging.INFO)
 handler = logging.StreamHandler()
-formatter = logging.Formatter('\033[92m%(levelname)s\033[0m: %(asctime)s %(name)s %(message)s')
+formatter = logging.Formatter(
+    "\033[92m%(levelname)s\033[0m: %(asctime)s %(name)s %(message)s"
+)
 handler.setFormatter(formatter)
 background_logger.addHandler(handler)
+
 
 async def run_failure_func(instance, func, *args, **kwargs):
     # Get failure function
@@ -75,7 +78,10 @@ def job_init():
             # Execute function
             try:
                 result = await func(*args, **kwargs)
-            except Exception:
+            except Exception as e:
+                # Roll back the transaction
+                await async_session.rollback()
+                # Run failure functions for cleanup
                 await run_failure_func(self, func, *args, **kwargs)
                 # Update job status simple to failed
                 job = await crud_job.update(
@@ -96,7 +102,7 @@ def job_init():
                     db_obj=job,
                     obj_in={"status_simple": JobStatusType.finished.value},
                 )
-            # TODO Drop temp tables
+
             background_logger.info(f"Job {job_id} finished.")
             return result
 
@@ -144,7 +150,7 @@ def job_log(job_step_name: str, timeout: int = 120):
             try:
                 result = await asyncio.wait_for(func(*args, **kwargs), timeout)
             except asyncio.TimeoutError:
-                 # Roll back the transaction
+                # Roll back the transaction
                 await async_session.rollback()
                 # Handle the timeout here. For example, you can raise a custom exception or log it.
                 await run_failure_func(self, func, *args, **kwargs)
@@ -247,6 +253,7 @@ def run_background_or_immediately(settings):
 
 class CRUDFailedJob:
     """CRUD class that bundles functions for failed jobs"""
+
     def __init__(self, job_id, background_tasks, async_session, user_id):
         self.job_id = job_id
         self.background_tasks = background_tasks
