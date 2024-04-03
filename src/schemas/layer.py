@@ -256,7 +256,7 @@ class IFeatureToolRead(
 ):
     """Model to read a feature layer tool."""
 
-    pass
+    charts: dict | None = Field(None, description="Chart configuration")
 
 
 @optional

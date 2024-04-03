@@ -53,6 +53,9 @@ class LayerProjectLink(DateTimeBase, table=True):
         sa_column=Column(JSONB, nullable=True),
         description="CQL2-JSON filter to query the layer",
     )
+    charts: dict | None = Field(
+        sa_column=Column(JSONB, nullable=True), description="Chart configuration"
+    )
 
     # Relationships
     project: "Project" = Relationship(back_populates="layer_projects")
