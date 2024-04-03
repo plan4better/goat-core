@@ -62,14 +62,13 @@ class CRUDOevGueteklasse(CRUDToolBase):
                 FROM (
                     SELECT parent_station.stop_id, parent_station.stop_name, grouped.trip_cnt_list, parent_station.geom
                     FROM (
-                        SELECT parent_station, array_agg(trip_cnt) AS trip_cnt_list, h3_3
+                        SELECT parent_station, array_agg(trip_cnt) AS trip_cnt_list
                         FROM child_stops
                         WHERE parent_station IS NOT NULL
-                        GROUP BY parent_station, h3_3
+                        GROUP BY parent_station
                     ) grouped,
                     basic.stops parent_station
-                    WHERE parent_station.h3_3 = grouped.h3_3
-                    AND parent_station.stop_id = grouped.parent_station
+                    WHERE parent_station.stop_id = grouped.parent_station
                     UNION ALL
                     SELECT stop_id, stop_name, ARRAY[trip_cnt] AS trip_cnt_list, geom
                     FROM child_stops
