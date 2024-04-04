@@ -320,7 +320,7 @@ class CRUDOevGueteklasse(CRUDToolBase):
         if params.catchment_type == CatchmentType.network:
             # Check reference area size
             area = await self.check_reference_area_size(
-                layer_project=layer_project,
+                layer_project=reference_layer_project,
                 tool_type=params.tool_type,
             )
             # Make sure in case of network catchment that the max size is only 10% of the default max size.
