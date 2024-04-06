@@ -1,4 +1,4 @@
-DROP FUNCTION basic.get_h3_neighbors;
+DROP FUNCTION IF EXISTS basic.get_h3_neighbors;
 CREATE OR REPLACE FUNCTION basic.get_h3_neighbors(h3_3_input integer)
  RETURNS Integer[]
  LANGUAGE plpgsql
