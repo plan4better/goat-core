@@ -99,6 +99,7 @@ class IFeatureBaseProject(CQLQuery):
         ...,
         description="Layer properties",
     )
+    charts: dict | None = Field(None, description="Layer chart properties")
 
 
 class IFeatureBaseProjectRead(IFeatureBaseProject):

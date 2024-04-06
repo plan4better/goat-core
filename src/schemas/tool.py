@@ -396,15 +396,15 @@ request_examples_join = {
             },
         },
     },
-    "join_mean": {
-        "summary": "Join Mean",
+    "join_sum": {
+        "summary": "Join Sum",
         "value": {
             "target_layer_project_id": 1,
             "target_field": "target_field_example2",
             "join_layer_project_id": 2,
             "join_field": "join_field_example2",
             "column_statistics": {
-                "operation": ColumnStatisticsOperation.mean.value,
+                "operation": ColumnStatisticsOperation.sum.value,
                 "field": "field_example2",
             },
         },
@@ -428,7 +428,7 @@ request_examples_aggregation_point = {
             "source_layer_project_id": 1,
             "area_type": AreaLayerType.h3_grid.value,
             "h3_resolution": 6,
-            "column_statistics": {"operation": "mean", "field": "field_example2"},
+            "column_statistics": {"operation": "sum", "field": "field_example2"},
             "source_group_by_field": ["group_by_example2"],
         },
     },
@@ -453,7 +453,7 @@ request_examples_aggregation_polygon = {
             "area_type": AreaLayerType.h3_grid.value,
             "h3_resolution": 6,
             "weigthed_by_intersecting_area": False,
-            "column_statistics": {"operation": "mean", "field": "field_example2"},
+            "column_statistics": {"operation": "sum", "field": "field_example2"},
             "source_group_by_field": ["group_by_example2"],
         },
     },

@@ -19,8 +19,6 @@ from src.schemas.layer import FeatureGeometryType
 class ColumnStatisticsOperation(str, Enum):
     count = "count"
     sum = "sum"
-    mean = "mean"
-    median = "median"
     min = "min"
     max = "max"
 

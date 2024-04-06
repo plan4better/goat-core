@@ -274,7 +274,6 @@ async def test_get_area_statistics(
     layer_id = fixture_create_internal_feature_polygon_layer["id"]
     expected_result = {
         "sum": 5813696342.208582,
-        "mean": 2906848171.10429092,
         "min": 83206235.43294483,
         "max": 5730490106.775637,
     }

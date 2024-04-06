@@ -8,6 +8,7 @@ from pydantic import UUID4
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.crud.crud_project import project as crud_project
 from src.crud.crud_user_project import user_project as crud_user_project
+from src.core.chart import read_chart_data
 from src.db.models._link_model import UserProjectLink
 from src.db.models.project import Project
 from src.db.session import AsyncSession
@@ -346,6 +347,11 @@ async def get_layers_from_project(
 )
 async def get_layer_from_project(
     async_session: AsyncSession = Depends(get_db),
+    id: UUID4 = Path(
+        ...,
+        description="The ID of the project to get",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
     layer_project_id: int = Path(
         ...,
         description="Layer project ID to get",
@@ -458,3 +464,31 @@ async def delete_layer_from_project(
     )
 
     return None
+
+@router.get(
+    "/{id}/layer/{layer_project_id}/chart-data",
+    response_model=dict,
+    response_model_exclude_none=True,
+    status_code=200,
+)
+async def get_chart_data(
+    async_session: AsyncSession = Depends(get_db),
+    id: UUID4 = Path(
+        ...,
+        description="The ID of the project to get",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    layer_project_id: int = Path(
+        ...,
+        description="Layer Project ID to get chart data",
+        example="1",
+    ),
+):
+    """Get chart data from a layer in a project by its ID."""
+
+    # Get chart data
+    return await read_chart_data(
+        async_session=async_session,
+        project_id=id,
+        layer_project_id=layer_project_id,
+    )

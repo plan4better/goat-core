@@ -2,7 +2,12 @@ from sqlalchemy import text
 
 from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
-from src.core.tool import CRUDToolBase, get_statistics_sql, convert_geom_measurement_field
+from src.core.tool import (
+    CRUDToolBase,
+    get_statistics_sql,
+    convert_geom_measurement_field,
+)
+from src.core.chart import Chart
 from src.schemas.job import JobStatusType
 from src.schemas.layer import (
     FeatureGeometryType,
@@ -18,7 +23,7 @@ from src.utils import (
 )
 
 
-class CRUDAggregateBase(CRUDToolBase):
+class CRUDAggregateBase(CRUDToolBase, Chart):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
         self.table_name_total_stats = (
@@ -82,10 +87,7 @@ class CRUDAggregateBase(CRUDToolBase):
             attribute_mapping_aggregation = {"text_attr1": f"h3_{params.h3_resolution}"}
 
         # Change data type in case of text and count as then it is integer
-        if (
-            params.column_statistics.operation
-            == ColumnStatisticsOperation.count
-        ):
+        if params.column_statistics.operation == ColumnStatisticsOperation.count:
             result_check_statistics_field["mapped_statistics_field_type"] = "integer"
 
         result_column = get_result_column(
@@ -153,6 +155,31 @@ class CRUDAggregateBase(CRUDToolBase):
             "result_check_statistics_field": result_check_statistics_field,
             "mapped_statistics_field": mapped_statistics_field,
         }
+
+    async def create_chart_aggregation(
+        self, aggregation_layer_project, layer, layer_project, params
+    ):
+        # Create charts
+        y_label = params.column_statistics.operation.value
+        if aggregation_layer_project:
+            # Get y_label from aggregation_layer_project if it exists else take firt column of attribute mapping
+            if aggregation_layer_project.properties.get("color_field"):
+                x_label = aggregation_layer_project.properties.get("color_field").get(
+                    "name"
+                )
+            else:
+                x_label = list(aggregation_layer_project.attribute_mapping.keys())[0]
+        else:
+            x_label = "h3_" + str(params.h3_resolution)
+
+        await self.create_chart(
+            layer=layer,
+            layer_project=layer_project,
+            operation=params.column_statistics.operation,
+            x_label=x_label,
+            y_label=y_label,
+            group_by=params.source_group_by_field,
+        )
 
 
 class CRUDAggregatePoint(CRUDAggregateBase):
@@ -288,8 +315,18 @@ class CRUDAggregatePoint(CRUDAggregateBase):
         await self.async_session.execute(sql_query)
 
         # Create new layer
-        await self.create_feature_layer_tool(
+        res = await self.create_feature_layer_tool(
             layer_in=layer_in,
+            params=params,
+        )
+        layer = res["layer"]
+        layer_project = res["layer_project"][0]
+
+        # Create chart
+        await self.create_chart_aggregation(
+            aggregation_layer_project=aggregation_layer_project,
+            layer=layer,
+            layer_project=layer_project,
             params=params,
         )
 
@@ -421,23 +458,26 @@ class CRUDAggregatePolygon(CRUDAggregateBase):
                     ELSE 0
                     END))
                 """
-                if (
-                    params.column_statistics.operation.value
-                    == ColumnStatisticsOperation.count.value
-                ):
-                    statistics_val = "1"
-                    statistics_sql = "SUM(val)"
-                else:
-                    if mapped_statistics_field == "$intersected_area":
-                        statistics_val = convert_geom_measurement_field(
-                            "j." + mapped_statistics_field
-                        )
-                    else:
-                        statistics_val = "p." + mapped_statistics_field
+            else:
+                first_statistic_column_query = ""
 
-                    statistics_sql = get_statistics_sql(
-                        "val", params.column_statistics.operation
+            if (
+                params.column_statistics.operation.value
+                == ColumnStatisticsOperation.count.value
+            ):
+                statistics_val = "1"
+                statistics_sql = "SUM(val)"
+            else:
+                if mapped_statistics_field == "$intersected_area":
+                    statistics_val = convert_geom_measurement_field(
+                        "j." + mapped_statistics_field
                     )
+                else:
+                    statistics_val = "p." + mapped_statistics_field
+
+                statistics_sql = get_statistics_sql(
+                    "val", params.column_statistics.operation
+                )
 
             # Pregroup the data
             group_column_name_with_comma = (
@@ -528,10 +568,22 @@ class CRUDAggregatePolygon(CRUDAggregateBase):
         await self.async_session.execute(sql_query_combine)
 
         # Create new layer
-        await self.create_feature_layer_tool(
+        res = await self.create_feature_layer_tool(
             layer_in=layer_in,
             params=params,
         )
+
+        layer = res["layer"]
+        layer_project = res["layer_project"][0]
+
+        # Create chart
+        await self.create_chart_aggregation(
+            aggregation_layer_project=aggregation_layer_project,
+            layer=layer,
+            layer_project=layer_project,
+            params=params,
+        )
+
         # Delete temporary tables
         await self.delete_temp_tables()
 
@@ -623,7 +675,10 @@ class CRUDOriginDestination(CRUDToolBase):
             mapped_unique_id_column.split("_")[0] + "_attr1": "origin",
             mapped_unique_id_column.split("_")[0] + "_attr2": "destination",
         }
-        if mapped_weight_column.split("_")[0] + "_attr1" not in attribute_mapping_relation:
+        if (
+            mapped_weight_column.split("_")[0] + "_attr1"
+            not in attribute_mapping_relation
+        ):
             attribute_mapping_relation[
                 mapped_weight_column.split("_")[0] + "_attr1"
             ] = "weight"
@@ -665,8 +720,11 @@ class CRUDOriginDestination(CRUDToolBase):
         await self.async_session.commit()
 
         # Compute relations
-        select_columns = ['matrix.' + attr for attr in list(result_layer_relation.attribute_mapping.keys())]
-        select_columns = ', '.join(select_columns)
+        select_columns = [
+            "matrix." + attr
+            for attr in list(result_layer_relation.attribute_mapping.keys())
+        ]
+        select_columns = ", ".join(select_columns)
         sql_query_relations = f"""
             INSERT INTO {self.result_table_relation} (layer_id, geom, {', '.join(list(result_layer_relation.attribute_mapping.keys()))})
             SELECT '{result_layer_relation.id}',

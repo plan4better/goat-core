@@ -113,10 +113,10 @@ def get_statistics_sql(field, operation):
         query = f"COUNT({field})"
     elif operation == ColumnStatisticsOperation.sum:
         query = f"SUM({field})"
-    elif operation == ColumnStatisticsOperation.mean:
-        query = f"AVG({field})"
-    elif operation == ColumnStatisticsOperation.median:
-        query = f"PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {field})"
+    # elif operation == ColumnStatisticsOperation.mean:
+    #     query = f"AVG({field})"
+    # elif operation == ColumnStatisticsOperation.median:
+    #     query = f"PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {field})"
     elif operation == ColumnStatisticsOperation.min:
         query = f"MIN({field})"
     elif operation == ColumnStatisticsOperation.max:
@@ -242,9 +242,7 @@ class CRUDToolBase(CRUDFailedJob):
         # Create style for layer
         # Request scale breaks in case of color_scale
         properties = None
-        if (
-           DefaultResultLayerName(default_layer_name) in custom_styles
-        ):
+        if DefaultResultLayerName(default_layer_name) in custom_styles:
             properties = custom_styles[DefaultResultLayerName(default_layer_name)]
 
         elif hasattr(params, "properties_base"):
@@ -307,9 +305,7 @@ class CRUDToolBase(CRUDFailedJob):
                         color_scale_breaks=color_scale_breaks,
                         color_range_type=properties_base["color_range_type"],
                     )
-            elif (
-                properties_base.get("color_scale") == "ordinal"
-            ):
+            elif properties_base.get("color_scale") == "ordinal":
                 # Check if layer has max nine unique values in color_field
                 unique_values = await crud_layer.get_unique_values(
                     async_session=self.async_session,
@@ -343,13 +339,13 @@ class CRUDToolBase(CRUDFailedJob):
             await crud_layer.label_cluster_keep(self.async_session, layer)
 
         # Add layer to project
-        await crud_layer_project.create(
+        layer_project = await crud_layer_project.create(
             async_session=self.async_session,
             project_id=self.project_id,
             layer_ids=[layer.id],
         )
 
-        return {"status": JobStatusType.finished.value}
+        return {"layer": layer, "layer_project": layer_project}
 
     async def check_max_feature_cnt(
         self,

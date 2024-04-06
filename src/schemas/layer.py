@@ -121,7 +121,6 @@ class AreaStatisticsOperation(Enum):
     """Allowed operations on polygon geometries."""
 
     sum = "sum"
-    mean = "mean"
     min = "min"
     max = "max"
 
