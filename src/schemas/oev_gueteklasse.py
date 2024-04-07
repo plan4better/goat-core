@@ -5,9 +5,7 @@ from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import (
     PTTimeWindow,
     input_layer_type_polygon,
-    DefaultResultLayerName,
 )
-from src.schemas.colors import ColorRangeType
 
 class CatchmentType(Enum):
     buffer = "buffer"
@@ -56,7 +54,7 @@ class IOevGueteklasse(BaseModel):
         CatchmentType.buffer,
         title="Catchment Type",
         description="The catchment type of the ÖV-Güteklasse.",
-    ) 
+    )
 
     @property
     def tool_type(self):
@@ -121,7 +119,7 @@ station_config_example = {
         "906": "B",
         "1400": "B",
     },
-    "time_frequency": [0, 4, 10, 19, 39, 60, 119],
+    "time_frequency": [5, 10, 20, 40, 60, 120],
     "categories": [
         {
             "A": 1,  # i.e. types of transports in category A are in transport stop category I
@@ -135,10 +133,10 @@ station_config_example = {
         {"A": 5, "B": 6, "C": 7},
     ],
     "classification": {
-        "1": {300: "1", 500: "1", 750: "2", 1000: "3", 1250: "4"},
-        "2": {300: "1", 500: "2", 750: "3", 1000: "4", 1250: "5"},
-        "3": {300: "2", 500: "3", 750: "4", 1000: "5", 1250: "6"},
-        "4": {300: "3", 500: "4", 750: "5", 1000: "6", 1250: "6"},
+        "1": {300: "1", 500: "1", 750: "2", 1000: "3"},
+        "2": {300: "1", 500: "2", 750: "3", 1000: "4"},
+        "3": {300: "2", 500: "3", 750: "4", 1000: "5"},
+        "4": {300: "3", 500: "4", 750: "5", 1000: "6"},
         "5": {300: "4", 500: "5", 750: "6"},
         "6": {300: "5", 500: "6"},
         "7": {300: "6"},
