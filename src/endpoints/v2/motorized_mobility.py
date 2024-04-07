@@ -1,12 +1,13 @@
-from uuid import UUID, uuid4
 from fastapi import APIRouter, Body, Depends
 from src.core.tool import start_calculation
-from src.crud.crud_catchment_area import CRUDCatchmentAreaPT
+from src.crud.crud_catchment_area import (
+    CRUDCatchmentAreaPT,
+    CRUDCatchmentAreaCar,
+)
 from src.crud.crud_trip_count_station import CRUDTripCountStation
 from src.crud.crud_oev_gueteklasse import CRUDOevGueteklasse
 from src.crud.crud_nearby_station_access import CRUDNearbyStationAccess
-from src.db.session import AsyncSession
-from src.endpoints.deps import get_db, get_http_client, get_user_id
+from src.endpoints.deps import get_http_client
 from src.schemas.job import JobType
 from src.schemas.catchment_area import (
     ICatchmentAreaPT,
@@ -72,8 +73,7 @@ async def compute_pt_catchment_area(
 )
 async def compute_car_catchment_area(
     *,
-    async_session: AsyncSession = Depends(get_db),
-    user_id: UUID = Depends(get_user_id),
+    common: CommonToolParams = Depends(),
     params: ICatchmentAreaCar = Body(
         ...,
         examples=request_examples_catchment_area_car,
@@ -81,7 +81,17 @@ async def compute_car_catchment_area(
     ),
 ):
     """Compute catchment areas for car."""
-    return {"job_id": uuid4()}
+    return await start_calculation(
+        job_type=JobType.catchment_area_car,
+        tool_class=CRUDCatchmentAreaCar,
+        crud_method="run_catchment_area",
+        async_session=common.async_session,
+        user_id=common.user_id,
+        background_tasks=common.background_tasks,
+        project_id=common.project_id,
+        params=params,
+        http_client=get_http_client(),
+    )
 
 
 @router.post(

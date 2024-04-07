@@ -10,10 +10,70 @@ from tests.utils import check_job_status
 async def test_compute_catchment_area_pt(client: AsyncClient, fixture_catchment_area_pt):
     assert fixture_catchment_area_pt["job_id"] is not None
 
+@pytest.mark.asyncio
+async def test_compute_catchment_area_car_layer(
+    client: AsyncClient,
+    fixture_add_aggregate_point_layer_to_project,
+):
+    project_id = fixture_add_aggregate_point_layer_to_project["project_id"]
+    layer_project_id = fixture_add_aggregate_point_layer_to_project[
+        "source_layer_project_id"
+    ] # TODO: Switch to smaller layer with <= 50 points as this is the max for car catchment areas
+
+    # Produce catchment area request payload
+    params = {
+        "starting_points": {"layer_project_id": layer_project_id},
+        "routing_type": "car",
+        "travel_cost": {
+            "max_traveltime": 15,
+            "steps": 5,
+        },
+        "catchment_area_type": "polygon",
+        "polygon_difference": True,
+    }
+    response = await client.post(
+        f"{settings.API_V2_STR}/motorized-mobility/car/catchment-area?project_id={project_id}",
+        json=params,
+    )
+    assert response.status_code == 201
+    # Check if job is finished
+    job = await check_job_status(client, response.json()["job_id"])
+    # Check if job is finished
+    assert job["status_simple"] == "finished"
+
 
 @pytest.mark.asyncio
-async def test_compute_catchment_area_car(client: AsyncClient, fixture_catchment_area_car):
-    assert fixture_catchment_area_car["job_id"] is not None
+async def test_compute_catchment_area_car_lat_lon(
+    client: AsyncClient,
+    fixture_create_project,
+    fixture_create_user,
+):
+    project_id = fixture_create_project["id"]
+    fixture_create_user["id"]
+
+    # Produce catchment area request payload
+    params = {
+        "starting_points": {
+            "latitude": [51.201582802561035],
+            "longitude": [9.481917667178564],
+        },
+        "routing_type": "car",
+        "travel_cost": {
+            "max_traveltime": 30,
+            "steps": 5,
+        },
+        "catchment_area_type": "polygon",
+        "polygon_difference": True,
+    }
+    response = await client.post(
+        f"{settings.API_V2_STR}/motorized-mobility/car/catchment-area?project_id={project_id}",
+        json=params,
+    )
+    assert response.status_code == 201
+    # Check if job is finished
+    job = await check_job_status(client, response.json()["job_id"])
+    # Check if job is finished
+    assert job["status_simple"] == "finished"
 
 
 @pytest.mark.asyncio
