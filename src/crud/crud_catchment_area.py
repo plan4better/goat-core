@@ -12,6 +12,9 @@ from src.schemas.catchment_area import (
     ICatchmentAreaCar,
     CatchmentAreaNearbyStationAccess,
     CatchmentAreaTravelTimeCostActiveMobility,
+    CatchmentAreaRoutingModeActiveMobility,
+    CatchmentAreaRoutingModeCar,
+    CatchmentAreaTravelTimeCostMotorizedMobility,
 )
 from src.schemas.error import (
     OutOfGeofenceError,
@@ -29,13 +32,19 @@ from src.schemas.toolbox_base import (
 from src.utils import decode_r5_grid
 
 
-async def call_routing_endpoint(request_payload: dict, http_client: AsyncClient):
+async def call_routing_endpoint(
+        routing_mode: CatchmentAreaRoutingModeActiveMobility | CatchmentAreaRoutingModeCar,
+        request_payload: dict, http_client: AsyncClient,
+):
     try:
         # Call GOAT Routing endpoint multiple times for upto 20 seconds / 10 retries
         for i in range(settings.CRUD_NUM_RETRIES):
             # Call GOAT Routing endpoint to compute catchment area
+            url = f"{settings.GOAT_ROUTING_URL}/active-mobility/catchment-area" \
+                if type(routing_mode) == CatchmentAreaRoutingModeActiveMobility else \
+                    f"{settings.GOAT_ROUTING_URL}/motorized-mobility/catchment-area"
             response = await http_client.post(
-                url=f"{settings.GOAT_ROUTING_URL}/catchment-area",
+                url=url,
                 json=request_payload,
                 headers={"Authorization": settings.GOAT_ROUTING_AUTHORIZATION},
             )
@@ -271,7 +280,7 @@ class CRUDCatchmentAreaActiveMobility(CRUDCatchmentAreaBase):
             "layer_id": str(layer_id),
         }
 
-        await call_routing_endpoint(request_payload, self.http_client)
+        await call_routing_endpoint(params.routing_type, request_payload, self.http_client)
 
         # Create layers only if result_params are not provided
         if not result_params:
@@ -368,7 +377,7 @@ class CRUDCatchmentAreaPT(CRUDCatchmentAreaBase):
         result_table = f"{settings.USER_DATA_SCHEMA}.{layer_catchment_area.feature_layer_geometry_type.value}_{str(self.user_id).replace('-', '')}"
 
         # Compute catchment area for each starting point
-        for i in range(0, len(params.starting_points.latitude)):
+        for i in range(0, len(lats)):
             # Identify relevant R5 region & bundle for this catchment area starting point
             sql_get_region_mapping = f"""
                 SELECT r5_region_id, r5_bundle_id, r5_host
@@ -376,8 +385,8 @@ class CRUDCatchmentAreaPT(CRUDCatchmentAreaBase):
                 WHERE ST_INTERSECTS(
                     ST_SETSRID(
                         ST_MAKEPOINT(
-                            {params.starting_points.longitude[i]},
-                            {params.starting_points.latitude[i]}
+                            {lons[i]},
+                            {lats[i]}
                         ),
                         4326
                     ),
@@ -530,3 +539,111 @@ class CRUDCatchmentAreaPT(CRUDCatchmentAreaBase):
     @job_init()
     async def run_catchment_area(self, params: ICatchmentAreaPT):
         return await self.catchment_area(params=params)
+
+
+class CRUDCatchmentAreaCar(CRUDCatchmentAreaBase):
+    def __init__(
+        self,
+        job_id,
+        background_tasks,
+        async_session,
+        user_id,
+        project_id,
+        http_client: AsyncClient,
+    ):
+        super().__init__(job_id, background_tasks, async_session, user_id, project_id)
+
+        self.http_client = http_client
+
+    async def catchment_area(
+        self,
+        params: ICatchmentAreaCar,
+        result_params: dict = None,
+    ):
+        """Compute car catchment area using GOAT Routing endpoint."""
+
+        # Fetch starting points
+        starting_points = await self.get_lats_lons(
+            layer_name=(
+                DefaultResultLayerName.catchment_area_starting_points
+                if not result_params else
+                result_params["starting_points_layer_name"]
+            ),
+            params=params
+        )
+        lats = starting_points["lats"]
+        lons = starting_points["lons"]
+        layer_starting_points = starting_points["layer_starting_points"]
+
+        if not result_params:
+            # Create feature layer to store computed catchment area output
+            layer_catchment_area = IFeatureLayerToolCreate(
+                name=DefaultResultLayerName.catchment_area_active_mobility.value,
+                feature_layer_geometry_type=CatchmentAreaGeometryTypeMapping[
+                    params.catchment_area_type.value
+                ],
+                attribute_mapping={"integer_attr1": "travel_cost"},
+                tool_type=params.tool_type.value,
+                job_id=self.job_id,
+            )
+            result_table = f"{settings.USER_DATA_SCHEMA}.{layer_catchment_area.feature_layer_geometry_type.value}_{str(self.user_id).replace('-', '')}"
+            layer_id = layer_catchment_area.id
+        else:
+            layer_id = result_params["layer_id"]
+
+        # Construct request payload
+        request_payload = {
+            "starting_points": {
+                "latitude": lats,
+                "longitude": lons,
+            },
+            "routing_type": params.routing_type.value,
+            "travel_cost": (
+                {
+                    "max_traveltime": params.travel_cost.max_traveltime,
+                    "steps": params.travel_cost.steps,
+                }
+                if type(params.travel_cost) == CatchmentAreaTravelTimeCostMotorizedMobility
+                else {
+                    "max_distance": params.travel_cost.max_distance,
+                    "steps": params.travel_cost.steps,
+                }
+            ),
+            "catchment_area_type": params.catchment_area_type.value,
+            "polygon_difference": params.polygon_difference,
+            "result_table": (
+                result_table if not result_params else result_params["result_table"]
+            ),
+            "layer_id": str(layer_id),
+        }
+
+        await call_routing_endpoint(params.routing_type, request_payload, self.http_client)
+
+        # Create layers only if result_params are not provided
+        if not result_params:
+            # Create new layers.
+            await self.create_feature_layer_tool(
+                layer_in=layer_catchment_area,
+                params=params,
+            )
+
+        # Create new layer if starting points are not a layer
+        if not params.starting_points.layer_project_id:
+            await self.create_feature_layer_tool(
+                layer_in=layer_starting_points,
+                params=params,
+            )
+
+        return {
+            "status": JobStatusType.finished.value,
+            "msg": "Active mobility catchment area was successfully computed.",
+        }
+
+    @job_log(job_step_name="catchment_area")
+    async def catchment_area_job(self, params: ICatchmentAreaCar):
+        return await self.catchment_area(params=params)
+
+    @run_background_or_immediately(settings)
+    @job_init()
+    async def run_catchment_area(self, params: ICatchmentAreaCar):
+        return await self.catchment_area_job(params=params)

@@ -25,13 +25,13 @@ class Settings(BaseSettings):
     REGION_MAPPING_PT_TABLE: Optional[str] = "basic.region_mapping_pt"
 
     ASYNC_CLIENT_DEFAULT_TIMEOUT: Optional[float] = (
-        5.0  # Default timeout for async http client
+        10.0  # Default timeout for async http client
     )
     ASYNC_CLIENT_READ_TIMEOUT: Optional[float] = (
-        15.0  # Read timeout for async http client
+        30.0  # Read timeout for async http client
     )
-    CRUD_NUM_RETRIES: Optional[int] = 10  # Number of times to retry calling an endpoint
-    CRUD_RETRY_INTERVAL: Optional[int] = 2  # Number of seconds to wait between retries
+    CRUD_NUM_RETRIES: Optional[int] = 20 # Number of times to retry calling an endpoint
+    CRUD_RETRY_INTERVAL: Optional[int] = 2 # Number of seconds to wait between retries
 
     SENTRY_DSN: Optional[HttpUrl] = None
     POSTGRES_SERVER: str
