@@ -48,7 +48,7 @@ class CRUDOevGueteklasse(CRUDToolBase):
             INSERT INTO {self.table_stations}({', '.join(station_category_layer.attribute_mapping.keys())}, layer_id, geom)
             WITH child_stops AS (
                 SELECT *
-                FROM temporal.count_public_transport_services_station (
+                FROM basic.count_public_transport_services_station (
                     '{reference_layer_project.table_name}',
                     :where_query,
                     '{str(timedelta(seconds=params.time_window.from_time))}',
@@ -268,7 +268,11 @@ class CRUDOevGueteklasse(CRUDToolBase):
                     "layer_id": str(uuid4()),
                 }
                 # Call routing endpoint
-                await call_routing_endpoint(request_payload, self.http_client)
+                await call_routing_endpoint(
+                    CatchmentAreaRoutingModeActiveMobility.walking,
+                    request_payload,
+                    self.http_client
+                )
 
                 # Insert into temp_catchment_stations
                 await self.async_session.execute(
