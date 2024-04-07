@@ -305,7 +305,7 @@ class OGRFileHandling:
 
         for i in range(layer_def.GetFieldCount()):
             field_def = layer_def.GetFieldDefn(i)
-            field_name = field_def.GetName()
+            field_name = field_def.GetName().lower()
             field_type_code = field_def.GetType()
             field_type = field_def.GetFieldTypeName(field_type_code)
 
