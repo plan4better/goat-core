@@ -64,6 +64,8 @@ class MaxFeatureCnt(int, Enum):
     area_statistics = 100000
     join = 100000
     catchment_area_active_mobility = 1000
+    catchment_area_pt = 5
+    catchment_area_car = 50
     oev_gueteklasse = 10000
     aggregate_point = 1000000
     aggregate_polygon = 100000
@@ -96,7 +98,7 @@ class GeofenceTable(str, Enum):
 
     catchment_area_active_mobility = "basic.geofence_active_mobility"
     catchment_area_pt = "basic.geofence_pt"
-    catchment_area_car = "basic.geofence_car"
+    catchment_area_car = "basic.geofence_active_mobility"
     oev_gueteklasse = "basic.geofence_pt"
 
 
@@ -226,9 +228,9 @@ class PTTimeWindow(BaseModel):
     @property
     def weekday_date(self):
         mapping = {
-            "weekday": "2023-06-12",
-            "saturday": "2023-06-17",
-            "sunday": "2023-06-18",
+            "weekday": "2024-04-08",
+            "saturday": "2024-04-13",
+            "sunday": "2024-04-14",
         }
         return mapping[PTSupportedDay(self.weekday).value]
 

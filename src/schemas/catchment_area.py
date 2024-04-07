@@ -89,10 +89,10 @@ class CatchmentAreaRoutingModeConfigPT(BaseModel):
     )
 
 
-class CatchmentAreaRoutingTypeCar(str, Enum):
+class CatchmentAreaRoutingModeCar(str, Enum):
     """Routing car type schema."""
 
-    car_peak = "car_peak"
+    car = "car"
 
 
 """Catchment area travel cost schemas."""
@@ -174,6 +174,33 @@ class CatchmentAreaTravelTimeCostMotorizedMobility(BaseModel):
     )
 
 
+# TODO: Check how to treat miles
+class CatchmentAreaTravelDistanceCostMotorizedMobility(BaseModel):
+    """Travel distance cost schema."""
+
+    max_distance: int = Field(
+        ...,
+        title="Max Distance",
+        description="The maximum distance in meters.",
+        ge=50,
+        le=20000,
+    )
+    steps: int = Field(
+        ...,
+        title="Steps",
+        description="The number of steps.",
+    )
+
+    # Ensure the number of steps doesn't exceed the maximum distance
+    @validator("steps", pre=True, always=True)
+    def valid_num_steps(cls, v):
+        if v > 20000:
+            raise ValueError(
+                "The number of steps must not exceed the maximum distance."
+            )
+        return v
+
+
 """Catchment area decay function schemas."""
 
 class CatchmentAreaDecayFunctionTypePT(Enum):
@@ -207,6 +234,14 @@ class CatchmentAreaTypePT(str, Enum):
     """Catchment area type schema for public transport."""
 
     polygon = "polygon"
+    rectangular_grid = "rectangular_grid"
+
+
+class CatchmentAreaTypeCar(str, Enum):
+    """Catchment area type schema for car."""
+
+    polygon = "polygon"
+    network = "network"
     rectangular_grid = "rectangular_grid"
 
 
@@ -351,15 +386,33 @@ class ICatchmentAreaCar(BaseModel):
         title="Starting Points",
         description="The starting points of the catchment area.",
     )
-    routing_type: CatchmentAreaRoutingTypeCar = Field(
+    routing_type: CatchmentAreaRoutingModeCar = Field(
         ...,
         title="Routing Type",
         description="The routing type of the catchment area.",
     )
-    travel_cost: CatchmentAreaTravelTimeCostMotorizedMobility = Field(
+    travel_cost: (
+        CatchmentAreaTravelTimeCostMotorizedMobility
+        | CatchmentAreaTravelDistanceCostMotorizedMobility
+    ) = Field(
         ...,
         title="Travel Cost",
         description="The travel cost of the catchment area.",
+    )
+    scenario_id: UUID | None = Field(
+        None,
+        title="Scenario ID",
+        description="The ID of the scenario that is used for the routing.",
+    )
+    catchment_area_type: CatchmentAreaTypeCar = Field(
+        ...,
+        title="Return Type",
+        description="The return type of the catchment area.",
+    )
+    polygon_difference: bool | None = Field(
+        None,
+        title="Polygon Difference",
+        description="If true, the polygons returned will be the geometrical difference of two following calculations.",
     )
 
     @property
@@ -368,7 +421,7 @@ class ICatchmentAreaCar(BaseModel):
 
     @property
     def geofence_table(self):
-        mode = ToolType.catchment_area_car.value.value.replace("catchment_area_", "")
+        mode = ToolType.catchment_area_active_mobility.value.replace("catchment_area_", "")
         return f"basic.geofence_{mode}"
 
     @property
@@ -634,7 +687,7 @@ request_examples_catchment_area_car = {
         "summary": "Catchment area for a single starting point using car",
         "value": {
             "starting_points": {"latitude": [52.5200], "longitude": [13.4050]},
-            "routing_type": "car_peak",
+            "routing_type": "car",
             "travel_cost": {"max_traveltime": 30, "steps": 10},
         },
     },
@@ -646,7 +699,7 @@ request_examples_catchment_area_car = {
                 "latitude": [52.5200, 52.5250, 52.5300],
                 "longitude": [13.4050, 13.4150, 13.4250],
             },
-            "routing_type": "car_peak",
+            "routing_type": "car",
             "travel_cost": {"max_traveltime": 30, "steps": 10},
         },
     },

@@ -24,7 +24,7 @@ BEGIN
         'INSERT INTO %s 
         SELECT input_table.%s, h3_index, basic.to_short_h3_3(h3_lat_lng_to_cell(ST_Centroid(h3_boundary)::point, 3)::bigint) AS h3_3
         FROM (SELECT * FROM %s %s) input_table,
-        LATERAL temporal.fill_polygon_h3_10(input_table.geom);', result_table_name, relevant_columns, input_table, where_filter 
+        LATERAL basic.fill_polygon_h3_10(input_table.geom);', result_table_name, relevant_columns, input_table, where_filter 
     );
 
     IF NOT append_existing THEN
