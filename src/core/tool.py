@@ -7,7 +7,7 @@ from httpx import AsyncClient
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
-
+from shapely import wkt
 from src.core.job import CRUDFailedJob
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import layer as crud_layer
@@ -47,7 +47,7 @@ from src.schemas.toolbox_base import (
     MaxFeaturePolygonArea,
     DefaultResultLayerName,
 )
-from src.utils import build_where_clause, get_random_string, search_value
+from src.utils import build_where_clause, get_random_string, search_value, build_where
 
 
 async def start_calculation(
@@ -132,6 +132,70 @@ class CRUDToolBase(CRUDFailedJob):
         super().__init__(job_id, background_tasks, async_session, user_id)
         self.project_id = project_id
 
+    async def build_additional_spatial_filter(
+        self,
+        layer_project: BaseModel,
+        layer_project_filter: BaseModel,
+    ):
+        # Add filter by extent to query
+        coords = layer_project_filter.extent[16:-3].split(", ")
+        coords = [[float(coord) for coord in point.split()] for point in coords]
+
+        # Add spatial filter to query
+        query = layer_project.query
+        spatial_filter = {
+            "op": "s_intersects",
+            "args": [
+                {"property": "geom"},
+                {
+                    "type": "Polygon",
+                    "coordinates": [coords],
+                },
+            ],
+        }
+        if query is None:
+            query = spatial_filter
+        else:
+            query = {"op": "and", "args": [query, spatial_filter]}
+
+        layer_project.query = query
+        return layer_project
+
+    async def check_max_feature_cnt_aggregation(
+        self,
+        layers_project: dict,
+        params: IToolParam,
+    ):
+        # Count exclusively features that are within the extent of the other layers
+        source_layer_project = layers_project["source_layer_project_id"]
+        aggregation_layer_project = layers_project["aggregation_layer_project_id"]
+
+        source_layer_project = await self.build_additional_spatial_filter(
+            layer_project=source_layer_project,
+            layer_project_filter=aggregation_layer_project,
+        )
+        aggregation_layer_project = await self.build_additional_spatial_filter(
+            layer_project=aggregation_layer_project,
+            layer_project_filter=source_layer_project,
+        )
+
+        # Check if the feature count is below the limit
+        for layer_project in [source_layer_project, aggregation_layer_project]:
+            cnt = await crud_layer_project.get_feature_cnt(
+                async_session=self.async_session,
+                layer_project=layer_project,
+            )
+            cnt = cnt["filtered_count"]
+            # Make sure that the count is below the limit for aggregation_point or aggregation_polygon
+            if cnt > MaxFeatureCnt[params.tool_type.value].value:
+                raise FeatureCountError(
+                    f"The operation cannot be performed on more than {MaxFeatureCnt[params.tool_type.value].value} features."
+                )
+        return {
+            "source_layer_project_id": source_layer_project,
+            "aggregation_layer_project_id": aggregation_layer_project,
+        }
+
     async def get_layers_project(self, params: IToolParam):
         # Get all params that have the name layer_project_id and build a dict using the variable name as key
         layer_project_ids = {}
@@ -160,11 +224,19 @@ class CRUDToolBase(CRUDFailedJob):
             )
             layers_project[layer_name] = layer_project
 
-        # Check Max feature count
-        await self.check_max_feature_cnt(
-            layers_project=list(layers_project.values()),
-            tool_type=params.tool_type,
-        )
+        # Adjust max_feature count for aggregation layers
+        if params.tool_type in [ToolType.aggregate_point, ToolType.aggregate_polygon]:
+            # Check max feature count based on the features within the extent of the other layers
+            layers_project = await self.check_max_feature_cnt_aggregation(
+                layers_project=layers_project,
+                params=params,
+            )
+        else:
+            # Check Max feature count for all layers
+            await self.check_max_feature_cnt(
+                layers_project=list(layers_project.values()),
+                tool_type=params.tool_type,
+            )
 
         # If geometry is of type polygon and tool type is in MaxFeaturePolygonArea
         for layer_project in layers_project.values():
