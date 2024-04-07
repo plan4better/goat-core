@@ -50,13 +50,13 @@ BEGIN
 		SELECT ROW_NUMBER() OVER() AS _class, _time
 		FROM (SELECT jsonb_array_elements_text(_station_config->'time_frequency')::integer AS _time) x 
 	) a
-	WHERE _station_group_trip_time_frequency <= _time;
+	WHERE _station_group_trip_time_frequency < _time;
 
     IF _time_interval IS NULL THEN
         RETURN JSONB_BUILD_OBJECT('_class', '999', 'frequency', _station_group_trip_time_frequency);
     END IF;
 
-    _station_category := _station_config->'categories'->_time_interval-2 ->>_station_group;
+    _station_category := _station_config->'categories'->_time_interval-1 ->>_station_group;
 
     IF _station_category IS NULL THEN
         RETURN JSONB_BUILD_OBJECT('_class', '999', 'frequency', _station_group_trip_time_frequency);
