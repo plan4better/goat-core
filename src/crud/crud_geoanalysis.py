@@ -168,7 +168,7 @@ class CRUDAggregateBase(CRUDToolBase, Chart):
                     "name"
                 )
             else:
-                x_label = list(aggregation_layer_project.attribute_mapping.keys())[0]
+                x_label = list(aggregation_layer_project.attribute_mapping.values())[0]
         else:
             x_label = "h3_" + str(params.h3_resolution)
 
