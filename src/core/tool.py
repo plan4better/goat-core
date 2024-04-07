@@ -7,7 +7,6 @@ from httpx import AsyncClient
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
-from shapely import wkt
 from src.core.job import CRUDFailedJob
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import layer as crud_layer
@@ -24,7 +23,7 @@ from src.schemas.error import (
     LayerProjectTypeError,
     LayerSizeError,
 )
-from src.schemas.job import JobStatusType, JobType, Msg, MsgType
+from src.schemas.job import JobType, Msg, MsgType
 from src.schemas.layer import (
     ComputeBreakOperation,
     FeatureGeometryType,
@@ -47,7 +46,7 @@ from src.schemas.toolbox_base import (
     MaxFeaturePolygonArea,
     DefaultResultLayerName,
 )
-from src.utils import build_where_clause, get_random_string, search_value, build_where
+from src.utils import build_where_clause, get_random_string, search_value
 
 
 async def start_calculation(

@@ -74,7 +74,7 @@ class CRUDOevGueteklasse(CRUDToolBase):
                     FROM child_stops
                     WHERE parent_station IS NULL
                 ) services_count,
-                LATERAL temporal.oev_guetklasse_station_category(
+                LATERAL basic.oev_guetklasse_station_category(
                     trip_cnt_list,
                     '{json.dumps(params.station_config.dict())}'::jsonb,
                     {params.time_window.from_time},
