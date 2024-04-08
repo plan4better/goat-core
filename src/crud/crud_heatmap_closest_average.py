@@ -33,17 +33,20 @@ class CRUDHeatmapClosestAverageBase(CRUDHeatmapBase):
         query = f"""
             INSERT INTO {result_table} (layer_id, geom, text_attr1, float_attr1)
             WITH grouped AS (
-                SELECT dest_id.value AS dest_id, (ARRAY_AGG(traveltime))[1:num_destinations] AS traveltime
+                SELECT sorted.dest_id, (ARRAY_AGG(sorted.traveltime))[1:sorted.num_destinations] AS traveltime
                 FROM (
-                    SELECT matrix.orig_id, matrix.dest_id, matrix.traveltime, opportunity.num_destinations
-                    FROM {opportunity_table} opportunity, {self.TRAVELTIME_MATRIX_TABLE[params.routing_type]} matrix
-                    WHERE matrix.h3_3 = opportunity.h3_3
-                    AND matrix.orig_id = opportunity.h3_index
-                    AND matrix.traveltime <= opportunity.max_traveltime
-                    ORDER BY matrix.dest_id, matrix.traveltime
-                ) sub_matrix
-                JOIN LATERAL UNNEST(sub_matrix.dest_id) dest_id(value) ON TRUE
-                GROUP BY dest_id.value, sub_matrix.num_destinations
+                    SELECT dest_id.value AS dest_id, sub_matrix.traveltime, sub_matrix.num_destinations
+                    FROM (
+                        SELECT matrix.orig_id, matrix.dest_id, matrix.traveltime, opportunity.num_destinations
+                        FROM {opportunity_table} opportunity, {self.TRAVELTIME_MATRIX_TABLE[params.routing_type]} matrix
+                        WHERE matrix.h3_3 = opportunity.h3_3
+                        AND matrix.orig_id = opportunity.h3_index
+                        AND matrix.traveltime <= opportunity.max_traveltime
+                    ) sub_matrix
+                    JOIN LATERAL UNNEST(sub_matrix.dest_id) dest_id(value) ON TRUE
+                    ORDER BY dest_id.value, sub_matrix.traveltime
+                ) sorted
+                GROUP BY sorted.dest_id, sorted.num_destinations
             )
             SELECT '{result_layer_id}', ST_SetSRID(h3_cell_to_boundary(grouped.dest_id)::geometry, 4326), grouped.dest_id,
                 AVG(traveltime.value) AS accessibility
