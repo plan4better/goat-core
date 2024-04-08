@@ -2,7 +2,8 @@ from enum import Enum
 from pydantic import Field, BaseModel
 from typing import List
 from src.schemas.layer import ToolType
-from src.schemas.toolbox_base import input_layer_type_point, input_layer_type_polygon
+from src.schemas.toolbox_base import input_layer_type_point, input_layer_type_polygon, DefaultResultLayerName
+from src.schemas.colors import ColorRangeType
 
 
 # TODO: Validate the traveltime based on the mode.
@@ -160,6 +161,19 @@ class IHeatmapGravityActive(RoutingTypeActive, HeatmapGravityBase):
     def tool_type(self):
         return ToolType.heatmap_gravity_active_mobility
 
+    @property
+    def properties_base(self):
+        return {
+            DefaultResultLayerName.heatmap_gravity_active_mobility: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {
+                    "name": "accessibility",
+                    "type": "number",
+                },
+                "color_scale": "quantile",
+            }
+        }
+
 
 
 class IHeatmapGravityMotorized(RoutingTypeMotorized, HeatmapGravityBase):
@@ -169,6 +183,18 @@ class IHeatmapGravityMotorized(RoutingTypeMotorized, HeatmapGravityBase):
     def tool_type(self):
         return ToolType.heatmap_gravity_motorized_mobility
 
+    @property
+    def properties_base(self):
+        return {
+            DefaultResultLayerName.heatmap_gravity_active_mobility: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {
+                    "name": "accessibility",
+                    "type": "number",
+                },
+                "color_scale": "quantile",
+            }
+        }
 
 
 class IHeatmapClosestAverageActive(RoutingTypeActive, HeatmapClosestAverageBase):
