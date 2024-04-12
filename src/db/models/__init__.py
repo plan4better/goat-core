@@ -9,3 +9,4 @@ from .scenario import Scenario
 from .scenario_feature import ScenarioFeature
 from .system_setting import SystemSetting
 from .user import User
+from .system_task import SystemTask

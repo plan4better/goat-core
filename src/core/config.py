@@ -135,6 +135,8 @@ class Settings(BaseSettings):
             region_name=values.get("AWS_REGION"),
         )
 
+    DEFAULT_PROJECT_THUMBNAIL: Optional[str] = "https://assets.plan4better.de/img/goat_new_project_artwork.png"
+    DEFAULT_LAYER_THUMBNAIL: Optional[str] = "https://assets.plan4better.de/img/goat_new_dataset_thumbnail.png"
     ASSETS_URL: Optional[str] = None
     THUMBNAIL_DIR_LAYER: Optional[str] = None
 

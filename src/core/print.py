@@ -6,14 +6,12 @@ from typing import Dict, List, Union
 import aiohttp
 import matplotlib.pyplot as plt
 import pandas as pd
-import asyncio
-import io
 from PIL import Image
 
 from cairosvg import svg2png
 from pydantic import BaseModel
 from pymgl import Map
-from shapely import from_wkt
+from shapely import from_wkb
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
@@ -305,7 +303,7 @@ class PrintMap:
         map.load()
 
         # Set map extent
-        geom_shape = from_wkt(layer.extent)
+        geom_shape = from_wkb(layer.extent.data)
         map.setBounds(
             xmin=geom_shape.bounds[0],
             ymin=geom_shape.bounds[1],
