@@ -11,62 +11,65 @@ from src.db.session import session_manager
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.models.system_task import SystemTask
 from datetime import datetime, timedelta, timezone
-from fastapi_pagination import Params as PaginationParams
 from src.crud.crud_user_project import user_project as crud_user_project
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 
 
-async def fetch_last_run_timestamp(async_session: AsyncSession) -> datetime:
+SYSTEM_TASK_ID = "thumbnail_update"
+
+
+async def fetch_last_run_timestamp(async_session: AsyncSession):
     """Fetch the last run timestamp of the thumbnail update task."""
 
-    crud_system_task = CRUDBase(SystemTask)
-    result = await crud_system_task.get(async_session, "thumbnail_update")
-    return result.last_run if result is not None else datetime.now(timezone.utc) - timedelta(minutes=5)
+    result = await CRUDBase(SystemTask).get(async_session, SYSTEM_TASK_ID)
+    return result, (
+        result.last_run if result is not None
+        else datetime.now(timezone.utc) - timedelta(minutes=5)
+    )
 
 
-async def update_last_run_timestamp(async_session: AsyncSession, last_run: datetime):
+async def update_last_run_timestamp(
+        async_session: AsyncSession,
+        system_task: SystemTask,
+        new_timestamp: datetime,
+):
     """Update the last run timestamp of the thumbnail update task."""
 
-    await async_session.execute(
-        text(
-            """UPDATE customer.system_task
-            SET last_run = :last_run WHERE id = 'thumbnail_update'""",
-        ),
-        {"last_run": last_run},
+    await CRUDBase(SystemTask).update(
+        db=async_session,
+        db_obj=system_task,
+        obj_in={"last_run": new_timestamp},
     )
-    await async_session.commit()
 
 
-async def fetch_projects_to_update(async_session: AsyncSession, last_run: datetime, page: int):
+async def fetch_projects_to_update(async_session: AsyncSession, last_run: datetime):
     """Fetch all projects which require a thumbnail update."""
 
     query = select(Project).where(Project.updated_at > last_run)
     return await CRUDBase(Project).get_multi(
         async_session,
         query=query,
-        page_params=PaginationParams(page=page),
     )
 
 
-async def fetch_layers_to_update(async_session: AsyncSession, last_run: datetime, page: int):
+async def fetch_layers_to_update(async_session: AsyncSession, last_run: datetime):
     """Fetch all layers which require a thumbnail update."""
 
     query = select(Layer).where(Layer.updated_at > last_run)
     return await CRUDBase(Layer).get_multi(
         async_session,
         query=query,
-        page_params=PaginationParams(page=page),
     )
 
 
 async def process_projects(async_session: AsyncSession, last_run: datetime):
     """Update thumbnails of projects."""
 
-    # Process projects page-by-page
-    page = 1
-    projects = (await fetch_projects_to_update(async_session, last_run, page)).items
-    while len(projects) > 0:
+    # Process all projects requiring a thumbnail update
+    projects = await fetch_projects_to_update(async_session, last_run)
+    if len(projects) > 0:
         for project in projects:
+            project = project[0]
             user_project = await crud_user_project.get_by_multi_keys(
                 async_session,
                 keys={"user_id": project.user_id, "project_id": project.id},
@@ -76,6 +79,8 @@ async def process_projects(async_session: AsyncSession, last_run: datetime):
             )
             if user_project != [] and layers_project != []:
                 try:
+                    print(f"Updating thumbnail for project: {project.id}")
+
                     old_thumbnail_url = project.thumbnail_url
 
                     # Create thumbnail
@@ -110,21 +115,19 @@ async def process_projects(async_session: AsyncSession, last_run: datetime):
                 except Exception as e:
                     print(f"Error updating project thumbnail: {e}")
 
-        # Fetch next page of projects to process
-        page += 1
-        projects = (await fetch_projects_to_update(async_session, last_run, page)).items
-
 
 async def process_layers(async_session: AsyncSession, last_run: datetime):
     """Update thumbnails of layers."""
 
-    # Process projects page-by-page
-    page = 1
-    layers = (await fetch_layers_to_update(async_session, last_run, page)).items
-    while len(layers) > 0:
+    # Process all layers requiring a thumbnail update
+    layers = await fetch_layers_to_update(async_session, last_run)
+    if len(layers) > 0:
         for layer in layers:
+            layer = layer[0]
             if (layer.type in (LayerType.feature, LayerType.table)):
                 try:
+                    print(f"Updating thumbnail for layer: {layer.id}")
+
                     old_thumbnail_url = layer.thumbnail_url
 
                     # Create thumbnail
@@ -153,16 +156,12 @@ async def process_layers(async_session: AsyncSession, last_run: datetime):
                 except Exception as e:
                     print(f"Error updating layer thumbnail: {e}")
 
-        # Fetch next page of projects to process
-        page += 1
-        layers = (await fetch_layers_to_update(async_session, last_run, page)).items
-
 
 async def main():
     session_manager.init(settings.ASYNC_SQLALCHEMY_DATABASE_URI)
     async with session_manager.session() as async_session:
         # Get timestamp of last thumbnail update script run
-        last_run = await fetch_last_run_timestamp(async_session)
+        system_task, last_run = await fetch_last_run_timestamp(async_session)
         current_run = datetime.now(timezone.utc)
 
         # Update project thumbnails
@@ -172,7 +171,8 @@ async def main():
         await process_layers(async_session, last_run)
 
         # Set last run timestamp to current time
-        await update_last_run_timestamp(async_session, current_run)
+        await update_last_run_timestamp(async_session, system_task, current_run)
+    await session_manager.close()
 
 
 if __name__ == "__main__":
