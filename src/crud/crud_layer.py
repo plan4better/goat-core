@@ -14,7 +14,6 @@ from pydantic import BaseModel
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
-import re
 
 # Local application imports
 from src.core.config import settings
@@ -22,18 +21,13 @@ from src.core.job import CRUDFailedJob, job_init, job_log, run_background_or_imm
 from src.core.layer import FileUpload, OGRFileHandling, delete_old_files, CRUDLayerBase
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 
-# Import PrintMap only outside of tests
-if settings.TEST_MODE is False:
-    from src.core.print import PrintMap
 from src.crud.base import CRUDBase
 from src.db.models.layer import Layer
-from src.db.models._link_model import LayerProjectLink
 from src.schemas.error import (
     ColumnNotFoundError,
     LayerNotFoundError,
     NoCRSError,
     OperationNotSupportedError,
-    ThumbnailComputeError,
     UnsupportedLayerTypeError,
 )
 from src.schemas.job import JobStatusType
@@ -64,7 +58,6 @@ from src.utils import (
     async_zip_directory,
     build_where,
     build_where_clause,
-    sanitize_error_message,
 )
 
 
@@ -118,7 +111,6 @@ class CRUDLayer(CRUDLayerBase):
         layer = await self.get(async_session, id=id)
         if layer is None:
             raise LayerNotFoundError(f"{Layer.__name__} not found")
-        old_thumbnail_url = layer.thumbnail_url
 
         # Get the right Layer model for update
         schema = get_layer_schema(
@@ -134,35 +126,6 @@ class CRUDLayer(CRUDLayerBase):
             async_session, db_obj=layer, obj_in=layer_in
         )
 
-        # Update thumbnail. Only run outside of tests as the print class depends on geoapi as external service.
-        if (
-            layer.type in (LayerType.feature, LayerType.table)
-            and settings.TEST_MODE is False
-        ):
-            file_name = str(layer.id) + "_" + str(uuid4()) + ".png"
-            try:
-                thumbnail_url = await PrintMap(
-                    async_session=async_session
-                ).create_layer_thumbnail(layer=layer, file_name=file_name)
-            except Exception as e:
-                raise ThumbnailComputeError(sanitize_error_message(str(e)))
-
-            # Update thumbnail_url
-            layer = await CRUDBase(Layer).update(
-                db=async_session,
-                db_obj=layer,
-                obj_in={"thumbnail_url": thumbnail_url},
-            )
-        # Delete old thumbnail from s3 if the thumbnail is not a base thumbnail.
-        if (
-            old_thumbnail_url
-            and settings.THUMBNAIL_DIR_LAYER in old_thumbnail_url
-            and settings.TEST_MODE is False
-        ):
-            settings.S3_CLIENT.delete_object(
-                Bucket=settings.AWS_S3_ASSETS_BUCKET,
-                Key=old_thumbnail_url.replace(settings.ASSETS_URL + "/", ""),
-            )
         return layer
 
     async def delete(
@@ -754,23 +717,12 @@ class CRUDLayerImport(CRUDFailedJob):
             obj_in=layer_in,
         )
 
-        # Create thumbnail using print class
-        if settings.TEST_MODE is False:
-            file_name = str(layer.id) + "_" + str(uuid4()) + ".png"
-            try:
-                thumbnail_url = await PrintMap(
-                    async_session=self.async_session
-                ).create_layer_thumbnail(layer=layer_in, file_name=file_name)
-            except Exception as e:
-                msg_text = "Failed to create thumbnail."
-                print(msg_text)
-
-            # Update thumbnail_url
-            layer = await CRUDBase(Layer).update(
-                db=self.async_session,
-                db_obj=layer,
-                obj_in={"thumbnail_url": thumbnail_url},
-            )
+        # Update layer with default thumbnail url
+        layer = await CRUDBase(Layer).update(
+            db=self.async_session,
+            db_obj=layer,
+            obj_in={"thumbnail_url": settings.DEFAULT_LAYER_THUMBNAIL},
+        )
 
         # Label cluster_keep
         if layer.type == LayerType.feature:
