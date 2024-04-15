@@ -17,6 +17,7 @@ from src.schemas.layer import (
 )
 from src.schemas.common import CQLQuery
 from src.utils import build_where, optional
+from pydantic import HttpUrl
 
 
 ################################################################################
@@ -71,6 +72,7 @@ class IProjectCreate(ContentBaseAttributes):
 class IProjectRead(ContentBaseAttributes, DateTimeBase):
     id: UUID = Field(..., description="Project ID")
     layer_order: list[int] | None = Field(None, description="Layer order in project")
+    thumbnail_url: HttpUrl | None = Field(description="Project thumbnail URL")
 
 
 @optional
