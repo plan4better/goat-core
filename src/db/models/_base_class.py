@@ -4,9 +4,7 @@ from typing import Optional, Any, List
 from sqlalchemy.ext.declarative import as_declarative, declared_attr
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlalchemy import ForeignKey, Text, ARRAY
-from sqlalchemy.sql import func
 from uuid import UUID
-from pydantic import HttpUrl
 
 
 # class DateTimeBase(SQLModel):
@@ -61,10 +59,6 @@ class ContentBaseAttributes(SQLModel):
     tags: List[str] | None = Field(
         sa_column=Column(ARRAY(Text()), nullable=True), description="Layer tags"
     )
-    thumbnail_url: HttpUrl | None = Field(
-        sa_column=Column(Text, nullable=True), description="Layer thumbnail URL",
-        default="https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png",
-    )
 
 
 content_base_example = {
@@ -72,7 +66,6 @@ content_base_example = {
     "name": "Layer name",
     "description": "Layer description",
     "tags": ["tag1", "tag2"],
-    "thumbnail_url": "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png",
 }
 
 

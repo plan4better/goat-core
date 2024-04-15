@@ -13,7 +13,6 @@ from src.schemas.project import (
 )
 from src.crud.crud_user_project import user_project as crud_user_project
 from src.crud.base import CRUDBase
-from src.core.config import settings
 from src.db.models._link_model import UserProjectLink
 
 class CRUDProject(CRUDBase):
@@ -41,13 +40,6 @@ class CRUDProject(CRUDBase):
                 project_id=project.id,
                 initial_view_state=initial_view_state,
             ),
-        )
-
-        # Update project with default thumbnail url
-        project = await self.update(
-            async_session,
-            db_obj=project,
-            obj_in={"thumbnail_url": settings.DEFAULT_PROJECT_THUMBNAIL},
         )
 
         # Doing unneeded type conversion to make sure the relations of project are not loaded

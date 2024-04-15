@@ -717,13 +717,6 @@ class CRUDLayerImport(CRUDFailedJob):
             obj_in=layer_in,
         )
 
-        # Update layer with default thumbnail url
-        layer = await CRUDBase(Layer).update(
-            db=self.async_session,
-            db_obj=layer,
-            obj_in={"thumbnail_url": settings.DEFAULT_LAYER_THUMBNAIL},
-        )
-
         # Label cluster_keep
         if layer.type == LayerType.feature:
             await CRUDLayer(Layer).label_cluster_keep(self.async_session, layer)

@@ -263,7 +263,6 @@ request_examples = {
         "name": "Project 1",
         "description": "Project 1 description",
         "tags": ["tag1", "tag2"],
-        "thumbnail_url": "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png",
         "initial_view_state": initial_view_state_example,
     },
     "update": {
@@ -271,7 +270,6 @@ request_examples = {
         "name": "Project 2",
         "description": "Project 2 description",
         "tags": ["tag1", "tag2"],
-        "thumbnail_url": "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png",
     },
     "initial_view_state": initial_view_state_example,
     "update_layer": {

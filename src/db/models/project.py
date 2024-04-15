@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, List
 from uuid import UUID
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
+from sqlalchemy import Text
 from sqlalchemy.sql import text
 from sqlmodel import (
     Column,
@@ -14,12 +15,13 @@ from sqlmodel import (
 
 from src.db.models._base_class import DateTimeBase
 from src.db.models.layer import ContentBaseAttributes
+from pydantic import HttpUrl
+from src.core.config import settings
 
 if TYPE_CHECKING:
     from .report import Report
     from _link_model import UserProjectLink
     from _link_model import LayerProjectLink
-    from .job import Job
 
 
 class Project(ContentBaseAttributes, DateTimeBase, table=True):
@@ -57,6 +59,10 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
             nullable=True,
         ),
         description="Layer order in project",
+    )
+    thumbnail_url: HttpUrl | None = Field(
+        sa_column=Column(Text, nullable=True), description="Project thumbnail URL",
+        default=settings.DEFAULT_PROJECT_THUMBNAIL,
     )
     # Relationships
     reports: List["Report"] = Relationship(

@@ -18,7 +18,7 @@ from src.schemas.catchment_area import (
 class IStartingPointNearbyStationAccess(CatchmentAreaStartingPointsBase):
     """Model for the starting points of the nearby station endpoint."""
 
-    check_starting_points = check_starting_points(1)
+    check_starting_points = check_starting_points(1000)
 
 
 class INearbyStationAccess(BaseModel):
