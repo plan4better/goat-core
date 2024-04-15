@@ -2,10 +2,13 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Text
 from sqlalchemy.sql import text
 from sqlmodel import Column, Field, ForeignKey, Relationship
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from src.db.models._base_class import DateTimeBase, ContentBaseAttributes
+from pydantic import HttpUrl
+from src.core.config import settings
 
 if TYPE_CHECKING:
     from .project import Project
@@ -49,6 +52,10 @@ class Report(DateTimeBase, ContentBaseAttributes, table=True):
         description="Project ID that contains the report. This is mandatory for reports as they are always contained in a project.",
     )
     report: dict = Field(sa_column=Column(JSONB), description="Report object in JSON Format")
+    thumbnail_url: HttpUrl | None = Field(
+        sa_column=Column(Text, nullable=True), description="Report thumbnail URL",
+        default=settings.DEFAULT_REPORT_THUMBNAIL,
+    )
 
     # Relationships
     project: "Project" = Relationship(back_populates="reports")

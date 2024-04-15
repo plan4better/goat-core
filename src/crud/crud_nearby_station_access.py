@@ -30,8 +30,8 @@ class CRUDNearbyStationAccess(CRUDToolBase):
 
     @job_log(job_step_name="nearby_station_access")
     async def nearby_station_access(self, params: INearbyStationAccess):
-        """Computes an catchment area based on provided parameters, then identifies stations within this catchment area area
-        and computes the frequency of routes serving these stations."""
+        """Computes a catchment area based on provided parameters, then identifies stations within this catchment area
+        and computes the frequency of public transport routes serving these stations."""
 
         # Create feature layer to store computed nearby stations output
         layer_stations = IFeatureLayerToolCreate(

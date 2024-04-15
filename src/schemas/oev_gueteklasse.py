@@ -174,7 +174,6 @@ oev_gueteklasse_station_config_layer_base = {
     "type": "feature",
     "feature_layer_geometry_type": "point",
     "indicator_type": "oev_gueteklasse",
-    "thumbnail_url": "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png",
     "style": {},
     "data_source": "Plan4Better GmbH",
     "attribute_mapping": {
@@ -192,7 +191,6 @@ oev_gueteklasse_config_layer_base = {
     "description": "ÖV-Güteklassen with catchment areas",
     "layer_type": "feature_layer_type",
     "indicator_type": "oev_gueteklasse",
-    "thumbnail_url": "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png",
     "style": {},
     "data_source": "Plan4Better GmbH",
 }

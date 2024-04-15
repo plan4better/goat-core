@@ -137,6 +137,7 @@ class Settings(BaseSettings):
 
     DEFAULT_PROJECT_THUMBNAIL: Optional[str] = "https://assets.plan4better.de/img/goat_new_project_artwork.png"
     DEFAULT_LAYER_THUMBNAIL: Optional[str] = "https://assets.plan4better.de/img/goat_new_dataset_thumbnail.png"
+    DEFAULT_REPORT_THUMBNAIL: Optional[str] = "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png"
     ASSETS_URL: Optional[str] = None
     THUMBNAIL_DIR_LAYER: Optional[str] = None
 

@@ -293,6 +293,10 @@ class LayerBase(ContentBaseAttributes):
         sa_column=Column(Boolean, nullable=False, server_default="False"),
         description="If the layer should be added in the catalog",
     )
+    thumbnail_url: HttpUrl | None = Field(
+        sa_column=Column(Text, nullable=True), description="Layer thumbnail URL",
+        default=settings.DEFAULT_LAYER_THUMBNAIL,
+    )
 
     # Check if language and geographical_tag valid according to pycountry
     @validator("language_code", pre=True, check_fields=False)

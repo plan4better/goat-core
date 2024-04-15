@@ -950,7 +950,6 @@ async def fixture_create_catalog_layers(
         layer_dict = {
             "description": "Layer description",
             "tags": ["tag1", "tag2"],
-            "thumbnail_url": "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png",
             "lineage": "Derived from web research and ground surveys conducted in 2021 by trained professionals.",
             "positional_accuracy": "High accuracy with an error margin of ±2 meters.",
             "attribute_accuracy": "Attribute data verified with 90% confidence level.",

@@ -34,7 +34,6 @@ request_examples = {
         "name": "My first report",
         "description": "This is my first report",
         "tags": ["tag1", "tag2"],
-        "thumbnail_url": "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png",
         "project_id": "39e16c27-2b03-498e-8ccc-68e798c64b8d",
         "report": {"no_structure": "no_structure"},
     },
@@ -43,7 +42,6 @@ request_examples = {
         "name": "My updated report",
         "description": "This is my updated report",
         "tags": ["tag1", "tag2"],
-        "thumbnail_url": "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png",
         "report": {"no_structure": "no_structure"},
     },
 }

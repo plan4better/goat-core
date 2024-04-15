@@ -272,11 +272,8 @@ class CRUDToolBase(CRUDFailedJob):
         )
         layer_in.name = new_layer_name
 
-        # TODO: Compute properties dynamically and create thumbnail dynamically
+        # TODO: Compute properties dynamically
         properties = get_base_style(layer_in.feature_layer_geometry_type)
-        thumbnail_url = (
-            "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png"
-        )
         layer = Layer(
             **layer_in.dict(exclude_none=True),
             folder_id=project.folder_id,
@@ -284,7 +281,6 @@ class CRUDToolBase(CRUDFailedJob):
             type=LayerType.feature,
             feature_layer_type=FeatureType.tool,
             properties=properties,
-            thumbnail_url=thumbnail_url,
         )
 
         # Get extent, size and properties
