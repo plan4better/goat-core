@@ -165,7 +165,7 @@ class CatchmentAreaTravelTimeCostMotorizedMobility(BaseModel):
         title="Max Travel Time",
         description="The maximum travel time in minutes.",
         ge=1,
-        le=60,
+        le=90,
     )
     steps: int = Field(
         ...,

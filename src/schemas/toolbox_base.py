@@ -49,12 +49,12 @@ class DefaultResultLayerName(str, Enum):
     buffer = "Buffer"
     origin_destination_relation = "O-D Relation"
     origin_destination_point = "O-D Point"
-    heatmap_gravity_active_mobility = "Heatmap (gravity)"
-    heatmap_gravity_motorized_mobility = "Heatmap (gravity)"
-    heatmap_closest_average_active_mobility = "Heatmap (closest average)"
-    heatmap_closest_average_motorized_mobility = "Heatmap (closest average)"
-    heatmap_connectivity_active_mobility = "Heatmap (connectivity)"
-    heatmap_connectivity_motorized_mobility = "Heatmap (connectivity)"
+    heatmap_gravity_active_mobility = "Heatmap - Gravity"
+    heatmap_gravity_motorized_mobility = "Heatmap - Gravity"
+    heatmap_closest_average_active_mobility = "Heatmap - Closest Average"
+    heatmap_closest_average_motorized_mobility = "Heatmap - Closest Average"
+    heatmap_connectivity_active_mobility = "Heatmap - Connectivity"
+    heatmap_connectivity_motorized_mobility = "Heatmap - Connectivity"
 
 class MaxFeatureCnt(int, Enum):
     """Max feature count schema."""

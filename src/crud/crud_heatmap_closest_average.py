@@ -75,7 +75,7 @@ class CRUDHeatmapClosestAverageActiveMobility(CRUDHeatmapClosestAverageBase):
 
         # Create feature layer to store computed heatmap output
         layer_heatmap = IFeatureLayerToolCreate(
-            name=DefaultResultLayerName.heatmap_gravity_active_mobility.value,
+            name=DefaultResultLayerName.heatmap_closest_average_active_mobility.value,
             feature_layer_geometry_type=FeatureGeometryType.polygon,
             attribute_mapping={
                 "text_attr1": "h3_index",
