@@ -43,12 +43,6 @@ class CRUDJoin(CRUDToolBase):
             join_layer_project.attribute_mapping, params.join_field
         )
 
-        # Check if mapped_target_field and mapped_join_field are having the same type
-        if mapped_target_field.split("_")[0] != mapped_join_field.split("_")[0]:
-            raise ColumnTypeError(
-                "Mapped target field and mapped join field are not having the same type."
-            )
-
         # Check if mapped statistics field is float, integer or biginteger
         mapped_statistics_field = await self.check_column_statistics(
             layer_project=join_layer_project,
@@ -112,7 +106,7 @@ class CRUDJoin(CRUDToolBase):
             SELECT '{layer_in.id}', {select_columns}, {statistics_column_query}
             FROM {target_layer_project.table_name}
             LEFT JOIN {join_layer_project.table_name}
-            ON {target_layer_project.table_name}.{mapped_target_field} = {join_layer_project.table_name}.{mapped_join_field}
+            ON {target_layer_project.table_name}.{mapped_target_field}::text = {join_layer_project.table_name}.{mapped_join_field}::text
             {where_query}
             GROUP BY {select_columns}
         """

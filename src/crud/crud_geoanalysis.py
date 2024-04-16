@@ -631,19 +631,6 @@ class CRUDOriginDestination(CRUDToolBase):
             origin_destination_matrix_layer_project.attribute_mapping,
             params.destination_column,
         )
-        if (
-            len(
-                {
-                    mapped_unique_id_column.split("_")[0],
-                    mapped_origin_column.split("_")[0],
-                    mapped_destination_column.split("_")[0],
-                }
-            )
-            > 1
-        ):
-            raise ColumnTypeError(
-                "The unique_id, origin and destination column must be of the same type"
-            )
 
         # Check if weight column is of type number
         mapped_weight_column = search_value(
@@ -732,8 +719,8 @@ class CRUDOriginDestination(CRUDToolBase):
             (ARRAY_AGG(matrix.{mapped_origin_column}))[1] AS origin, (ARRAY_AGG(matrix.{mapped_destination_column}))[1] AS destination,
             SUM(matrix.{mapped_weight_column}) AS weight
             FROM {temp_geometry_layer} origin, {temp_geometry_layer} destination, {temp_origin_destination_matrix_layer} matrix
-            WHERE origin.{mapped_unique_id_column} = matrix.{mapped_origin_column}
-            AND destination.{mapped_unique_id_column} = matrix.{mapped_destination_column}
+            WHERE origin.{mapped_unique_id_column}::text = matrix.{mapped_origin_column}::text
+            AND destination.{mapped_unique_id_column}::text = matrix.{mapped_destination_column}::text
             GROUP BY matrix.{mapped_origin_column}, matrix.{mapped_destination_column}
         """
         await self.async_session.execute(sql_query_relations)
@@ -745,12 +732,12 @@ class CRUDOriginDestination(CRUDToolBase):
             (
                 SELECT '{result_layer_point.id}', g.{mapped_unique_id_column}, SUM(m.{mapped_weight_column}) AS weight
                 FROM {temp_geometry_layer} g, {temp_origin_destination_matrix_layer} m
-                WHERE g.{mapped_unique_id_column} = m.{mapped_destination_column}
+                WHERE g.{mapped_unique_id_column}::text = m.{mapped_destination_column}::text
                 GROUP BY g.{mapped_unique_id_column}
             )
             SELECT '{result_layer_point.id}', ST_CENTROID(g.geom), gg.weight
             FROM {temp_geometry_layer} g, grouped gg
-            WHERE g.{mapped_unique_id_column} = gg.{mapped_unique_id_column}
+            WHERE g.{mapped_unique_id_column}::text = gg.{mapped_unique_id_column}::text
         """
         await self.async_session.execute(sql_query_points)
 
