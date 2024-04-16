@@ -76,12 +76,12 @@ async def read_jobs(
         description="Specify if the job should be read. If not specified, all jobs will be returned.",
     ),
     order_by: str = Query(
-        None,
+        default="created_at",
         description="Specify the column name that should be used to order. You can check the Layer model to see which column names exist.",
         example="created_at",
     ),
     order: OrderEnum = Query(
-        "descendent",
+        default="descendent",
         description="Specify the order to apply. There are the option ascendent or descendent.",
         example="descendent",
     ),
