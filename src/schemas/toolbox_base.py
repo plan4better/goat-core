@@ -33,7 +33,7 @@ class ColumnStatistic(BaseModel):
 class DefaultResultLayerName(str, Enum):
     """Default result layer name schema."""
 
-    join = "Join"
+    join = "Join & Group"
     catchment_area_starting_points = "Start - Catchment"
     catchment_area_active_mobility = "Catchment Area"
     catchment_area_pt = "Catchment Area"
