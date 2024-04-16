@@ -338,8 +338,8 @@ class CRUDOevGueteklasse(CRUDToolBase):
             name=DefaultResultLayerName.oev_gueteklasse_station.value,
             feature_layer_geometry_type=UserDataGeomType.point.value,
             attribute_mapping={
-                "text_attr1": "stop_name",
-                "text_attr2": "stop_id",
+                "text_attr1": "stop_id",
+                "text_attr2": "stop_name",
                 "float_attr1": "frequency",
                 "integer_attr1": "station_category",
             },
