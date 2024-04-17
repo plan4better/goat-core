@@ -27,7 +27,7 @@ async def read_chart_data(
     operation = charts["operation"]
     x_label = charts["x_label"]
     y_label = charts["y_label"]
-    group_by = charts["group_by"]
+    group_by = charts.get("group_by")
 
     # Get y_query
     x_label_mapped = search_value(layer_project.attribute_mapping, x_label)
@@ -46,6 +46,7 @@ async def read_chart_data(
             FROM {layer_project.table_name}
             WHERE layer_id = '{layer_project.layer_id}'
             GROUP BY {x_label_mapped}
+            ORDER BY {x_label_mapped}
         )
         SELECT ARRAY_AGG(x), ARRAY_AGG(y)
         FROM data

@@ -204,6 +204,19 @@ class IHeatmapClosestAverageActive(RoutingTypeActive, HeatmapClosestAverageBase)
     def tool_type(self):
         return ToolType.heatmap_closest_average_active_mobility
 
+    @property
+    def properties_base(self):
+        return {
+            DefaultResultLayerName.heatmap_closest_average_active_mobility: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {
+                    "name": "accessibility",
+                    "type": "number",
+                },
+                "color_scale": "quantile",
+            }
+        }
+
 
 class IHeatmapClosestAverageMotorized(RoutingTypeMotorized, HeatmapClosestAverageBase):
     """Closest average based heatmap for motorized mobility schema."""
@@ -212,6 +225,18 @@ class IHeatmapClosestAverageMotorized(RoutingTypeMotorized, HeatmapClosestAverag
     def tool_type(self):
         return ToolType.heatmap_closest_average_motorized_mobility
 
+    @property
+    def properties_base(self):
+        return {
+            DefaultResultLayerName.heatmap_closest_average_motorized_mobility: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {
+                    "name": "accessibility",
+                    "type": "number",
+                },
+                "color_scale": "quantile",
+            }
+        }
 
 class IHeatmapConnectivityActive(RoutingTypeActive, HeatmapConnectivityBase):
     """Connectivity based heatmap for active mobility schema."""
@@ -220,6 +245,19 @@ class IHeatmapConnectivityActive(RoutingTypeActive, HeatmapConnectivityBase):
     def tool_type(self):
         return ToolType.heatmap_connectivity_active_mobility
 
+    @property
+    def properties_base(self):
+        return {
+            DefaultResultLayerName.heatmap_connectivity_active_mobility: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {
+                    "name": "accessibility",
+                    "type": "number",
+                },
+                "color_scale": "quantile",
+            }
+        }
+
 
 class IHeatmapConnectivityMotorized(RoutingTypeMotorized, HeatmapConnectivityBase):
     """Connectivity based heatmap for motorized mobility schema."""
@@ -227,3 +265,17 @@ class IHeatmapConnectivityMotorized(RoutingTypeMotorized, HeatmapConnectivityBas
     @property
     def tool_type(self):
         return ToolType.heatmap_connectivity_motorized_mobility
+
+    @property
+    def properties_base(self):
+        return {
+            DefaultResultLayerName.heatmap_connectivity_motorized_mobility: {
+                "color_range_type": ColorRangeType.sequential,
+                "color_field": {
+                    "name": "accessibility",
+                    "type": "number",
+                },
+                "color_scale": "quantile",
+            }
+        }
+

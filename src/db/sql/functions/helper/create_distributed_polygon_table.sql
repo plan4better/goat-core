@@ -1,3 +1,4 @@
+
 DROP FUNCTION IF EXISTS basic.create_distributed_polygon_table; 
 CREATE OR REPLACE FUNCTION basic.create_distributed_polygon_table(input_table text, relevant_columns text, where_filter text,
 max_vertices_polygon integer, result_table_name text)
@@ -15,8 +16,17 @@ BEGIN
 	EXECUTE format(
 		'DROP TABLE IF EXISTS polygons_subdivided; 
 		CREATE TEMP TABLE polygons_subdivided AS 
-		SELECT %s, ST_SUBDIVIDE(geom, %s) AS geom 
-		FROM polygons;', relevant_columns, max_vertices_polygon
+		WITH splitted AS 
+		(
+			SELECT %s, ST_SUBDIVIDE(geom, %s) AS geom 
+			FROM polygons
+		)
+		SELECT %s, 
+		CASE WHEN ST_IsValid(geom) = TRUE
+		THEN geom
+		ELSE ST_MakeValid(geom)
+		END AS geom 
+		FROM polygons;', relevant_columns, max_vertices_polygon, relevant_columns
 	);
 	CREATE INDEX ON polygons_subdivided USING GIST(geom);
 	
