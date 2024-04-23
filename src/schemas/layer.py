@@ -662,11 +662,12 @@ class LayerGetBase(BaseModel):
     distributor_name: List[str] | None = Field(
         None, description="List of distributor names"
     )
-    in_catalog: bool | None = Field(
-        False,
-        description="If true, only layers that are in the catalog will be returned and if false only the layers not in catalog and owned by the user will be returned.",
-    )
     spatial_search: str | None = Field(None, description="Spatial search for the layer")
+    in_catalog: bool = Field(
+        True,
+        const=True,
+        description="This field is always true. Only layers that are in the catalog will be returned.",
+    )
 
     @validator("language_code", pre=True, check_fields=False)
     def language_code_valid(cls, language_code):
@@ -696,6 +697,9 @@ class LayerGetBase(BaseModel):
 class ILayerGet(LayerGetBase):
     pass
 
+
+class ICatalogLayerGet(LayerGetBase):
+    pass
 
 class IMetadataAggregate(LayerGetBase):
     pass
