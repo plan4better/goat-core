@@ -680,33 +680,6 @@ class CRUDToolBase(CRUDFailedJob):
         await self.async_session.commit()
         return temp_points
 
-    async def create_table_polygons_to_h3_grid(
-        self,
-        layer_projects: List[BaseModel],
-    ):
-        # Create temp table name for points
-        temp_points = await self.create_temp_table_name("points")
-
-        append_to_existing = False
-        for layer_project in layer_projects:
-            # Create distributed point table using sql
-            where_query_point = "WHERE " + layer_project.where_query.replace("'", "''")
-            arr_columns = ["id"] + list(layer_project.attribute_mapping.keys())
-
-            await self.async_session.execute(
-                f"""SELECT basic.create_table_polygons_to_h3_grid(
-                    '{layer_project.table_name}',
-                    '{', '.join(arr_columns)}',
-                    '{where_query_point}',
-                    '{temp_points}',
-                    {append_to_existing}
-                )"""
-            )
-            await self.async_session.commit()
-            append_to_existing = True
-
-        return temp_points
-
     async def create_temp_table_layer(self, layer_project: BaseModel):
         """Create a temp table for the layer_project."""
 

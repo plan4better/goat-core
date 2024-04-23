@@ -1,30 +1,64 @@
-from src.crud.crud_heatmap import CRUDHeatmapBase
-from src.schemas.heatmap import (
-    IHeatmapGravityActive,
-    ImpedanceFunctionType,
-    ActiveRoutingHeatmapType,
-)
+from typing import List
 from src.core.config import settings
 from src.schemas.job import JobStatusType
+from src.crud.crud_heatmap import CRUDHeatmapBase
+from src.schemas.toolbox_base import DefaultResultLayerName
 from src.core.job import job_init, job_log, run_background_or_immediately
 from src.schemas.layer import IFeatureLayerToolCreate, FeatureGeometryType
-from src.schemas.toolbox_base import (
-    DefaultResultLayerName,
+from src.schemas.heatmap import (
+    IHeatmapGravityActive,
+    ActiveRoutingHeatmapType,
+    IHeatmapGravityMotorized,
+    MotorizedRoutingHeatmapType,
+    ImpedanceFunctionType,
+    TRAVELTIME_MATRIX_TABLE,
+    TRAVELTIME_MATRIX_RESOLUTION,
 )
 
 
-class CRUDHeatmapGravityBase(CRUDHeatmapBase):
-    TRAVELTIME_MATRIX_TABLE = {
-        ActiveRoutingHeatmapType.walking: "basic.traveltime_matrix_walking",
-        ActiveRoutingHeatmapType.bicycle: "basic.traveltime_matrix_bicycle",
-    }
+class CRUDHeatmapGravity(CRUDHeatmapBase):
 
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
 
+    async def create_distributed_opportunity_table(
+        self,
+        routing_type: ActiveRoutingHeatmapType | MotorizedRoutingHeatmapType,
+        layers: List[dict],
+    ):
+        """Create distributed table for user-specified opportunities."""
+
+        # Create temp table name for points
+        temp_points = await self.create_temp_table_name("points")
+
+        append_to_existing = False
+        for layer in layers:
+            # Create distributed point table using sql
+            where_query_point = "WHERE " + layer["where_query"].replace("'", "''")
+            potential_column = 1 if not layer["layer"].destination_potential_column \
+                else layer["layer"].destination_potential_column
+
+            await self.async_session.execute(
+                f"""SELECT basic.create_heatmap_gravity_opportunity_table(
+                    '{layer["table_name"]}',
+                    {layer["layer"].max_traveltime},
+                    {layer["layer"].sensitivity},
+                    {potential_column}::text,
+                    '{where_query_point}',
+                    '{temp_points}',
+                    {TRAVELTIME_MATRIX_RESOLUTION[routing_type]},
+                    {append_to_existing}
+                )"""
+            )
+
+            await self.async_session.commit()
+            append_to_existing = True
+
+        return temp_points
+
     # TODO: Verify function formulas
     def build_impedance_function(self, type: ImpedanceFunctionType):
-        """Builds impedance function used to compute gravity-based heatmaps."""
+        """Builds impedance function used to compute heatmap gravity."""
 
         if type == ImpedanceFunctionType.gaussian:
             return "SUM(EXP(1) ^ ((((traveltime * 60) ^ 2) * -1) / sensitivity) * potential)"
@@ -39,12 +73,12 @@ class CRUDHeatmapGravityBase(CRUDHeatmapBase):
 
     def build_query(
         self,
-        params: IHeatmapGravityActive,
+        params: IHeatmapGravityActive | IHeatmapGravityMotorized,
         opportunity_table: str,
         result_table: str,
         result_layer_id: str,
     ):
-        """Builds SQL query to compute gravity-based heatmap."""
+        """Builds SQL query to compute heatmap gravity."""
 
         impedance_function = self.build_impedance_function(params.impedance_function)
 
@@ -55,7 +89,7 @@ class CRUDHeatmapGravityBase(CRUDHeatmapBase):
             FROM
             (
                 SELECT matrix.orig_id, matrix.dest_id, matrix.traveltime, opportunity.sensitivity, opportunity.potential
-                FROM {opportunity_table} opportunity, basic.traveltime_matrix_walking matrix
+                FROM {opportunity_table} opportunity, {TRAVELTIME_MATRIX_TABLE[params.routing_type]} matrix
                 WHERE matrix.h3_3 = opportunity.h3_3
                 AND matrix.orig_id = opportunity.h3_index
                 AND matrix.traveltime <= opportunity.max_traveltime
@@ -66,25 +100,25 @@ class CRUDHeatmapGravityBase(CRUDHeatmapBase):
 
         return query
 
-
-class CRUDHeatmapGravityActiveMobility(CRUDHeatmapGravityBase):
-    def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
-        super().__init__(job_id, background_tasks, async_session, user_id, project_id)
-
     @job_log(job_step_name="heatmap_gravity")
-    async def heatmap(self, params: IHeatmapGravityActive):
-        """Compute gravity-based heatmap for active mobility."""
+    async def heatmap(self, params: IHeatmapGravityActive | IHeatmapGravityMotorized):
+        """Compute heatmap gravity."""
 
         # Fetch opportunity tables
         layers = await self.fetch_opportunity_layers(params)
-        opportunity_table = await self.create_distributed_opportunity_table(params, layers)
+        opportunity_table = await self.create_distributed_opportunity_table(
+            params.routing_type,
+            layers,
+        )
 
         # Initialize result table
         result_table = f"{settings.USER_DATA_SCHEMA}.{FeatureGeometryType.polygon.value}_{str(self.user_id).replace('-', '')}"
 
         # Create feature layer to store computed heatmap output
         layer_heatmap = IFeatureLayerToolCreate(
-            name=DefaultResultLayerName.heatmap_gravity_active_mobility.value,
+            name=DefaultResultLayerName.heatmap_gravity_active_mobility.value
+                if type(params.routing_type) == ActiveRoutingHeatmapType
+                else DefaultResultLayerName.heatmap_gravity_motorized_mobility.value,
             feature_layer_geometry_type=FeatureGeometryType.polygon,
             attribute_mapping={
                 "text_attr1": "h3_index",
@@ -110,10 +144,10 @@ class CRUDHeatmapGravityActiveMobility(CRUDHeatmapGravityBase):
 
         return {
             "status": JobStatusType.finished.value,
-            "msg": "Gravity-based heatmap for active mobility was successfully computed.",
+            "msg": "Heatmap gravity was successfully computed.",
         }
 
     @run_background_or_immediately(settings)
     @job_init()
-    async def run_heatmap(self, params: IHeatmapGravityActive):
+    async def run_heatmap(self, params: IHeatmapGravityActive | IHeatmapGravityMotorized):
         return await self.heatmap(params=params)

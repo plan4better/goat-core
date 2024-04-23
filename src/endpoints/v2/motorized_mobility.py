@@ -29,6 +29,9 @@ from src.schemas.heatmap import (
     IHeatmapClosestAverageMotorized,
     IHeatmapConnectivityMotorized,
 )
+from src.crud.crud_heatmap_gravity import CRUDHeatmapGravity
+from src.crud.crud_heatmap_closest_average import CRUDHeatmapClosestAverage
+from src.crud.crud_heatmap_connectivity import CRUDHeatmapConnectivity
 from src.schemas.toolbox_base import IToolResponse
 from src.schemas.toolbox_base import CommonToolParams
 
@@ -177,7 +180,7 @@ async def compute_nearby_station_access(
 
 @router.post(
     "/heatmap-gravity",
-    summary="Compute gravity-based heatmap for motorized mobility",
+    summary="Compute heatmap gravity for motorized mobility",
     response_model=IToolResponse,
     status_code=201,
 )
@@ -187,14 +190,14 @@ async def compute_motorized_mobility_heatmap_gravity(
     params: IHeatmapGravityMotorized = Body(
         ...,
         examples={},
-        description="The gravity-based heatmap parameters.",
+        description="The heatmap gravity parameters.",
     ),
 ):
-    """Compute gravity-based heatmap for motorized mobility."""
+    """Compute heatmap gravity for motorized mobility."""
 
     return await start_calculation(
         job_type=JobType.heatmap_gravity_motorized_mobility,
-        tool_class=CRUDCatchmentAreaPT,
+        tool_class=CRUDHeatmapGravity,
         crud_method="run_heatmap",
         async_session=common.async_session,
         user_id=common.user_id,
@@ -206,7 +209,7 @@ async def compute_motorized_mobility_heatmap_gravity(
 
 @router.post(
     "/heatmap-closest-average",
-    summary="Compute closest-average-based heatmap for motorized mobility",
+    summary="Compute heatmap closest-average for motorized mobility",
     response_model=IToolResponse,
     status_code=201,
 )
@@ -216,14 +219,14 @@ async def compute_motorized_mobility_heatmap_closest_average(
     params: IHeatmapClosestAverageMotorized = Body(
         ...,
         examples={},
-        description="The closest-average-based heatmap parameters.",
+        description="The heatmap closest-average parameters.",
     ),
 ):
-    """Compute closest-average-based heatmap for motorized mobility."""
+    """Compute heatmap closest-average for motorized mobility."""
 
     return await start_calculation(
         job_type=JobType.heatmap_closest_average_motorized_mobility,
-        tool_class=CRUDCatchmentAreaPT,
+        tool_class=CRUDHeatmapClosestAverage,
         crud_method="run_heatmap",
         async_session=common.async_session,
         user_id=common.user_id,
@@ -235,7 +238,7 @@ async def compute_motorized_mobility_heatmap_closest_average(
 
 @router.post(
     "/heatmap-connectivity",
-    summary="Compute connectivity-based heatmap for motorized mobility",
+    summary="Compute heatmap connectivity for motorized mobility",
     response_model=IToolResponse,
     status_code=201,
 )
@@ -245,14 +248,14 @@ async def compute_motorized_mobility_heatmap_connectivity(
     params: IHeatmapConnectivityMotorized = Body(
         ...,
         examples={},
-        description="The connectivity-based heatmap parameters.",
+        description="The heatmap connectivity parameters.",
     ),
 ):
-    """Compute connectivity-based heatmap for motorized mobility."""
+    """Compute heatmap connectivity for motorized mobility."""
 
     return await start_calculation(
         job_type=JobType.heatmap_connectivity_motorized_mobility,
-        tool_class=CRUDCatchmentAreaPT,
+        tool_class=CRUDHeatmapConnectivity,
         crud_method="run_heatmap",
         async_session=common.async_session,
         user_id=common.user_id,
