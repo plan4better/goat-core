@@ -6,7 +6,6 @@ from src.schemas.toolbox_base import input_layer_type_point, input_layer_type_po
 from src.schemas.colors import ColorRangeType
 
 
-# TODO: Validate the traveltime based on the mode.
 class ActiveRoutingHeatmapType(str, Enum):
     """Supported routing modes for active mobility and the heatmap."""
 
@@ -54,6 +53,7 @@ class MaxTravelTimeTransportMode(int, Enum):
 
     walking = 30
     bicycle = 30
+    pedelec = 30
     public_transport = 60
     car = 60
 
