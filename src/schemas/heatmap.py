@@ -7,7 +7,7 @@ from src.schemas.colors import ColorRangeType
 
 
 class ActiveRoutingHeatmapType(str, Enum):
-    """Supported routing modes for active mobility and the heatmap."""
+    """Supported active mobility types for heatmaps."""
 
     walking = "walking"
     bicycle = "bicycle"
@@ -15,7 +15,7 @@ class ActiveRoutingHeatmapType(str, Enum):
 
 
 class MotorizedRoutingHeatmapType(str, Enum):
-    """Supported routing modes for the heatmap."""
+    """Supported motorized mobility types for heatmaps."""
 
     public_transport = "public_transport"
     car = "car"
