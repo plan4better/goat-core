@@ -293,7 +293,7 @@ style_starting = {
         "category": "Uber",
     },
     "color_scale": "quantile",
-    "marker_size": 30,
+    "marker_size": 40,
     "fixed_radius": False,
     "radius_range": [0, 10],
     "radius_scale": "linear",
@@ -312,9 +312,89 @@ style_starting = {
     "stroke_width_scale": "linear",
 }
 
+style_nearby_station = {
+    "color": [239, 101, 72],
+    "filled": True,
+    "radius": 5,
+    "opacity": 1,
+    "stroked": False,
+    "max_zoom": 22,
+    "min_zoom": 1,
+    "visibility": True,
+    "color_field": {"name": "access_time", "type": "number"},
+    "color_range": {
+        "name": "Uber Viz Diverging 2.5",
+        "type": "diverging",
+        "colors": [
+            "#00939C",
+            "#3EADB3",
+            "#7CC7CB",
+            "#BAE1E2",
+            "#F8C0AA",
+            "#E68F71",
+            "#D45F39",
+            "#C22E00",
+        ],
+        "category": "Uber",
+    },
+    "color_scale": "quantile",
+    "marker_size": 30,
+    "fixed_radius": False,
+    "marker_field": {"name": "dominant_mode", "type": "string"},
+    "radius_range": [0, 10],
+    "radius_scale": "linear",
+    "stroke_color": [225, 49, 106],
+    "stroke_width": 2,
+    "custom_marker": True,
+    "marker_mapping": [
+        [
+            ["rail"],
+            {
+                "url": "https://assets.plan4better.de/icons/maki/rail-metro.svg",
+                "name": "rail-metro",
+            },
+        ],
+        [
+            ["tram"],
+            {
+                "url": "https://assets.plan4better.de/icons/maki/rail-light.svg",
+                "name": "rail-light",
+            },
+        ],
+        [
+            ["bus"],
+            {"url": "https://assets.plan4better.de/icons/maki/bus.svg", "name": "bus"},
+        ],
+        [
+            ["metro"],
+            {
+                "url": "https://assets.plan4better.de/icons/maki/rail.svg",
+                "name": "rail",
+            },
+        ],
+    ],
+    "marker_size_range": [0, 10],
+    "color_scale_breaks": {
+        "max": 15,
+        "min": 3,
+        "mean": 9.89,
+        "breaks": [6, 8, 9, 10, 11, 12, 13],
+    },
+    "stroke_color_range": {
+        "name": "Global Warming",
+        "type": "sequential",
+        "colors": ["#5A1846", "#900C3F", "#C70039", "#E3611C", "#F1920E", "#FFC300"],
+        "category": "Uber",
+    },
+    "stroke_color_scale": "quantile",
+    "stroke_width_range": [0, 10],
+    "stroke_width_scale": "linear",
+}
+
 custom_styles = {
     DefaultResultLayerName.oev_gueteklasse: style_oev_gueteklassen_polygon,
     DefaultResultLayerName.oev_gueteklasse_station: style_oev_gueteklassen_point,
     DefaultResultLayerName.catchment_area_starting_points: style_starting,
     DefaultResultLayerName.nearby_station_access_starting_points: style_starting,
+    DefaultResultLayerName.nearby_station_access: style_nearby_station,
 }
