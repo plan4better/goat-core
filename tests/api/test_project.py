@@ -178,7 +178,9 @@ async def test_update_layer_project(client: AsyncClient, fixture_create_layer_pr
         f"{settings.API_V2_STR}/project/{project_id}/layer/{layer_project_id}",
         json={
             "name": "test2",
-            "query": {"op": "=", "args": [{"property": "category"}, "bus_stop"]},
+            "query": {
+                "cql": {"op": "=", "args": [{"property": "category"}, "bus_stop"]}
+            },
         },
     )
     assert response.status_code == 200
@@ -200,22 +202,24 @@ async def test_update_layer_project_with_spatial_filter(
         json={
             "name": "test2",
             "query": {
-                "op": "s_intersects",
-                "args": [
-                    {"property": "geometry"},
-                    {
-                        "coordinates": [
-                            [
-                                [11.072458, 49.467157],
-                                [11.072458, 49.471157],
-                                [11.076458, 49.471157],
-                                [11.076458, 49.467157],
-                                [11.072458, 49.467157],
-                            ]
-                        ],
-                        "type": "Polygon",
-                    },
-                ],
+                "cql": {
+                    "op": "s_intersects",
+                    "args": [
+                        {"property": "geometry"},
+                        {
+                            "coordinates": [
+                                [
+                                    [11.072458, 49.467157],
+                                    [11.072458, 49.471157],
+                                    [11.076458, 49.471157],
+                                    [11.076458, 49.467157],
+                                    [11.072458, 49.467157],
+                                ]
+                            ],
+                            "type": "Polygon",
+                        },
+                    ],
+                }
             },
         },
     )
@@ -237,7 +241,7 @@ async def test_update_layer_project_bad_format_query(
         f"{settings.API_V2_STR}/project/{project_id}/layer/{layer_project_id}",
         json={
             "name": "test2",
-            "query": {"op": "=", "args": "wrong"},
+            "query": {"cql": {"op": "=", "args": "wrong"}},
         },
     )
     assert response.status_code == 422

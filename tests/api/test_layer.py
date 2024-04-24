@@ -121,7 +121,7 @@ async def test_export_internal_layer_with_filter(
         "file_type": "gpkg",
         "file_name": "test",
         "crs": "EPSG:4326",
-        "query": {"op": ">", "args": [{"property": "zipcode"}, "80802"]},
+        "query": {"cql": {"op": ">", "args": [{"property": "zipcode"}, "80802"]}},
     }
 
     # Call export endpoint

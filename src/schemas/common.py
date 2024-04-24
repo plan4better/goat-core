@@ -31,6 +31,7 @@ class MetaDataQuery(BaseModel):
         None, description="Intersection query"
     )
 
+
 class CQLQueryObject(BaseModel):
     metadata: MetaDataQuery | None = Field(None, description="Metadata query")
     cql: dict | None = Field(None, description="CQL query")
@@ -46,6 +47,20 @@ class CQLQueryObject(BaseModel):
             raise ValidationError(f"Invalid CQL query: {e}")
         return v
 
+
 class CQLQuery(BaseModel):
     """Model for CQL query."""
+
     query: CQLQueryObject | None = Field(None, description="CQL query")
+
+
+# test = CQLQueryObject(
+#     cql={
+#         "op": "=",
+#         "args": [{"property": "category"}, "second_category"],
+#     }
+# )
+# print(test)
+
+# x={'query': {'cql': {'op': '=', 'args': [{'property': 'category'}, 'second_category']}}}
+# CQLQuery(**x)

@@ -695,8 +695,8 @@ class LayerGetBase(BaseModel):
 
 
 class ILayerGet(LayerGetBase):
-    in_catalog: bool = Field(
-        False,
+    in_catalog: bool | None = Field(
+        None,
         description="This field is always true. Only layers that are in the catalog will be returned.",
     )
 
