@@ -141,7 +141,7 @@ class CRUDToolBase(CRUDFailedJob):
         coords = [[float(coord) for coord in point.split()] for point in coords]
 
         # Add spatial filter to query
-        query = layer_project.query
+        query = layer_project.query.cql
         spatial_filter = {
             "op": "s_intersects",
             "args": [
@@ -157,7 +157,7 @@ class CRUDToolBase(CRUDFailedJob):
         else:
             query = {"op": "and", "args": [query, spatial_filter]}
 
-        layer_project.query = query
+        layer_project.query.cql = query
         return layer_project
 
     async def check_max_feature_cnt_aggregation(

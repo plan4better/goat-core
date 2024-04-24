@@ -695,11 +695,18 @@ class LayerGetBase(BaseModel):
 
 
 class ILayerGet(LayerGetBase):
-    pass
-
+    in_catalog: bool = Field(
+        False,
+        description="This field is always true. Only layers that are in the catalog will be returned.",
+    )
 
 class ICatalogLayerGet(LayerGetBase):
-    pass
+    in_catalog: bool = Field(
+        True,
+        const=True,
+        description="This field is always true. Only layers that are in the catalog will be returned.",
+    )
+
 
 class IMetadataAggregate(LayerGetBase):
     pass

@@ -445,6 +445,9 @@ def build_where(id: UUID, table_name: str, query: str | dict, attribute_mapping:
     else:
         if isinstance(query, str):
             query = json.loads(query)
+        else:
+            query = query.cql
+
         query_obj = CQLQuery(query=query)
         ast = cql2_json_parser(query_obj.query)
         attribute_mapping = {value: key for key, value in attribute_mapping.items()}
