@@ -71,16 +71,6 @@ class INearbyStationAccess(BaseModel):
     def geofence_table(self):
         return "basic.geofence_pt"
 
-    @property
-    def properties_base(self):
-        return {
-            DefaultResultLayerName.nearby_station_access: {
-                "color_range_type": ColorRangeType.sequential,
-                "color_field": {"name": "access_time", "type": "number"},
-                "color_scale": "quantile",
-            }
-        }
-
 
 request_example_nearby_station_access = {
     "single_point_nearby_station": {
