@@ -196,6 +196,7 @@ async def test_single_catchment_area_public_transport(
             "to_time": 39600,  # 9 AM
         },
         "catchment_area_type": "polygon",
+        "polygon_difference": True,
     }
     response = await client.post(
         f"{settings.API_V2_STR}/motorized-mobility/pt/catchment-area?project_id={project_id}",

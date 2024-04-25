@@ -327,13 +327,19 @@ class CRUDCatchmentAreaPT(CRUDCatchmentAreaBase):
         self.http_client = http_client
 
     async def write_catchment_area_result(
-        self, catchment_area_type, layer_id, result_table, shapes, grid
+        self,
+        catchment_area_type,
+        layer_id,
+        result_table,
+        shapes,
+        grid,
+        polygon_difference,
     ):
         """Save the result of the catchment area computation to the database."""
 
         if catchment_area_type == "polygon":
             # Save catchment area geometry data (shapes)
-            shapes = shapes["incremental"]
+            shapes = shapes["incremental"] if polygon_difference else shapes["full"]
             insert_string = ""
             for i in shapes.index:
                 geom = shapes["geometry"][i]
@@ -512,6 +518,7 @@ class CRUDCatchmentAreaPT(CRUDCatchmentAreaBase):
                     result_table=result_table,
                     shapes=catchment_area_shapes,
                     grid=catchment_area_grid,
+                    polygon_difference=params.polygon_difference,
                 )
             except Exception as e:
                 raise SQLError(
