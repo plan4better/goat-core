@@ -444,9 +444,12 @@ def build_where(id: UUID, table_name: str, query: str | dict, attribute_mapping:
         return f"{table_name}.layer_id = '{str(id)}'"
     else:
         if isinstance(query, str):
-            query = json.loads(query)
+            query = {"cql": json.loads(query)}
+        else:
+            query = {"cql": query.cql}
+
         query_obj = CQLQuery(query=query)
-        ast = cql2_json_parser(query_obj.query)
+        ast = cql2_json_parser(query_obj.query.cql)
         attribute_mapping = {value: key for key, value in attribute_mapping.items()}
         # Add id to attribute mapping
         attribute_mapping["id"] = "id"

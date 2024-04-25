@@ -198,7 +198,7 @@ async def test_aggregate(
             response = await client.put(
                 f"{settings.API_V2_STR}/project/{project_id}/layer/{layer_project_id}",
                 json={
-                    "query": filter,
+                    "query": {"cql": filter},
                 },
             )
             assert response.status_code == 200

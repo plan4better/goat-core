@@ -31,6 +31,7 @@ from src.schemas.layer import (
     OgrPostgresType,
     UserDataGeomType,
 )
+from src.schemas.common import CQLQueryObject
 from src.schemas.style import (
     get_base_style,
     get_tool_style_with_breaks,
@@ -141,7 +142,6 @@ class CRUDToolBase(CRUDFailedJob):
         coords = [[float(coord) for coord in point.split()] for point in coords]
 
         # Add spatial filter to query
-        query = layer_project.query
         spatial_filter = {
             "op": "s_intersects",
             "args": [
@@ -152,12 +152,12 @@ class CRUDToolBase(CRUDFailedJob):
                 },
             ],
         }
-        if query is None:
-            query = spatial_filter
+        if layer_project.query is None:
+            query = {"cql": spatial_filter}
         else:
-            query = {"op": "and", "args": [query, spatial_filter]}
+            query = {"cql": {"op": "and", "args": [layer_project.query.cql, spatial_filter]}}
 
-        layer_project.query = query
+        layer_project.query = CQLQueryObject(**query)
         return layer_project
 
     async def check_max_feature_cnt_aggregation(
@@ -167,33 +167,44 @@ class CRUDToolBase(CRUDFailedJob):
     ):
         # Count exclusively features that are within the extent of the other layers
         source_layer_project = layers_project["source_layer_project_id"]
-        aggregation_layer_project = layers_project["aggregation_layer_project_id"]
+        aggregation_layer_project = layers_project.get("aggregation_layer_project_id")
 
-        source_layer_project = await self.build_additional_spatial_filter(
-            layer_project=source_layer_project,
-            layer_project_filter=aggregation_layer_project,
-        )
-        aggregation_layer_project = await self.build_additional_spatial_filter(
-            layer_project=aggregation_layer_project,
-            layer_project_filter=source_layer_project,
-        )
-
-        # Check if the feature count is below the limit
-        for layer_project in [source_layer_project, aggregation_layer_project]:
-            cnt = await crud_layer_project.get_feature_cnt(
-                async_session=self.async_session,
-                layer_project=layer_project,
+        if aggregation_layer_project is None:
+            await self.check_max_feature_cnt(
+                layers_project=[source_layer_project],
+                tool_type=params.tool_type,
             )
-            cnt = cnt["filtered_count"]
-            # Make sure that the count is below the limit for aggregation_point or aggregation_polygon
-            if cnt > MaxFeatureCnt[params.tool_type.value].value:
-                raise FeatureCountError(
-                    f"The operation cannot be performed on more than {MaxFeatureCnt[params.tool_type.value].value} features."
+            return layers_project
+        else:
+            # Build array for layers to check
+            layers_project = []
+            source_layer_project = await self.build_additional_spatial_filter(
+                layer_project=source_layer_project,
+                layer_project_filter=aggregation_layer_project,
+            )
+            layers_project.append(source_layer_project)
+            aggregation_layer_project = await self.build_additional_spatial_filter(
+                layer_project=aggregation_layer_project,
+                layer_project_filter=source_layer_project,
+            )
+            layers_project.append(aggregation_layer_project)
+
+            # Check if the feature count is below the limit
+            for layer_project in layers_project:
+                cnt = await crud_layer_project.get_feature_cnt(
+                    async_session=self.async_session,
+                    layer_project=layer_project,
                 )
-        return {
-            "source_layer_project_id": source_layer_project,
-            "aggregation_layer_project_id": aggregation_layer_project,
-        }
+                cnt = cnt["filtered_count"]
+                # Make sure that the count is below the limit for aggregation_point or aggregation_polygon
+                if cnt > MaxFeatureCnt[params.tool_type.value].value:
+                    raise FeatureCountError(
+                        f"The operation cannot be performed on more than {MaxFeatureCnt[params.tool_type.value].value} features."
+                    )
+            return {
+                "source_layer_project_id": source_layer_project,
+                "aggregation_layer_project_id": aggregation_layer_project,
+            }
 
     async def get_layers_project(self, params: IToolParam):
         # Get all params that have the name layer_project_id and build a dict using the variable name as key
