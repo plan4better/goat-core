@@ -532,6 +532,8 @@ class CRUDLayer(CRUDLayerBase):
         if isinstance(params, ILayerGet):
             if params.in_catalog is not None:
                 filters.append(and_(Layer.in_catalog == bool(params.in_catalog), Layer.user_id == user_id))
+            else:
+                filters.append(Layer.user_id == user_id)
         else:
             filters.append(Layer.in_catalog == bool(True))
 
