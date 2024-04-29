@@ -39,6 +39,7 @@ from src.schemas.layer import (
     IInternalLayerCreate,
     IInternalLayerExport,
     ILayerGet,
+    ICatalogLayerGet,
     IMetadataAggregate,
     IMetadataAggregateRead,
     ITableCreateAdditionalAttributes,
@@ -514,7 +515,7 @@ class CRUDLayer(CRUDLayerBase):
         result = result.fetchall()
         return result[0][0]
 
-    async def get_base_filter(self, user_id: UUID, params: IMetadataAggregate, attributes_to_exclude: list = []):
+    async def get_base_filter(self, user_id: UUID, params: ILayerGet | ICatalogLayerGet, attributes_to_exclude: list = []):
         """Get filter for get layer queries."""
         filters = []
         for key, value in params.dict().items():
@@ -527,14 +528,14 @@ class CRUDLayer(CRUDLayerBase):
                     value = [value]
                 filters.append(getattr(Layer, key).in_(value))
 
-        # Add filter to only include catalog layers
-        if params.in_catalog is True:
-            filters.append(Layer.in_catalog == bool(True))
-        # Get layers not in catalog and owned by user
+        # Check if ILayer get then it is for user owned layers
+        if isinstance(params, ILayerGet):
+            if params.in_catalog is not None:
+                filters.append(and_(Layer.in_catalog == bool(params.in_catalog), Layer.user_id == user_id))
+            else:
+                filters.append(Layer.user_id == user_id)
         else:
-            filters.append(
-                and_(Layer.in_catalog == bool(False), Layer.user_id == user_id)
-            )
+            filters.append(Layer.in_catalog == bool(True))
 
         # Add search filter
         if params.search is not None:
@@ -560,7 +561,7 @@ class CRUDLayer(CRUDLayerBase):
         order_by: str,
         order: str,
         page_params: PaginationParams,
-        params: ILayerGet,
+        params: ILayerGet | ICatalogLayerGet,
     ):
         """Get layer with filter."""
 
