@@ -121,7 +121,7 @@ async def test_export_internal_layer_with_filter(
         "file_type": "gpkg",
         "file_name": "test",
         "crs": "EPSG:4326",
-        "query": {"op": ">", "args": [{"property": "zipcode"}, "80802"]},
+        "query": {"cql": {"op": ">", "args": [{"property": "zipcode"}, "80802"]}},
     }
 
     # Call export endpoint
@@ -507,14 +507,23 @@ async def test_get_statistics_column_wrong_column_name(
 
 # Get metadata aggregate for layers based on different filters
 async def test_get_layers(
-    client: AsyncClient, fixture_create_catalog_layers
+    client: AsyncClient, fixture_create_multiple_layers
 ):
     response = await client.post(
-        f"{settings.API_V2_STR}/layer", json={"in_catalog": True}
+        f"{settings.API_V2_STR}/layer"
     )
     assert response.status_code == 200
     assert len(response.json()["items"]) == 4
 
+# Get metadata aggregate for layers based on different filters
+async def test_get_catalog_layers(
+    client: AsyncClient, fixture_create_catalog_layers
+):
+    response = await client.post(
+        f"{settings.API_V2_STR}/layer/catalog"
+    )
+    assert response.status_code == 200
+    assert len(response.json()["items"]) == 4
 
 # Get metadata aggregate for layers based on different filters
 async def test_get_layers_metadata_aggregate(

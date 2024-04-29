@@ -329,7 +329,7 @@ async def create_internal_layer(
     job = await check_job_status(client, job_id)
     assert job["status_simple"] == "finished"
     response = await client.post(
-        f"{settings.API_V2_STR}/layer", json={"search": layer_dict["name"], "in_catalog": layer_dict.get("in_catalog")}
+        f"{settings.API_V2_STR}/layer", json={"search": layer_dict["name"]}
     )
     assert response.status_code == 200
     layer_dict = response.json()["items"][0]
@@ -898,11 +898,7 @@ async def fixture_delete_external_layers(
     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}")
     assert response.status_code == 404  # Not Found
 
-
-@pytest.fixture
-async def fixture_create_catalog_layers(
-    client: AsyncClient, fixture_create_user, fixture_get_home_folder
-):
+async def create_multiple_layer(client: AsyncClient, fixture_create_user, fixture_get_home_folder, in_catalog: bool):
     # Define layer metadata for the different layer types
     varying_attributes = [
         {
@@ -911,7 +907,7 @@ async def fixture_create_catalog_layers(
             "distributor_name": "Plan4Better GmbH",
             "data_category": "transportation",
             "license": "CC_BY",
-            "in_catalog": True,
+            "in_catalog": in_catalog,
         },
         {
             "geographical_code": "be",
@@ -919,7 +915,7 @@ async def fixture_create_catalog_layers(
             "distributor_name": "Plan4Better GmbH",
             "data_category": "environment",
             "license": "ODC_ODbL",
-            "in_catalog": True,
+            "in_catalog": in_catalog,
         },
         {
             "geographical_code": "de",
@@ -927,7 +923,7 @@ async def fixture_create_catalog_layers(
             "distributor_name": "Technical University of Munich",
             "data_category": "transportation",
             "license": "ODC_ODbL",
-            "in_catalog": True,
+            "in_catalog": in_catalog,
         },
         {
             "geographical_code": "de",
@@ -935,7 +931,7 @@ async def fixture_create_catalog_layers(
             "distributor_name": "Technical University of Munich",
             "data_category": "transportation",
             "license": "CC_BY",
-            "in_catalog": True,
+            "in_catalog": in_catalog,
         },
     ]
     layer_types = ["point", "line", "polygon", "point"]
@@ -975,6 +971,17 @@ async def fixture_create_catalog_layers(
         cnt += 1
     return layers
 
+@pytest.fixture
+async def fixture_create_multiple_layers(
+    client: AsyncClient, fixture_create_user, fixture_get_home_folder
+):
+    return await create_multiple_layer(client, fixture_create_user, fixture_get_home_folder, False)
+
+@pytest.fixture
+async def fixture_create_catalog_layers(
+    client: AsyncClient, fixture_create_user, fixture_get_home_folder
+):
+    return await create_multiple_layer(client, fixture_create_user, fixture_get_home_folder, True)
 
 def get_payload_types(request_examples: dict) -> list:
     return request_examples

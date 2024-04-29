@@ -50,7 +50,7 @@ async def test_join_filter(client: AsyncClient, fixture_add_join_layers_to_proje
     response = await client.put(
         f"{settings.API_V2_STR}/project/{project_id}/layer/{layer_id_gpkg}",
         json={
-            "query": {"op": "=", "args": [{"property": "plz"}, "80799"]},
+            "query": {"cql": {"op": "=", "args": [{"property": "plz"}, "80799"]}},
         },
     )
     assert response.status_code == 200
@@ -59,7 +59,7 @@ async def test_join_filter(client: AsyncClient, fixture_add_join_layers_to_proje
     response = await client.put(
         f"{settings.API_V2_STR}/project/{project_id}/layer/{layer_id_table}",
         json={
-            "query": {"op": ">", "args": [{"property": "events"}, "500"]},
+            "query": {"cql": {"op": ">", "args": [{"property": "events"}, "500"]}},
         },
     )
     assert response.status_code == 200
