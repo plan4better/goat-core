@@ -340,11 +340,13 @@ class CRUDCatchmentAreaPT(CRUDCatchmentAreaBase):
         if catchment_area_type == "polygon":
             # Save catchment area geometry data (shapes)
             shapes = shapes["incremental"] if polygon_difference else shapes["full"]
-            insert_string = ""
+            shapes_sorted = []
             for i in shapes.index:
-                geom = shapes["geometry"][i]
-                minute = shapes["minute"][i]
-                insert_string += f"('{layer_id}', ST_SetSRID(ST_GeomFromText('{geom}'), 4326), {minute}),"
+                shapes_sorted.append((shapes["geometry"][i], shapes["minute"][i]))
+            shapes_sorted = sorted(shapes_sorted, key=lambda x: x[1], reverse=True)
+            insert_string = ""
+            for shape in shapes_sorted:
+                insert_string += f"('{layer_id}', ST_SetSRID(ST_GeomFromText('{shape[0]}'), 4326), {shape[1]}),"
             insert_string = f"""
                 INSERT INTO {result_table} (layer_id, geom, integer_attr1)
                 VALUES {insert_string.rstrip(",")};
