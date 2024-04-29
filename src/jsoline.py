@@ -424,7 +424,11 @@ def generate_jsolines(grid, travel_time, percentile, steps):
         grid["west"],
         grid["north"],
         grid["zoom"],
-        cutoffs=np.arange(start=0, stop=travel_time + 1, step=(travel_time / steps)),
+        cutoffs=np.arange(
+            start=(travel_time / steps),
+            stop=travel_time + 1,
+            step=(travel_time / steps),
+        ),
         return_incremental=True,
     )
     return isochrones

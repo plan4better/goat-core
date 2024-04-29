@@ -1,24 +1,42 @@
 from enum import Enum
-from pydantic import Field, BaseModel
+from pydantic import Field, BaseModel, validator
 from typing import List
 from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import input_layer_type_point, input_layer_type_polygon, DefaultResultLayerName
 from src.schemas.colors import ColorRangeType
 
 
-# TODO: Validate the traveltime based on the mode.
 class ActiveRoutingHeatmapType(str, Enum):
-    """Supported routing modes for active mobility and the heatmap."""
+    """Supported active mobility types for heatmaps."""
 
     walking = "walking"
     bicycle = "bicycle"
+    pedelec = "pedelec"
 
 
 class MotorizedRoutingHeatmapType(str, Enum):
-    """Supported routing modes for the heatmap."""
+    """Supported motorized mobility types for heatmaps."""
 
     public_transport = "public_transport"
     car = "car"
+
+
+TRAVELTIME_MATRIX_TABLE = {
+    ActiveRoutingHeatmapType.walking: "basic.traveltime_matrix_walking",
+    ActiveRoutingHeatmapType.bicycle: "basic.traveltime_matrix_bicycle",
+    ActiveRoutingHeatmapType.pedelec.value: "basic.traveltime_matrix_pedelec",
+    MotorizedRoutingHeatmapType.public_transport.value: "basic.traveltime_matrix_pt",
+    MotorizedRoutingHeatmapType.car.value: "basic.traveltime_matrix_car",
+}
+
+
+TRAVELTIME_MATRIX_RESOLUTION = {
+    ActiveRoutingHeatmapType.walking.value: 10,
+    ActiveRoutingHeatmapType.bicycle.value: 9,
+    ActiveRoutingHeatmapType.pedelec.value: 9,
+    MotorizedRoutingHeatmapType.public_transport.value: 9,
+    MotorizedRoutingHeatmapType.car.value: 8,
+}
 
 
 class ImpedanceFunctionType(str, Enum):
@@ -35,6 +53,7 @@ class MaxTravelTimeTransportMode(int, Enum):
 
     walking = 30
     bicycle = 30
+    pedelec = 30
     public_transport = 60
     car = 60
 
@@ -94,6 +113,15 @@ class HeatmapGravityBase(BaseModel):
         description="The opportunities the heatmap should be calculated for heatmap.",
     )
 
+    def validate_max_traveltime(routing_type, values):
+        max_traveltime = MaxTravelTimeTransportMode[routing_type].value
+        for opportunity in values.get("opportunities"):
+            if opportunity.max_traveltime > max_traveltime:
+                raise ValueError(
+                    f"Max supported travel time for {routing_type} is {max_traveltime} minutes."
+                )
+        return routing_type
+
     @property
     def input_layer_types(self):
         return {"opportunity_layer_project_id": input_layer_type_point}
@@ -107,6 +135,15 @@ class HeatmapClosestAverageBase(BaseModel):
         title="Opportunities",
         description="The opportunities the heatmap should be calculated for heatmap.",
     )
+
+    def validate_max_traveltime(routing_type, values):
+        max_traveltime = MaxTravelTimeTransportMode[routing_type].value
+        for opportunity in values.get("opportunities"):
+            if opportunity.max_traveltime > max_traveltime:
+                raise ValueError(
+                    f"Max supported travel time for {routing_type} is {max_traveltime} minutes."
+                )
+        return routing_type
 
     @property
     def input_layer_types(self):
@@ -129,13 +166,21 @@ class HeatmapConnectivityBase(BaseModel):
         le=60,
     )
 
+    def validate_max_traveltime(routing_type, values):
+        max_traveltime = MaxTravelTimeTransportMode[routing_type].value
+        if values.get("max_traveltime") > max_traveltime:
+            raise ValueError(
+                f"Max supported travel time for {routing_type} is {max_traveltime} minutes."
+            )
+        return routing_type
+
     @property
     def input_layer_types(self):
         return {"reference_area_layer_project_id": input_layer_type_polygon}
 
 
-class RoutingTypeActive(BaseModel):
-    """Routing type for active mobility schema."""
+class IHeatmapGravityActive(HeatmapGravityBase):
+    """Gravity based heatmap for active mobility schema."""
 
     routing_type: ActiveRoutingHeatmapType = Field(
         ...,
@@ -143,19 +188,9 @@ class RoutingTypeActive(BaseModel):
         description="The routing type of the heatmap.",
     )
 
-
-class RoutingTypeMotorized(BaseModel):
-    """Routing type for motorized mobility schema."""
-
-    routing_type: MotorizedRoutingHeatmapType = Field(
-        ...,
-        title="Routing Type",
-        description="The routing type of the heatmap.",
-    )
-
-
-class IHeatmapGravityActive(RoutingTypeActive, HeatmapGravityBase):
-    """Gravity based heatmap for active mobility schema."""
+    @validator("routing_type")
+    def validate_routing_type(cls, routing_type, values):
+        return super().validate_max_traveltime(routing_type, values)
 
     @property
     def tool_type(self):
@@ -176,8 +211,18 @@ class IHeatmapGravityActive(RoutingTypeActive, HeatmapGravityBase):
 
 
 
-class IHeatmapGravityMotorized(RoutingTypeMotorized, HeatmapGravityBase):
+class IHeatmapGravityMotorized(HeatmapGravityBase):
     """Gravity based heatmap for motorized mobility schema."""
+
+    routing_type: MotorizedRoutingHeatmapType = Field(
+        ...,
+        title="Routing Type",
+        description="The routing type of the heatmap.",
+    )
+
+    @validator("routing_type")
+    def validate_routing_type(cls, routing_type, values):
+        return super().validate_max_traveltime(routing_type, values)
 
     @property
     def tool_type(self):
@@ -197,8 +242,18 @@ class IHeatmapGravityMotorized(RoutingTypeMotorized, HeatmapGravityBase):
         }
 
 
-class IHeatmapClosestAverageActive(RoutingTypeActive, HeatmapClosestAverageBase):
+class IHeatmapClosestAverageActive(HeatmapClosestAverageBase):
     """Closest average based heatmap for active mobility schema."""
+
+    routing_type: ActiveRoutingHeatmapType = Field(
+        ...,
+        title="Routing Type",
+        description="The routing type of the heatmap.",
+    )
+
+    @validator("routing_type")
+    def validate_routing_type(cls, routing_type, values):
+        return super().validate_max_traveltime(routing_type, values)
 
     @property
     def tool_type(self):
@@ -218,8 +273,18 @@ class IHeatmapClosestAverageActive(RoutingTypeActive, HeatmapClosestAverageBase)
         }
 
 
-class IHeatmapClosestAverageMotorized(RoutingTypeMotorized, HeatmapClosestAverageBase):
+class IHeatmapClosestAverageMotorized(HeatmapClosestAverageBase):
     """Closest average based heatmap for motorized mobility schema."""
+
+    routing_type: MotorizedRoutingHeatmapType = Field(
+        ...,
+        title="Routing Type",
+        description="The routing type of the heatmap.",
+    )
+
+    @validator("routing_type")
+    def validate_routing_type(cls, routing_type, values):
+        return super().validate_max_traveltime(routing_type, values)
 
     @property
     def tool_type(self):
@@ -238,8 +303,18 @@ class IHeatmapClosestAverageMotorized(RoutingTypeMotorized, HeatmapClosestAverag
             }
         }
 
-class IHeatmapConnectivityActive(RoutingTypeActive, HeatmapConnectivityBase):
+class IHeatmapConnectivityActive(HeatmapConnectivityBase):
     """Connectivity based heatmap for active mobility schema."""
+
+    routing_type: ActiveRoutingHeatmapType = Field(
+        ...,
+        title="Routing Type",
+        description="The routing type of the heatmap.",
+    )
+
+    @validator("routing_type")
+    def validate_routing_type(cls, routing_type, values):
+        return super().validate_max_traveltime(routing_type, values)
 
     @property
     def tool_type(self):
@@ -259,8 +334,18 @@ class IHeatmapConnectivityActive(RoutingTypeActive, HeatmapConnectivityBase):
         }
 
 
-class IHeatmapConnectivityMotorized(RoutingTypeMotorized, HeatmapConnectivityBase):
+class IHeatmapConnectivityMotorized(HeatmapConnectivityBase):
     """Connectivity based heatmap for motorized mobility schema."""
+
+    routing_type: MotorizedRoutingHeatmapType = Field(
+        ...,
+        title="Routing Type",
+        description="The routing type of the heatmap.",
+    )
+
+    @validator("routing_type")
+    def validate_routing_type(cls, routing_type, values):
+        return super().validate_max_traveltime(routing_type, values)
 
     @property
     def tool_type(self):

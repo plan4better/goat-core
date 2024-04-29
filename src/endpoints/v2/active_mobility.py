@@ -12,15 +12,9 @@ from src.schemas.heatmap import (
     IHeatmapClosestAverageActive,
     IHeatmapConnectivityActive,
 )
-from src.crud.crud_heatmap_gravity import (
-    CRUDHeatmapGravityActiveMobility,
-)
-from src.crud.crud_heatmap_closest_average import (
-    CRUDHeatmapClosestAverageActiveMobility,
-)
-from src.crud.crud_heatmap_connectivity import (
-    CRUDHeatmapConnectivityActiveMobility,
-)
+from src.crud.crud_heatmap_gravity import CRUDHeatmapGravity
+from src.crud.crud_heatmap_closest_average import CRUDHeatmapClosestAverage
+from src.crud.crud_heatmap_connectivity import CRUDHeatmapConnectivity
 from src.schemas.job import JobType
 from src.schemas.toolbox_base import CommonToolParams, IToolResponse
 
@@ -59,7 +53,7 @@ async def compute_active_mobility_catchment_area(
 
 @router.post(
     "/heatmap-gravity",
-    summary="Compute gravity-based heatmap for active mobility",
+    summary="Compute heatmap gravity for active mobility",
     response_model=IToolResponse,
     status_code=201,
 )
@@ -69,14 +63,14 @@ async def compute_active_mobility_heatmap_gravity(
     params: IHeatmapGravityActive = Body(
         ...,
         examples={},
-        description="The gravity-based heatmap parameters.",
+        description="The heatmap gravity parameters.",
     ),
 ):
-    """Compute gravity-based heatmap for active mobility."""
+    """Compute heatmap gravity for active mobility."""
 
     return await start_calculation(
         job_type=JobType.heatmap_gravity_active_mobility,
-        tool_class=CRUDHeatmapGravityActiveMobility,
+        tool_class=CRUDHeatmapGravity,
         crud_method="run_heatmap",
         async_session=common.async_session,
         user_id=common.user_id,
@@ -88,7 +82,7 @@ async def compute_active_mobility_heatmap_gravity(
 
 @router.post(
     "/heatmap-closest-average",
-    summary="Compute closest-average-based heatmap for active mobility",
+    summary="Compute heatmap closest-average for active mobility",
     response_model=IToolResponse,
     status_code=201,
 )
@@ -98,14 +92,14 @@ async def compute_active_mobility_heatmap_closest_average(
     params: IHeatmapClosestAverageActive = Body(
         ...,
         examples={},
-        description="The closest-average-based heatmap parameters.",
+        description="The heatmap closest-average parameters.",
     ),
 ):
-    """Compute closest-average-based heatmap for active mobility."""
+    """Compute heatmap closest-average for active mobility."""
 
     return await start_calculation(
         job_type=JobType.heatmap_closest_average_active_mobility,
-        tool_class=CRUDHeatmapClosestAverageActiveMobility,
+        tool_class=CRUDHeatmapClosestAverage,
         crud_method="run_heatmap",
         async_session=common.async_session,
         user_id=common.user_id,
@@ -117,7 +111,7 @@ async def compute_active_mobility_heatmap_closest_average(
 
 @router.post(
     "/heatmap-connectivity",
-    summary="Compute connectivity-based heatmap for active mobility",
+    summary="Compute heatmap connectivity for active mobility",
     response_model=IToolResponse,
     status_code=201,
 )
@@ -127,14 +121,14 @@ async def compute_active_mobility_heatmap_connectivity(
     params: IHeatmapConnectivityActive = Body(
         ...,
         examples={},
-        description="The connectivity-based heatmap parameters.",
+        description="The heatmap connectivity parameters.",
     ),
 ):
-    """Compute connectivity-based heatmap for active mobility."""
+    """Compute heatmap connectivity for active mobility."""
 
     return await start_calculation(
         job_type=JobType.heatmap_connectivity_active_mobility,
-        tool_class=CRUDHeatmapConnectivityActiveMobility,
+        tool_class=CRUDHeatmapConnectivity,
         crud_method="run_heatmap",
         async_session=common.async_session,
         user_id=common.user_id,

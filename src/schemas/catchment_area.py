@@ -284,6 +284,30 @@ class ICatchmentAreaActiveMobility(BaseModel):
         description="If true, the polygons returned will be the geometrical difference of two following calculations.",
     )
 
+    # Check that polygon difference exists if catchment area type is polygon
+    @validator("polygon_difference", pre=True, always=True)
+    def check_polygon_difference(cls, v, values):
+        if (
+            values["catchment_area_type"] == CatchmentAreaTypeActiveMobility.polygon.value
+            and v is None
+        ):
+            raise ValueError(
+                "The polygon difference must be set if the catchment area type is polygon."
+            )
+        return v
+
+    # Check that polygon difference is not specified if catchment area type is not polygon
+    @validator("polygon_difference", pre=True, always=True)
+    def check_polygon_difference_not_specified(cls, v, values):
+        if (
+            values["catchment_area_type"] != CatchmentAreaTypeActiveMobility.polygon.value
+            and v is not None
+        ):
+            raise ValueError(
+                "The polygon difference must not be set if the catchment area type is not polygon."
+            )
+        return v
+
     @property
     def tool_type(self):
         return ToolType.catchment_area_active_mobility
@@ -337,6 +361,12 @@ class ICatchmentAreaPT(BaseModel):
         description="The return type of the catchment area.",
     )
 
+    polygon_difference: bool | None = Field(
+        None,
+        title="Polygon Difference",
+        description="If true, the polygons returned will be the geometrical difference of two following calculations.",
+    )
+
     decay_function: CatchmentAreaDecayFunctionPT = Field(
         CatchmentAreaDecayFunctionPT(),
         title="Decay Function",
@@ -353,6 +383,30 @@ class ICatchmentAreaPT(BaseModel):
     zoom: int = 9
     percentiles: List[int] = [5]
     monte_carlo_draws: int = 200
+
+    # Check that polygon difference exists if catchment area type is polygon
+    @validator("polygon_difference", pre=True, always=True)
+    def check_polygon_difference(cls, v, values):
+        if (
+            values["catchment_area_type"] == CatchmentAreaTypePT.polygon.value
+            and v is None
+        ):
+            raise ValueError(
+                "The polygon difference must be set if the catchment area type is polygon."
+            )
+        return v
+
+    # Check that polygon difference is not specified if catchment area type is not polygon
+    @validator("polygon_difference", pre=True, always=True)
+    def check_polygon_difference_not_specified(cls, v, values):
+        if (
+            values["catchment_area_type"] != CatchmentAreaTypePT.polygon.value
+            and v is not None
+        ):
+            raise ValueError(
+                "The polygon difference must not be set if the catchment area type is not polygon."
+            )
+        return v
 
     @property
     def tool_type(self):
@@ -415,6 +469,30 @@ class ICatchmentAreaCar(BaseModel):
         description="If true, the polygons returned will be the geometrical difference of two following calculations.",
     )
 
+    # Check that polygon difference exists if catchment area type is polygon
+    @validator("polygon_difference", pre=True, always=True)
+    def check_polygon_difference(cls, v, values):
+        if (
+            values["catchment_area_type"] == CatchmentAreaTypeCar.polygon.value
+            and v is None
+        ):
+            raise ValueError(
+                "The polygon difference must be set if the catchment area type is polygon."
+            )
+        return v
+
+    # Check that polygon difference is not specified if catchment area type is not polygon
+    @validator("polygon_difference", pre=True, always=True)
+    def check_polygon_difference_not_specified(cls, v, values):
+        if (
+            values["catchment_area_type"] != CatchmentAreaTypeCar.polygon.value
+            and v is not None
+        ):
+            raise ValueError(
+                "The polygon difference must not be set if the catchment area type is not polygon."
+            )
+        return v
+
     @property
     def tool_type(self):
         return ToolType.catchment_area_car
@@ -475,6 +553,30 @@ class CatchmentAreaNearbyStationAccess(BaseModel):
         title="Polygon Difference",
         description="If true, the polygons returned will be the geometrical difference of two following calculations.",
     )
+
+    # Check that polygon difference exists if catchment area type is polygon
+    @validator("polygon_difference", pre=True, always=True)
+    def check_polygon_difference(cls, v, values):
+        if (
+            values["catchment_area_type"] == CatchmentAreaTypeActiveMobility.polygon.value
+            and v is None
+        ):
+            raise ValueError(
+                "The polygon difference must be set if the catchment area type is polygon."
+            )
+        return v
+
+    # Check that polygon difference is not specified if catchment area type is not polygon
+    @validator("polygon_difference", pre=True, always=True)
+    def check_polygon_difference_not_specified(cls, v, values):
+        if (
+            values["catchment_area_type"] != CatchmentAreaTypeActiveMobility.polygon.value
+            and v is not None
+        ):
+            raise ValueError(
+                "The polygon difference must not be set if the catchment area type is not polygon."
+            )
+        return v
 
     @property
     def tool_type(self):

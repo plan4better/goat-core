@@ -327,18 +327,26 @@ class CRUDCatchmentAreaPT(CRUDCatchmentAreaBase):
         self.http_client = http_client
 
     async def write_catchment_area_result(
-        self, catchment_area_type, layer_id, result_table, shapes, grid
+        self,
+        catchment_area_type,
+        layer_id,
+        result_table,
+        shapes,
+        grid,
+        polygon_difference,
     ):
         """Save the result of the catchment area computation to the database."""
 
         if catchment_area_type == "polygon":
             # Save catchment area geometry data (shapes)
-            shapes = shapes["incremental"]
-            insert_string = ""
+            shapes = shapes["incremental"] if polygon_difference else shapes["full"]
+            shapes_sorted = []
             for i in shapes.index:
-                geom = shapes["geometry"][i]
-                minute = shapes["minute"][i]
-                insert_string += f"('{layer_id}', ST_SetSRID(ST_GeomFromText('{geom}'), 4326), {minute}),"
+                shapes_sorted.append((shapes["geometry"][i], shapes["minute"][i]))
+            shapes_sorted = sorted(shapes_sorted, key=lambda x: x[1], reverse=True)
+            insert_string = ""
+            for shape in shapes_sorted:
+                insert_string += f"('{layer_id}', ST_SetSRID(ST_GeomFromText('{shape[0]}'), 4326), {shape[1]}),"
             insert_string = f"""
                 INSERT INTO {result_table} (layer_id, geom, integer_attr1)
                 VALUES {insert_string.rstrip(",")};
@@ -512,6 +520,7 @@ class CRUDCatchmentAreaPT(CRUDCatchmentAreaBase):
                     result_table=result_table,
                     shapes=catchment_area_shapes,
                     grid=catchment_area_grid,
+                    polygon_difference=params.polygon_difference,
                 )
             except Exception as e:
                 raise SQLError(

@@ -1,40 +1,64 @@
-from src.crud.crud_heatmap import CRUDHeatmapBase
+from pydantic import BaseModel
+from src.core.config import settings
+from src.core.tool import CRUDToolBase
+from src.schemas.job import JobStatusType
+from src.schemas.toolbox_base import DefaultResultLayerName
+from src.core.job import job_init, job_log, run_background_or_immediately
+from src.schemas.layer import IFeatureLayerToolCreate, FeatureGeometryType
 from src.schemas.heatmap import (
     IHeatmapConnectivityActive,
     ActiveRoutingHeatmapType,
-)
-from src.core.config import settings
-from src.schemas.job import JobStatusType
-from src.core.job import job_init, job_log, run_background_or_immediately
-from src.schemas.layer import IFeatureLayerToolCreate, FeatureGeometryType
-from src.schemas.toolbox_base import (
-    DefaultResultLayerName,
+    IHeatmapConnectivityMotorized,
+    MotorizedRoutingHeatmapType,
+    TRAVELTIME_MATRIX_TABLE,
+    TRAVELTIME_MATRIX_RESOLUTION,
 )
 
 
-class CRUDHeatmapConnectivityBase(CRUDHeatmapBase):
-    TRAVELTIME_MATRIX_TABLE = {
-        ActiveRoutingHeatmapType.walking: "basic.traveltime_matrix_walking",
-        ActiveRoutingHeatmapType.bicycle: "basic.traveltime_matrix_bicycle",
-    }
-
+class CRUDHeatmapConnectivity(CRUDToolBase):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
 
+    async def create_distributed_opportunity_table(
+        self,
+        routing_type: ActiveRoutingHeatmapType | MotorizedRoutingHeatmapType,
+        layer_project: BaseModel,
+    ):
+        """Create distributed table for user-specified opportunities."""
+
+        # Create temp table name for points
+        temp_points = await self.create_temp_table_name("points")
+
+        # Create distributed point table using sql
+        where_query_point = "WHERE " + layer_project.where_query.replace("'", "''")
+
+        await self.async_session.execute(
+            f"""SELECT basic.create_heatmap_connectivity_opportunity_table(
+                '{layer_project.table_name}',
+                '{where_query_point}',
+                '{temp_points}',
+                {TRAVELTIME_MATRIX_RESOLUTION[routing_type]},
+                {False}
+            )"""
+        )
+        await self.async_session.commit()
+
+        return temp_points
+
     def build_query(
         self,
-        params: IHeatmapConnectivityActive,
+        params: IHeatmapConnectivityActive | IHeatmapConnectivityMotorized,
         reference_area_table: str,
         result_table: str,
         result_layer_id: str,
     ):
-        """Builds SQL query to compute connectivity-based heatmap."""
+        """Builds SQL query to compute heatmap connectivity."""
 
         query = f"""
             INSERT INTO {result_table} (layer_id, geom, text_attr1, float_attr1)
             SELECT '{result_layer_id}', ST_SetSRID(h3_cell_to_boundary(matrix.orig_id)::geometry, 4326),
                 matrix.orig_id, SUM((ARRAY_LENGTH(matrix.dest_id, 1) * ((3 * SQRT(3) / 2) * POWER(h3_get_hexagon_edge_length_avg(10, 'm'), 2))))
-            FROM {reference_area_table} o, {self.TRAVELTIME_MATRIX_TABLE[params.routing_type]} matrix
+            FROM {reference_area_table} o, {TRAVELTIME_MATRIX_TABLE[params.routing_type]} matrix
             WHERE matrix.h3_3 = o.h3_3
             AND matrix.orig_id = o.h3_index
             AND matrix.traveltime <= {params.max_traveltime}
@@ -42,19 +66,18 @@ class CRUDHeatmapConnectivityBase(CRUDHeatmapBase):
         """
         return query
 
-
-class CRUDHeatmapConnectivityActiveMobility(CRUDHeatmapConnectivityBase):
-    def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
-        super().__init__(job_id, background_tasks, async_session, user_id, project_id)
-
     @job_log(job_step_name="heatmap_connectivity")
-    async def heatmap(self, params: IHeatmapConnectivityActive):
-        """Compute connectivity-based heatmap for active mobility."""
+    async def heatmap(
+        self,
+        params: IHeatmapConnectivityActive | IHeatmapConnectivityMotorized,
+    ):
+        """Compute heatmap connectivity."""
 
         # Fetch reference area table
         reference_area_layer = await self.get_layers_project(params)
-        reference_area_table = await self.create_table_polygons_to_h3_grid(
-            [reference_area_layer["reference_area_layer_project_id"]]
+        reference_area_table = await self.create_distributed_opportunity_table(
+            params.routing_type,
+            reference_area_layer["reference_area_layer_project_id"],
         )
 
         # Initialize result table
@@ -62,7 +85,9 @@ class CRUDHeatmapConnectivityActiveMobility(CRUDHeatmapConnectivityBase):
 
         # Create feature layer to store computed heatmap output
         layer_heatmap = IFeatureLayerToolCreate(
-            name=DefaultResultLayerName.heatmap_connectivity_active_mobility.value,
+            name=DefaultResultLayerName.heatmap_connectivity_active_mobility.value
+                if type(params.routing_type) == ActiveRoutingHeatmapType
+                else DefaultResultLayerName.heatmap_connectivity_motorized_mobility.value,
             feature_layer_geometry_type=FeatureGeometryType.polygon,
             attribute_mapping={
                 "text_attr1": "h3_index",
@@ -88,10 +113,13 @@ class CRUDHeatmapConnectivityActiveMobility(CRUDHeatmapConnectivityBase):
 
         return {
             "status": JobStatusType.finished.value,
-            "msg": "Connectivity-based heatmap for active mobility was successfully computed.",
+            "msg": "Heatmap connectivity was successfully computed.",
         }
 
     @run_background_or_immediately(settings)
     @job_init()
-    async def run_heatmap(self, params: IHeatmapConnectivityActive):
+    async def run_heatmap(
+        self,
+        params: IHeatmapConnectivityActive | IHeatmapConnectivityMotorized,
+    ):
         return await self.heatmap(params=params)
