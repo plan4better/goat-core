@@ -57,17 +57,24 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         return temp_points
 
     # TODO: Verify function formulas
-    def build_impedance_function(self, type: ImpedanceFunctionType):
+    def build_impedance_function(
+        self,
+        type: ImpedanceFunctionType,
+        max_traveltime: int,
+        max_sensitivity: float
+    ):
         """Builds impedance function used to compute heatmap gravity."""
 
+        max_traveltime = float(max_traveltime)
+
         if type == ImpedanceFunctionType.gaussian:
-            return "SUM(EXP(1) ^ ((((traveltime * 60) ^ 2) * -1) / sensitivity) * potential)"
+            return f"SUM((EXP(1) ^ ((((traveltime / {max_traveltime}) ^ 2) * -1) / (sensitivity / {max_sensitivity}))) * potential)"
         elif type == ImpedanceFunctionType.linear:
-            return "SUM(potential / (traveltime * 60))"
+            return f"SUM((1 - (traveltime / {max_traveltime})) * potential)"
         elif type == ImpedanceFunctionType.exponential:
-            return "SUM(EXP(1) ^ ((traveltime * 60) * -1) * potential)"
+            return f"SUM((EXP(1) ^ (((sensitivity / {max_sensitivity}) * -1) * (traveltime / {max_traveltime}))) * potential)"
         elif type == ImpedanceFunctionType.power:
-            return "SUM(potential / ((traveltime * 60) ^ 2))"
+            return f"SUM(((traveltime / {max_traveltime}) ^ ((sensitivity / {max_sensitivity}) * -1)) * potential)"
         else:
             raise ValueError(f"Unknown impedance function type: {type}")
 
@@ -75,12 +82,18 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         self,
         params: IHeatmapGravityActive | IHeatmapGravityMotorized,
         opportunity_table: str,
+        max_traveltime: int,
+        max_sensitivity: float,
         result_table: str,
         result_layer_id: str,
     ):
         """Builds SQL query to compute heatmap gravity."""
 
-        impedance_function = self.build_impedance_function(params.impedance_function)
+        impedance_function = self.build_impedance_function(
+            type=params.impedance_function,
+            max_traveltime=max_traveltime,
+            max_sensitivity=max_sensitivity,
+        )
 
         query = f"""
             INSERT INTO {result_table} (layer_id, geom, text_attr1, float_attr1)
@@ -88,7 +101,8 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
                 {impedance_function} AS accessibility
             FROM
             (
-                SELECT matrix.orig_id, matrix.dest_id, matrix.traveltime, opportunity.sensitivity, opportunity.potential
+                SELECT matrix.orig_id, matrix.dest_id, CAST(matrix.traveltime AS float) AS traveltime,
+                    opportunity.sensitivity, opportunity.potential
                 FROM {opportunity_table} opportunity, {TRAVELTIME_MATRIX_TABLE[params.routing_type]} matrix
                 WHERE matrix.h3_3 = opportunity.h3_3
                 AND matrix.orig_id = opportunity.h3_index
@@ -128,10 +142,16 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
             job_id=self.job_id,
         )
 
+        # Get max traveltime & sensitivity for normalization
+        max_traveltime = max([layer["layer"].max_traveltime for layer in layers])
+        max_sensitivity = max([layer["layer"].sensitivity for layer in layers])
+
         # Compute heatmap & write to result table
         await self.async_session.execute(self.build_query(
             params=params,
             opportunity_table=opportunity_table,
+            max_traveltime=max_traveltime,
+            max_sensitivity=max_sensitivity,
             result_table=result_table,
             result_layer_id=str(layer_heatmap.id),
         ))
