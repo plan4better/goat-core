@@ -202,6 +202,8 @@ class CRUDLayerProject(CRUDLayerBase):
                     layer_project[0].name for layer_project in layer_projects
                 ]:
                     layer_name = "Copy from " + layer.name
+            else:
+                layer_name = layer.name
 
             # Create layer project link
             layer_project = LayerProjectLink(
