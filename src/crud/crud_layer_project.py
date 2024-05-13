@@ -197,13 +197,12 @@ class CRUDLayerProject(CRUDLayerBase):
             layer = layer[0]
 
             # Check if layer with same name and ID already exists in project. Then the layer should be duplicated with a new name.
+            layer_name = layer.name
             if layer_projects != []:
                 if layer.name in [
                     layer_project[0].name for layer_project in layer_projects
                 ]:
                     layer_name = "Copy from " + layer.name
-            else:
-                layer_name = layer.name
 
             # Create layer project link
             layer_project = LayerProjectLink(
