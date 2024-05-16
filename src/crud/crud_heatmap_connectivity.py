@@ -54,10 +54,12 @@ class CRUDHeatmapConnectivity(CRUDToolBase):
     ):
         """Builds SQL query to compute heatmap connectivity."""
 
+        h3_cell_area = f"((3 * SQRT(3) / 2) * POWER(h3_get_hexagon_edge_length_avg({TRAVELTIME_MATRIX_RESOLUTION[params.routing_type]}, 'm'), 2))"
+
         query = f"""
             INSERT INTO {result_table} (layer_id, geom, text_attr1, float_attr1)
             SELECT '{result_layer_id}', ST_SetSRID(h3_cell_to_boundary(matrix.orig_id)::geometry, 4326),
-                matrix.orig_id, SUM((ARRAY_LENGTH(matrix.dest_id, 1) * ((3 * SQRT(3) / 2) * POWER(h3_get_hexagon_edge_length_avg(10, 'm'), 2))))
+                matrix.orig_id, SUM(ARRAY_LENGTH(matrix.dest_id, 1) * {h3_cell_area})
             FROM {reference_area_table} o, {TRAVELTIME_MATRIX_TABLE[params.routing_type]} matrix
             WHERE matrix.h3_3 = o.h3_3
             AND matrix.orig_id = o.h3_index
