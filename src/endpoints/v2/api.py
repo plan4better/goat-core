@@ -1,6 +1,18 @@
 from fastapi import APIRouter
 
-from . import folder, job, layer, project, report, system, user, active_mobility, motorized_mobility, tool
+from . import (
+    active_mobility,
+    folder,
+    job,
+    layer,
+    motorized_mobility,
+    project,
+    report,
+    scenario,
+    system,
+    tool,
+    user,
+)
 
 router = APIRouter()
 
@@ -12,9 +24,14 @@ router.include_router(report.router, prefix="/report", tags=["Report"])
 router.include_router(job.router, prefix="/job", tags=["Job"])
 router.include_router(system.router, prefix="/system", tags=["System Settings"])
 router.include_router(
-    active_mobility.router, prefix="/active-mobility", tags=["Active Mobility Indicators"]
+    active_mobility.router,
+    prefix="/active-mobility",
+    tags=["Active Mobility Indicators"],
 )
-router.include_router(motorized_mobility.router, prefix="/motorized-mobility", tags=["Motorized Mobility Indicators"])
 router.include_router(
-    tool.router, prefix="/tool", tags=["Toolbox"]
+    motorized_mobility.router,
+    prefix="/motorized-mobility",
+    tags=["Motorized Mobility Indicators"],
 )
+router.include_router(tool.router, prefix="/tool", tags=["Toolbox"])
+router.include_router(scenario.router, prefix="/scenario", tags=["Scenario"])
