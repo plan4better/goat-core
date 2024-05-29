@@ -65,14 +65,14 @@ async def read_scenarios(
 async def read_scenario_by_id(
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
-    id: UUID4 = Path(
+    scenario_id: UUID4 = Path(
         ...,
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
 ):
     """Retrieve a scenario by id."""
-    scenario = await crud_scenario.get(async_session, id=id)
+    scenario = await crud_scenario.get(async_session, id=scenario_id)
 
     if scenario is None:
         raise HTTPException(
