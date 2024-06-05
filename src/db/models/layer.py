@@ -149,21 +149,18 @@ class FeatureGeometryType(str, Enum):
 
 
 class DataLicense(str, Enum):
+    DDN2 = "DDN2"
+    DDZ2 = "DDZ2"
     CC_BY = "CC_BY"
     CC_BY_SA = "CC_BY_SA"
     CC_BY_ND = "CC_BY_ND"
     CC_BY_NC = "CC_BY_NC"
     CC_BY_NC_SA = "CC_BY_NC_SA"
     CC_BY_NC_ND = "CC_BY_NC_ND"
+    CC_ZERO = "CC_ZERO"
     ODC_BY = "ODC_BY"
     ODC_ODbL = "ODC_ODbL"
-    GPL = "GPL"
-    LGPL = "LGPL"
-    APACHE = "APACHE"
-    MIT = "MIT"
-    PROPRIETARY_PLAN4BETTER = "PROPRIETARY_PLAN4BETTER"
     OTHER = "OTHER"
-
 
 class DataCategory(str, Enum):
     basemap = "basemap"
