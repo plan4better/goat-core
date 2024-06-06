@@ -1,23 +1,34 @@
-from typing import TYPE_CHECKING
+from datetime import datetime
+from enum import Enum
+from typing import TYPE_CHECKING, List
 from uuid import UUID
 
+from geoalchemy2 import Geometry
+from pydantic import create_model
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
+    ARRAY,
+    BigInteger,
+    Boolean,
     Column,
+    DateTime,
     Field,
+    Float,
     ForeignKey,
+    Index,
     Integer,
     Relationship,
+    SQLModel,
     Text,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID as UUID_PG
-from enum import Enum
 
 from ._base_class import DateTimeBase
 
 if TYPE_CHECKING:
     from .layer import Layer
+
 
 class ScenarioType(str, Enum):
     """Scenario types."""
@@ -26,7 +37,83 @@ class ScenarioType(str, Enum):
     polygon = "polygon"
     network_street = "network_street"
 
-class ScenarioFeature(DateTimeBase, table=True):
+
+def generate_field_definitions():
+    field_definitions = {
+        "id": (
+            UUID | None,
+            Field(
+                sa_column=Column(
+                    UUID_PG(as_uuid=True), primary_key=True, nullable=False
+                )
+            ),
+        ),
+        "geom": (
+            str,
+            Field(
+                sa_column=Column(
+                    Geometry,
+                    nullable=False,
+                )
+            ),
+        ),
+    }
+
+    for i in range(1, 26):
+        field_definitions[f"integer_attr{i}"] = (
+            int | None,
+            Field(sa_column=Column(Integer)),
+        )
+        field_definitions[f"float_attr{i}"] = (
+            float | None,
+            Field(sa_column=Column(Float)),
+        )
+        field_definitions[f"text_attr{i}"] = (
+            str | None,
+            Field(sa_column=Column(Text)),
+        )
+
+    for i in range(1, 6):
+        field_definitions[f"bigint_attr{i}"] = (
+            int | None,
+            Field(sa_column=Column(BigInteger)),
+        )
+
+    for i in range(1, 11):
+        field_definitions[f"jsonb_attr{i}"] = (
+            dict | None,
+            Field(sa_column=Column(JSONB)),
+        )
+        field_definitions[f"boolean_attr{i}"] = (
+            bool | None,
+            Field(sa_column=Column(Boolean)),
+        )
+
+    for i in range(1, 4):
+        field_definitions[f"arrint_attr{i}"] = (
+            List[int] | None,
+            Field(sa_column=Column(ARRAY(Integer))),
+        )
+        field_definitions[f"arrfloat_attr{i}"] = (
+            List[float] | None,
+            Field(sa_column=Column(ARRAY(Float))),
+        )
+        field_definitions[f"arrtext_attr{i}"] = (
+            List[str] | None,
+            Field(sa_column=Column(ARRAY(Text))),
+        )
+        field_definitions[f"timestamp_attr{i}"] = (
+            datetime | None,
+            Field(sa_column=DateTime(timezone=False)),
+        )
+
+    return field_definitions
+
+
+UserData = create_model("UserData", __base__=SQLModel, **generate_field_definitions())
+
+
+class ScenarioFeature(DateTimeBase, UserData, table=True):
     """Layer model."""
 
     __tablename__ = "scenario_feature"
@@ -41,18 +128,23 @@ class ScenarioFeature(DateTimeBase, table=True):
         )
     )
     feature_id: int = Field(
-        sa_column=Column(Integer, nullable=False), description="Feature ID of the modified feature"
+        sa_column=Column(Integer, nullable=False),
+        description="Feature ID of the modified feature",
     )
-    original_layer_id: str = Field(
+    layer_id: str = Field(
         sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.layer.id")),
         description="Layer ID of the modified layer",
     )
     scenario_type: ScenarioType = Field(
         sa_column=Column(Text, nullable=False), description="Type of the scenario"
     )
-    modification: dict = Field(
-        sa_column=Column(JSONB), description="Modification object in JSON format"
-    )
 
     # Relationships
     original_layer: "Layer" = Relationship(back_populates="scenario_features")
+
+
+Index(
+    "scenario_feature_geom_idx",
+    ScenarioFeature.__table__.c.geom,
+    postgresql_using="gist",
+)
