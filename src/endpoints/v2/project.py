@@ -5,11 +5,10 @@ from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
 
+from src.core.chart import read_chart_data
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.crud.crud_project import project as crud_project
 from src.crud.crud_user_project import user_project as crud_user_project
-from src.core.chart import read_chart_data
-from src.db.models._link_model import UserProjectLink
 from src.db.models.project import Project
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_user_id
@@ -17,9 +16,8 @@ from src.schemas.common import ContentIdList, OrderEnum
 from src.schemas.project import (
     IExternalImageryProjectRead,
     IExternalVectorTileProjectRead,
-    IFeatureToolProjectRead,
-    IFeatureScenarioProjectRead,
     IFeatureStandardProjectRead,
+    IFeatureToolProjectRead,
     InitialViewState,
     IProjectBaseUpdate,
     IProjectCreate,
@@ -57,6 +55,7 @@ async def create_project(
         project_in=Project(**project_in.dict(exclude_none=True), user_id=user_id),
         initial_view_state=project_in.initial_view_state,
     )
+
 
 @router.get(
     "/{id}",
@@ -270,7 +269,6 @@ async def update_project_initial_view_state(
     response_model=List[
         IFeatureStandardProjectRead
         | IFeatureToolProjectRead
-        | IFeatureScenarioProjectRead
         | ITableProjectRead
         | IExternalVectorTileProjectRead
         | IExternalImageryProjectRead
@@ -308,7 +306,6 @@ async def add_layers_to_project(
     response_model=List[
         IFeatureStandardProjectRead
         | IFeatureToolProjectRead
-        | IFeatureScenarioProjectRead
         | ITableProjectRead
         | IExternalVectorTileProjectRead
         | IExternalImageryProjectRead
@@ -338,7 +335,6 @@ async def get_layers_from_project(
     "/{id}/layer/{layer_project_id}",
     response_model=IFeatureStandardProjectRead
     | IFeatureToolProjectRead
-    | IFeatureScenarioProjectRead
     | ITableProjectRead
     | IExternalVectorTileProjectRead
     | IExternalImageryProjectRead,
@@ -368,7 +364,6 @@ async def get_layer_from_project(
     "/{id}/layer/{layer_project_id}",
     response_model=IFeatureStandardProjectRead
     | IFeatureToolProjectRead
-    | IFeatureScenarioProjectRead
     | ITableProjectRead
     | IExternalVectorTileProjectRead
     | IExternalImageryProjectRead,
@@ -464,6 +459,7 @@ async def delete_layer_from_project(
     )
 
     return None
+
 
 @router.get(
     "/{id}/layer/{layer_project_id}/chart-data",

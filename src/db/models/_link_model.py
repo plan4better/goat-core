@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 from uuid import UUID
+
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
@@ -19,7 +20,6 @@ if TYPE_CHECKING:
     from .project import Project
 
 
-# TODO: Add relations
 class LayerProjectLink(DateTimeBase, table=True):
     __tablename__ = "layer_project"
     __table_args__ = {"schema": "customer"}
@@ -28,14 +28,20 @@ class LayerProjectLink(DateTimeBase, table=True):
         sa_column=Column(Integer, primary_key=True, autoincrement=True)
     )
     group: str | None = Field(
-        sa_column=Column(Text, nullable=True), description="Layer group name", max_length=255
+        sa_column=Column(Text, nullable=True),
+        description="Layer group name",
+        max_length=255,
     )
     layer_id: UUID = Field(
-        sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.layer.id", ondelete="CASCADE")),
+        sa_column=Column(
+            UUID_PG(as_uuid=True), ForeignKey("customer.layer.id", ondelete="CASCADE")
+        ),
         description="Layer ID",
     )
     project_id: UUID = Field(
-        sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.project.id", ondelete="CASCADE")),
+        sa_column=Column(
+            UUID_PG(as_uuid=True), ForeignKey("customer.project.id", ondelete="CASCADE")
+        ),
         description="Project ID",
     )
     name: str = Field(
@@ -70,12 +76,20 @@ class ScenarioScenarioFeatureLink(DateTimeBase, table=True):
         sa_column=Column(Integer, primary_key=True, autoincrement=True)
     )
     scenario_id: UUID = Field(
-        sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.scenario.id")),
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey("customer.scenario.id", ondelete="CASCADE"),
+            primary_key=True,
+            nullable=False,
+        ),
         description="Scenario ID",
     )
     scenario_feature_id: UUID = Field(
         sa_column=Column(
-            UUID_PG(as_uuid=True), ForeignKey("customer.scenario_feature.id")
+            UUID_PG(as_uuid=True),
+            ForeignKey("customer.scenario_feature.id", ondelete="CASCADE"),
+            primary_key=True,
+            nullable=False,
         ),
         description="Scenario Feature ID",
     )

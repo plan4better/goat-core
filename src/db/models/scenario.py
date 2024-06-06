@@ -1,6 +1,7 @@
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List
 from uuid import UUID
 
+from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
     Column,
     Field,
@@ -11,10 +12,11 @@ from sqlmodel import (
 )
 
 from ._base_class import DateTimeBase
-from sqlalchemy.dialects.postgresql import UUID as UUID_PG
+from ._link_model import ScenarioScenarioFeatureLink
 
 if TYPE_CHECKING:
     from .layer import Layer
+    from .scenario_feature import ScenarioFeature
     from .user import User
 
 
@@ -42,3 +44,7 @@ class Scenario(DateTimeBase, table=True):
 
     user: "User" = Relationship(back_populates="scenarios")
     layers: List["Layer"] = Relationship(back_populates="scenario")
+
+    scenario_features: List["ScenarioFeature"] = Relationship(
+        back_populates="scenarios", link_model=ScenarioScenarioFeatureLink
+    )

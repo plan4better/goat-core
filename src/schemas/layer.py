@@ -22,7 +22,6 @@ from src.db.models.layer import (
     GeospatialAttributes,
     LayerBase,
     LayerType,
-    ScenarioType,
     TableLayerExportType,
     ToolType,
     layer_base_example,
@@ -265,41 +264,6 @@ class IFeatureToolUpdate(FeatureUpdateBase):
     pass
 
 
-# Feature Layer Scenario
-class FeatureScenarioAttributesBase(BaseModel):
-    """Base model for additional attributes feature layer scenario."""
-
-    scenario_id: UUID = Field(..., description="Scenario ID of the scenario layer.")
-    scenario_type: ScenarioType = Field(..., description="Scenario type")
-
-
-feature_layer_scenario_attributes_example = {
-    "scenario_id": "60a42459-11c8-4cd7-91f1-091d0e05a4a3",
-    "scenario_type": "point",
-}
-
-
-class IFeatureScenarioCreate(LayerBase, FeatureScenarioAttributesBase):
-    """Model to create feature layer scenario."""
-
-    pass
-
-
-class IFeatureScenarioRead(
-    FeatureReadBaseAttributes, FeatureScenarioAttributesBase, DateTimeBase
-):
-    """Model to read a feature layer scenario."""
-
-    pass
-
-
-@optional
-class IFeatureScenarioUpdate(FeatureUpdateBase):
-    """Model to update a feature layer scenario."""
-
-    pass
-
-
 ################################################################################
 # Imagery Layer DTOs
 ################################################################################
@@ -508,11 +472,7 @@ def get_layer_class(class_type: str, layer_creator_class: dict, **kwargs):
 layer_creator_class = {
     "internal": {
         "table": ITableRead,
-        "feature": {
-            "standard": IFeatureStandardRead,
-            "tool": IFeatureToolRead,
-            "scenario": IFeatureScenarioRead,
-        },
+        "feature": {"standard": IFeatureStandardRead, "tool": IFeatureToolRead},
     },
     "external": {
         "external_imagery": IExternalImageryRead,
@@ -524,11 +484,7 @@ layer_creator_class = {
 layer_update_class = {
     "internal": {
         "table": ITableUpdate,
-        "feature": {
-            "standard": IFeatureStandardUpdate,
-            "tool": IFeatureToolUpdate,
-            "scenario": IFeatureScenarioUpdate,
-        },
+        "feature": {"standard": IFeatureStandardUpdate, "tool": IFeatureToolUpdate},
     },
     "external": {
         "external_imagery": IExternalImageryUpdate,
@@ -699,6 +655,7 @@ class ILayerGet(LayerGetBase):
         None,
         description="This field is always true. Only layers that are in the catalog will be returned.",
     )
+
 
 class ICatalogLayerGet(LayerGetBase):
     in_catalog: bool = Field(
