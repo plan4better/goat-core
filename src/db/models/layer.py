@@ -2,15 +2,15 @@ from enum import Enum
 from typing import TYPE_CHECKING, List, Optional, Union
 from uuid import UUID
 
+import pycountry
 from geoalchemy2 import Geometry, WKBElement
 from geoalchemy2.shape import to_shape
-import pycountry
-from pydantic import BaseModel, validator
-from pydantic import HttpUrl, EmailStr
+from pydantic import BaseModel, EmailStr, HttpUrl, validator
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
+    Boolean,
     Column,
     Field,
     ForeignKey,
@@ -19,18 +19,14 @@ from sqlmodel import (
     SQLModel,
     Text,
     UniqueConstraint,
-    Boolean,
 )
 
 from src.core.config import settings
 from src.db.models._base_class import ContentBaseAttributes, DateTimeBase
-from src.db.models.scenario_feature import ScenarioType
 
 if TYPE_CHECKING:
     from ._link_model import LayerProjectLink
     from .data_store import DataStore
-    from .scenario import Scenario
-    from .scenario_feature import ScenarioFeature
 
 
 class ToolType(str, Enum):
@@ -53,7 +49,9 @@ class ToolType(str, Enum):
     heatmap_gravity_active_mobility = "heatmap_gravity_active_mobility"
     heatmap_gravity_motorized_mobility = "heatmap_gravity_motorized_mobility"
     heatmap_closest_average_active_mobility = "heatmap_closest_average_active_mobility"
-    heatmap_closest_average_motorized_mobility = "heatmap_closest_average_motorized_mobility"
+    heatmap_closest_average_motorized_mobility = (
+        "heatmap_closest_average_motorized_mobility"
+    )
     heatmap_connectivity_active_mobility = "heatmap_connectivity_active_mobility"
     heatmap_connectivity_motorized_mobility = "heatmap_connectivity_motorized_mobility"
 
@@ -63,7 +61,6 @@ class FeatureType(str, Enum):
 
     standard = "standard"
     tool = "tool"
-    scenario = "scenario"
     street_network = "street_network"
 
 
@@ -94,6 +91,7 @@ class FileUploadType(str, Enum):
     kml = "kml"
     zip = "zip"  # Commonly used for shapefiles
 
+
 class FeatureLayerExportType(str, Enum):
     """Feature Layer export types."""
 
@@ -103,6 +101,7 @@ class FeatureLayerExportType(str, Enum):
     csv = "csv"
     xlsx = "xlsx"
     kml = "kml"
+
 
 class TableLayerExportType(str, Enum):
     """Table Layer export types."""
@@ -162,6 +161,7 @@ class DataLicense(str, Enum):
     ODC_ODbL = "ODC_ODbL"
     OTHER = "OTHER"
 
+
 class DataCategory(str, Enum):
     basemap = "basemap"
     imagery = "imagery"
@@ -191,6 +191,7 @@ class GeospatialAttributes(SQLModel):
         else:
             return v
 
+
 def validate_language_code(v):
     if v:
         try:
@@ -198,6 +199,7 @@ def validate_language_code(v):
         except KeyError:
             raise ValueError(f"The passed language {v} is not valid.")
     return v
+
 
 def validate_geographical_code(v):
     continents = [
@@ -219,6 +221,7 @@ def validate_geographical_code(v):
             if v not in continents:
                 raise ValueError(f"The passed country {v} is not valid.")
     return v
+
 
 class LayerBase(ContentBaseAttributes):
     """Base model for layers."""
@@ -291,7 +294,8 @@ class LayerBase(ContentBaseAttributes):
         description="If the layer should be added in the catalog",
     )
     thumbnail_url: HttpUrl | None = Field(
-        sa_column=Column(Text, nullable=True), description="Layer thumbnail URL",
+        sa_column=Column(Text, nullable=True),
+        description="Layer thumbnail URL",
         default=settings.DEFAULT_LAYER_THUMBNAIL,
     )
 
@@ -303,6 +307,7 @@ class LayerBase(ContentBaseAttributes):
     @validator("geographical_code", pre=True, check_fields=False)
     def geographical_code_valid(cls, v):
         return validate_geographical_code(v)
+
 
 layer_base_example = {
     "lineage": "Derived from web research and ground surveys conducted in 2021 by trained professionals.",
@@ -409,20 +414,8 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         description="If it is an tool layer, the tool type",
     )
     job_id: UUID | None = Field(
-        sa_column=Column(
-            UUID_PG(as_uuid=True), nullable=True
-        ),
+        sa_column=Column(UUID_PG(as_uuid=True), nullable=True),
         description="Job ID if the layer is a tool layer",
-    )
-    scenario_id: UUID | None = Field(
-        sa_column=Column(
-            UUID_PG(as_uuid=True), ForeignKey("customer.scenario.id"), nullable=True
-        ),
-        description="Scenario ID if there is a scenario associated with this layer",
-    )
-    scenario_type: Optional["ScenarioType"] = Field(
-        sa_column=Column(Text, nullable=True),
-        description="Scenario type if the layer is a scenario layer",
     )
     feature_layer_type: Optional["FeatureType"] = Field(
         sa_column=Column(Text, nullable=True), description="Feature layer type"
@@ -449,11 +442,6 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     )
 
     # Relationships
-
-    scenario: "Scenario" = Relationship(back_populates="layers")
-    scenario_features: List["ScenarioFeature"] = Relationship(
-        back_populates="original_layer"
-    )
     data_store: "DataStore" = Relationship(back_populates="layers")
     layer_projects: List["LayerProjectLink"] = Relationship(back_populates="layer")
 

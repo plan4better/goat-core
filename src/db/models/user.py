@@ -11,16 +11,18 @@ from sqlmodel import (
 
 if TYPE_CHECKING:
     from .folder import Folder
+    from .job import Job
     from .scenario import Scenario
     from .system_setting import SystemSetting
-    from .job import Job
 
 
 class User(SQLModel, table=True):
     __tablename__ = "user"
     __table_args__ = {"schema": "customer"}
 
-    id: UUID = Field(sa_column=Column(UUID_PG(as_uuid=True), primary_key=True, nullable=False))
+    id: UUID = Field(
+        sa_column=Column(UUID_PG(as_uuid=True), primary_key=True, nullable=False)
+    )
     # Relationships
     scenarios: List["Scenario"] = Relationship(
         back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}

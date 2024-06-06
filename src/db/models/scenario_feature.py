@@ -25,13 +25,15 @@ from sqlmodel import (
 )
 
 from ._base_class import DateTimeBase
+from ._link_model import ScenarioScenarioFeatureLink
 
 if TYPE_CHECKING:
     from .layer import Layer
+    from .scenario import Scenario
 
 
-class ScenarioType(str, Enum):
-    """Scenario types."""
+class ModificationType(str, Enum):
+    """Modification types."""
 
     point = "point"
     polygon = "polygon"
@@ -127,20 +129,24 @@ class ScenarioFeature(DateTimeBase, UserData, table=True):
             server_default=text("uuid_generate_v4()"),
         )
     )
-    feature_id: int = Field(
-        sa_column=Column(Integer, nullable=False),
+    feature_id: int | None = Field(
+        sa_column=Column(Integer, nullable=True),
         description="Feature ID of the modified feature",
     )
     layer_id: str = Field(
         sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.layer.id")),
         description="Layer ID of the modified layer",
     )
-    scenario_type: ScenarioType = Field(
-        sa_column=Column(Text, nullable=False), description="Type of the scenario"
+    modification_type: ModificationType = Field(
+        sa_column=Column(Text, nullable=False), description="Type of the modification"
     )
 
     # Relationships
     original_layer: "Layer" = Relationship(back_populates="scenario_features")
+
+    scenarios: List["Scenario"] = Relationship(
+        back_populates="scenario_features", link_model=ScenarioScenarioFeatureLink
+    )
 
 
 Index(

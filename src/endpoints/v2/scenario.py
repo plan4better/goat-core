@@ -19,6 +19,8 @@ from src.schemas.scenario import (
 
 router = APIRouter()
 
+### Scenario endpoints ###
+
 
 @router.get(
     "",
@@ -67,7 +69,7 @@ async def read_scenario_by_id(
     user_id: UUID4 = Depends(get_user_id),
     scenario_id: UUID4 = Path(
         ...,
-        description="The ID of the project to get",
+        description="The ID of the scenario to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
 ):
@@ -151,4 +153,61 @@ async def delete_scenario(
     """Delete scenario."""
 
     await crud_scenario.remove(db=async_session, id=scenario_id)
+    return None
+
+
+### Scenario Feature endpoints ###
+@router.get(
+    "/{scenario_id}/features",
+    summary="Retrieve a list of scenario features",
+    status_code=200,
+)
+async def read_scenario_features(
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+    scenario_id: UUID4 = Path(
+        ...,
+        description="The ID of the scenario to get features",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+):
+    """Retrieve a list of scenario features."""
+    scenario = await crud_scenario.get(async_session, id=scenario_id)
+    if scenario is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found"
+        )
+
+    scenario_features = scenario.scenario_features
+
+    return scenario_features
+
+
+@router.post(
+    "/{scenario_id}/features",
+    summary="Create scenario feature",
+    status_code=201,
+)
+async def create_scenario_feature(
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+    scenario_id: UUID4 = Path(
+        ...,
+        description="The ID of the scenario to create a feature",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+):
+    """Create scenario feature."""
+    scenario = await crud_scenario.get(async_session, id=scenario_id)
+    if scenario is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found"
+        )
+
+    # Create scenario feature
+    # scenario_feature = await crud_scenario_feature.create(
+    #     db=async_session,
+    #     obj_in=ScenarioFeature(**scenario_feature_in.dict(exclude_none=True), scenario_id=scenario_id),
+    # )
+
     return None
