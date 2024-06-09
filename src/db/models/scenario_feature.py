@@ -25,31 +25,22 @@ from sqlmodel import (
 )
 
 from ._base_class import DateTimeBase
-from ._link_model import ScenarioScenarioFeatureLink
 
 if TYPE_CHECKING:
+    from ._link_model import ScenarioScenarioFeatureLink
     from .layer import Layer
-    from .scenario import Scenario
 
 
-class ModificationType(str, Enum):
-    """Modification types."""
+class ScenarioFeatureEditType(str, Enum):
+    """Edit types."""
 
-    point = "point"
-    polygon = "polygon"
-    network_street = "network_street"
+    new = "n"
+    modified = "m"
+    deleted = "d"
 
 
 def generate_field_definitions():
     field_definitions = {
-        "id": (
-            UUID | None,
-            Field(
-                sa_column=Column(
-                    UUID_PG(as_uuid=True), primary_key=True, nullable=False
-                )
-            ),
-        ),
         "geom": (
             str,
             Field(
@@ -134,18 +125,21 @@ class ScenarioFeature(DateTimeBase, UserData, table=True):
         description="Feature ID of the modified feature",
     )
     layer_id: str = Field(
-        sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.layer.id")),
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey("customer.layer.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         description="Layer ID of the modified layer",
     )
-    modification_type: ModificationType = Field(
-        sa_column=Column(Text, nullable=False), description="Type of the modification"
+    edit_type: ScenarioFeatureEditType = Field(
+        sa_column=Column(Text, nullable=False), description="Type of the edit"
     )
-
     # Relationships
     original_layer: "Layer" = Relationship(back_populates="scenario_features")
 
-    scenarios: List["Scenario"] = Relationship(
-        back_populates="scenario_features", link_model=ScenarioScenarioFeatureLink
+    scenarios_links: List["ScenarioScenarioFeatureLink"] = Relationship(
+        back_populates="scenario_feature"
     )
 
 
