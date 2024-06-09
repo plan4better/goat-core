@@ -12,10 +12,10 @@ from sqlmodel import (
 )
 
 from ._base_class import DateTimeBase
-from ._link_model import ScenarioScenarioFeatureLink
 
 if TYPE_CHECKING:
-    from .scenario_feature import ScenarioFeature
+    from ._link_model import ScenarioScenarioFeatureLink
+    from .project import Project
     from .user import User
 
 
@@ -32,6 +32,13 @@ class Scenario(DateTimeBase, table=True):
         )
     )
     name: str = Field(sa_column=Column(Text, nullable=False), max_length=255)
+    project_id: UUID = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey("customer.project.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+    )
     user_id: UUID = Field(
         default=None,
         sa_column=Column(
@@ -42,7 +49,9 @@ class Scenario(DateTimeBase, table=True):
     )
 
     user: "User" = Relationship(back_populates="scenarios")
+    project: "Project" = Relationship(back_populates="scenarios")
 
-    scenario_features: List["ScenarioFeature"] = Relationship(
-        back_populates="scenarios", link_model=ScenarioScenarioFeatureLink
+    scenario_features_links: List["ScenarioScenarioFeatureLink"] = Relationship(
+        back_populates="scenario",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )

@@ -8,7 +8,6 @@ from . import (
     motorized_mobility,
     project,
     report,
-    scenario,
     system,
     tool,
     user,
@@ -34,4 +33,3 @@ router.include_router(
     tags=["Motorized Mobility Indicators"],
 )
 router.include_router(tool.router, prefix="/tool", tags=["Toolbox"])
-router.include_router(scenario.router, prefix="/scenario", tags=["Scenario"])

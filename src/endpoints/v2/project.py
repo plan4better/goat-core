@@ -1,17 +1,23 @@
 from typing import List
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
+from fastapi.responses import JSONResponse
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
+from sqlalchemy import select
 
 from src.core.chart import read_chart_data
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.crud.crud_project import project as crud_project
+from src.crud.crud_scenario import scenario as crud_scenario
 from src.crud.crud_user_project import user_project as crud_user_project
+from src.db.models._link_model import ScenarioScenarioFeatureLink
 from src.db.models.project import Project
+from src.db.models.scenario import Scenario
+from src.db.models.scenario_feature import ScenarioFeature
 from src.db.session import AsyncSession
-from src.endpoints.deps import get_db, get_user_id
+from src.endpoints.deps import get_db, get_scenario, get_user_id
 from src.schemas.common import ContentIdList, OrderEnum
 from src.schemas.project import (
     IExternalImageryProjectRead,
@@ -27,6 +33,15 @@ from src.schemas.project import (
 from src.schemas.project import (
     request_examples as project_request_examples,
 )
+from src.schemas.scenario import (
+    IScenarioCreate,
+    IScenarioFeatureCreate,
+    IScenarioUpdate,
+)
+from src.schemas.scenario import (
+    request_examples as scenario_request_examples,
+)
+from src.utils import delete_orphans, to_feature_collection
 
 router = APIRouter()
 
@@ -264,6 +279,11 @@ async def update_project_initial_view_state(
     return user_project.initial_view_state
 
 
+##############################################
+### Layer endpoints
+##############################################
+
+
 @router.post(
     "/{id}/layer",
     response_model=List[
@@ -488,3 +508,221 @@ async def get_chart_data(
         project_id=id,
         layer_project_id=layer_project_id,
     )
+
+
+##############################################
+### Scenario endpoints
+##############################################
+
+
+@router.get(
+    "/{id}/scenario",
+    summary="Retrieve a list of scenarios",
+    response_model=Page[Scenario],
+    status_code=200,
+)
+async def read_scenarios(
+    async_session: AsyncSession = Depends(get_db),
+    page_params: PaginationParams = Depends(),
+    id: UUID4 = Path(
+        ...,
+        description="The ID of the project to get",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    search: str = Query(None, description="Searches the name of the scenario"),
+    order_by: str = Query(
+        None,
+        description="Specify the column name that should be used to order",
+        example="created_at",
+    ),
+    order: OrderEnum = Query(
+        "descendent",
+        description="Specify the order to apply. There are the option ascendent or descendent.",
+        example="descendent",
+    ),
+):
+    """Retrieve a list of scenarios."""
+    query = select(Scenario).where(Scenario.project_id == id)
+    scenarios = await crud_scenario.get_multi(
+        db=async_session,
+        query=query,
+        page_params=page_params,
+        search_text={"name": search} if search else {},
+        order_by=order_by,
+        order=order,
+    )
+
+    return scenarios
+
+
+@router.post(
+    "/{id}/scenario",
+    summary="Create scenario",
+    status_code=201,
+    response_model=Scenario,
+    response_model_exclude_none=True,
+)
+async def create_scenario(
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+    id: UUID4 = Path(
+        ...,
+        description="The ID of the project to create a scenario",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    scenario_in: IScenarioCreate = Body(
+        ...,
+        example=scenario_request_examples["create"],
+        description="Scenario to create",
+    ),
+):
+    """Create scenario."""
+
+    return await crud_scenario.create(
+        db=async_session,
+        obj_in=Scenario(
+            **scenario_in.dict(exclude_none=True), user_id=user_id, project_id=id
+        ),
+    )
+
+
+@router.put(
+    "/{id}/scenario/{scenario_id}",
+    summary="Update scenario",
+    status_code=201,
+)
+async def update_scenario(
+    async_session: AsyncSession = Depends(get_db),
+    scenario: Scenario = Depends(get_scenario),
+    scenario_in: IScenarioUpdate = Body(
+        ...,
+        example=scenario_request_examples["update"],
+        description="Scenario to update",
+    ),
+):
+    """Update scenario."""
+
+    return await crud_scenario.update(
+        db=async_session,
+        db_obj=scenario,
+        obj_in=scenario_in,
+    )
+
+
+@router.delete(
+    "/{id}/scenario/{scenario_id}",
+    summary="Delete scenario",
+    status_code=204,
+)
+async def delete_scenario(
+    async_session: AsyncSession = Depends(get_db),
+    scenario: Scenario = Depends(get_scenario),
+):
+    """Delete scenario."""
+
+    await crud_scenario.remove(db=async_session, id=scenario.id)
+    # Deletes scenario features that are not linked to any scenario (orphans).
+    # This can't be achieved using CASCADE because the relationship is many-to-many.
+    await delete_orphans(
+        async_session,
+        ScenarioFeature,
+        ScenarioFeature.id.key,
+        ScenarioScenarioFeatureLink,
+        ScenarioScenarioFeatureLink.scenario_feature_id.key,
+    )
+    return None
+
+
+@router.get(
+    "/{id}/scenario/{scenario_id}/features",
+    summary="Retrieve a list of scenario features",
+    response_class=JSONResponse,
+    status_code=200,
+)
+async def read_scenario_features(
+    async_session: AsyncSession = Depends(get_db),
+    scenario: Scenario = Depends(get_scenario),
+):
+    """Retrieve a list of scenario features."""
+
+    scenario_features = await crud_scenario.get_features(
+        async_session=async_session,
+        scenario_id=scenario.id,
+    )
+
+    fc = to_feature_collection(scenario_features)
+
+    return fc
+
+
+@router.post(
+    "/{id}/scenario/{scenario_id}/features",
+    summary="Create scenario features",
+    response_class=JSONResponse,
+    status_code=201,
+)
+async def create_scenario_features(
+    async_session: AsyncSession = Depends(get_db),
+    scenario: Scenario = Depends(get_scenario),
+    features: List[IScenarioFeatureCreate] = Body(
+        ...,
+        example=scenario_request_examples["create_scenario_features"],
+        description="Scenario features to create",
+    ),
+):
+    """Create scenario features."""
+    scenario_features = []
+    for feature in features:
+        scenario_feature = ScenarioFeature.from_orm(feature)
+        scenario_scenario_feature_link = ScenarioScenarioFeatureLink(
+            scenario=scenario, scenario_feature=scenario_feature
+        )
+        async_session.add(scenario_feature)
+        async_session.add(scenario_scenario_feature_link)
+        scenario_features.append(scenario_feature)
+
+    await async_session.commit()
+
+    for scenario_feature in scenario_features:
+        await async_session.refresh(scenario_feature)
+
+    fc = to_feature_collection(scenario_features)
+
+    return fc
+
+
+@router.put(
+    "/{id}/scenario/{scenario_id}/features",
+    summary="Update scenario features",
+    status_code=201,
+)
+async def update_scenario_features(
+    async_session: AsyncSession = Depends(get_db),
+    scenario: Scenario = Depends(get_scenario),
+    features: List[IScenarioFeatureCreate] = Body(
+        ...,
+        description="Scenario features to update",
+    ),
+):
+    """Update scenario features."""
+
+    return None
+
+
+@router.delete(
+    "/{id}/scenario/{scenario_id}/features",
+    summary="Delete scenario features",
+    status_code=204,
+)
+async def delete_scenario_features(
+    async_session: AsyncSession = Depends(get_db),
+    scenario: Scenario = Depends(get_scenario),
+    feature_ids: List[UUID4] = Query(
+        ...,
+        description="List of feature IDs to delete",
+        example=["3fa85f64-5717-4562-b3fc-2c963f66afa6"],
+    ),
+):
+    """Delete scenario features."""
+
+    return None

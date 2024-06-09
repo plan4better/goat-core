@@ -18,6 +18,8 @@ from src.db.models._base_class import DateTimeBase
 if TYPE_CHECKING:
     from .layer import Layer
     from .project import Project
+    from .scenario import Scenario
+    from .scenario_feature import ScenarioFeature
 
 
 class LayerProjectLink(DateTimeBase, table=True):
@@ -75,7 +77,7 @@ class ScenarioScenarioFeatureLink(DateTimeBase, table=True):
     id: int | None = Field(
         sa_column=Column(Integer, primary_key=True, autoincrement=True)
     )
-    scenario_id: UUID = Field(
+    scenario_id: UUID | None = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
             ForeignKey("customer.scenario.id", ondelete="CASCADE"),
@@ -84,7 +86,7 @@ class ScenarioScenarioFeatureLink(DateTimeBase, table=True):
         ),
         description="Scenario ID",
     )
-    scenario_feature_id: UUID = Field(
+    scenario_feature_id: UUID | None = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
             ForeignKey("customer.scenario_feature.id", ondelete="CASCADE"),
@@ -93,6 +95,9 @@ class ScenarioScenarioFeatureLink(DateTimeBase, table=True):
         ),
         description="Scenario Feature ID",
     )
+
+    scenario: "Scenario" = Relationship(back_populates="scenario_features_links")
+    scenario_feature: "ScenarioFeature" = Relationship(back_populates="scenarios_links")
 
 
 class UserProjectLink(DateTimeBase, table=True):
