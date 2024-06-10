@@ -6,6 +6,7 @@ from src.core.tool import (
     CRUDToolBase,
     get_statistics_sql,
     convert_geom_measurement_field,
+    assign_attribute,
 )
 from src.core.chart import Chart
 from src.schemas.job import JobStatusType
@@ -662,23 +663,12 @@ class CRUDOriginDestination(CRUDToolBase):
             mapped_unique_id_column.split("_")[0] + "_attr1": "origin",
             mapped_unique_id_column.split("_")[0] + "_attr2": "destination",
         }
-        if (
-            mapped_weight_column.split("_")[0] + "_attr1"
-            not in attribute_mapping_relation
-        ):
-            attribute_mapping_relation[
-                mapped_weight_column.split("_")[0] + "_attr1"
-            ] = "weight"
-        else:
-            # Get attr of same name with max count
-            count_attr = 1
-            while (
-                mapped_weight_column.split("_")[0] + f"_attr{count_attr}"
-            ) in attribute_mapping_relation:
-                count_attr += 1
-            attribute_mapping_relation[
-                mapped_weight_column.split("_")[0] + f"_attr{count_attr}"
-            ] = "weight"
+        attribute_mapping_relation = assign_attribute(
+            mapped_weight_column, attribute_mapping_relation, "weight"
+        )
+        attribute_mapping_relation = assign_attribute(
+            "float_attr1", attribute_mapping_relation, "length_m"
+        )
 
         result_layer_relation = IFeatureLayerToolCreate(
             name=DefaultResultLayerName[params.tool_type + "_relation"].value,
@@ -717,7 +707,8 @@ class CRUDOriginDestination(CRUDToolBase):
             SELECT '{result_layer_relation.id}',
             ST_MakeLine(ST_CENTROID((ARRAY_AGG(origin.geom))[1]), ST_CENTROID((ARRAY_AGG(destination.geom))[1])),
             (ARRAY_AGG(matrix.{mapped_origin_column}))[1] AS origin, (ARRAY_AGG(matrix.{mapped_destination_column}))[1] AS destination,
-            SUM(matrix.{mapped_weight_column}) AS weight
+            SUM(matrix.{mapped_weight_column}) AS weight,
+            ST_LENGTH(ST_MakeLine(ST_CENTROID((ARRAY_AGG(origin.geom))[1]), ST_CENTROID((ARRAY_AGG(destination.geom))[1]))::geography) AS length_m
             FROM {temp_geometry_layer} origin, {temp_geometry_layer} destination, {temp_origin_destination_matrix_layer} matrix
             WHERE origin.{mapped_unique_id_column}::text = matrix.{mapped_origin_column}::text
             AND destination.{mapped_unique_id_column}::text = matrix.{mapped_destination_column}::text
