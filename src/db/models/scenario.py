@@ -1,6 +1,7 @@
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List
 from uuid import UUID
 
+from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
     Column,
     Field,
@@ -11,10 +12,10 @@ from sqlmodel import (
 )
 
 from ._base_class import DateTimeBase
-from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 
 if TYPE_CHECKING:
-    from .layer import Layer
+    from ._link_model import ScenarioScenarioFeatureLink
+    from .project import Project
     from .user import User
 
 
@@ -31,6 +32,13 @@ class Scenario(DateTimeBase, table=True):
         )
     )
     name: str = Field(sa_column=Column(Text, nullable=False), max_length=255)
+    project_id: UUID = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey("customer.project.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+    )
     user_id: UUID = Field(
         default=None,
         sa_column=Column(
@@ -41,4 +49,9 @@ class Scenario(DateTimeBase, table=True):
     )
 
     user: "User" = Relationship(back_populates="scenarios")
-    layers: List["Layer"] = Relationship(back_populates="scenario")
+    project: "Project" = Relationship(back_populates="scenarios")
+
+    scenario_features_links: List["ScenarioScenarioFeatureLink"] = Relationship(
+        back_populates="scenario",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )

@@ -1,23 +1,21 @@
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, HttpUrl, validator
 from sqlmodel import SQLModel
 
 from src.db.models._base_class import DateTimeBase
 from src.db.models.layer import ContentBaseAttributes, internal_layer_table_name
+from src.schemas.common import CQLQuery
 from src.schemas.layer import (
     IExternalImageryRead,
     IExternalVectorTileRead,
-    IFeatureScenarioRead,
     IFeatureStandardRead,
     IFeatureToolRead,
     ITableRead,
     LayerOtherProperties,
 )
-from src.schemas.common import CQLQuery
 from src.utils import build_where, optional
-from pydantic import HttpUrl
 
 
 ################################################################################
@@ -131,6 +129,7 @@ def where_query(values: SQLModel | BaseModel):
         attribute_mapping=values.attribute_mapping,
     )
 
+
 class IFeatureStandardProjectRead(
     LayerProjectIds, IFeatureStandardRead, IFeatureBaseProjectRead
 ):
@@ -143,12 +142,6 @@ class IFeatureToolProjectRead(
     pass
 
 
-class IFeatureScenarioProjectRead(
-    LayerProjectIds, IFeatureScenarioRead, IFeatureBaseProjectRead
-):
-    pass
-
-
 @optional
 class IFeatureStandardProjectUpdate(IFeatureBaseProject):
     pass
@@ -156,11 +149,6 @@ class IFeatureStandardProjectUpdate(IFeatureBaseProject):
 
 @optional
 class IFeatureToolProjectUpdate(IFeatureBaseProject):
-    pass
-
-
-@optional
-class IFeatureScenarioProjectUpdate(IFeatureBaseProject):
     pass
 
 
@@ -238,7 +226,6 @@ class IExternalImageryProjectUpdate(BaseModel):
 layer_type_mapping_read = {
     "feature_standard": IFeatureStandardProjectRead,
     "feature_tool": IFeatureToolProjectRead,
-    "feature_scenario": IFeatureScenarioProjectRead,
     "table": ITableProjectRead,
     "external_vector_tile": IExternalVectorTileProjectRead,
     "external_imagery": IExternalImageryProjectRead,
@@ -247,7 +234,6 @@ layer_type_mapping_read = {
 layer_type_mapping_update = {
     "feature_standard": IFeatureStandardProjectUpdate,
     "feature_tool": IFeatureToolProjectUpdate,
-    "feature_scenario": IFeatureScenarioProjectUpdate,
     "table": ITableProjectUpdate,
     "external_vector_tile": IExternalVectorTileProjectUpdate,
     "external_imagery": IExternalImageryProjectUpdate,
@@ -297,23 +283,6 @@ request_examples = {
             "summary": "Feature Layer Tool",
             "value": {
                 "name": "Feature Layer Tool",
-                "group": "Group 1",
-                "properties": {
-                    "type": "circle",
-                    "paint": {
-                        "circle-radius": 5,
-                        "circle-color": "#ff0000",
-                    },
-                    "layout": {"visibility": "visible"},
-                    "minzoom": 0,
-                    "maxzoom": 22,
-                },
-            },
-        },
-        "feature_scenario": {
-            "summary": "Feature Layer Scenario",
-            "value": {
-                "name": "Feature Layer Scenario",
                 "group": "Group 1",
                 "properties": {
                     "type": "circle",

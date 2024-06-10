@@ -12,12 +12,17 @@ import subprocess
 import time
 import zipfile
 from functools import wraps
-from typing import Any
+from typing import Any, List, Type
 from uuid import UUID
+
+import aiohttp
 
 # Third party imports
 import numpy as np
 from fastapi import UploadFile
+from geoalchemy2.shape import to_shape
+from geojson import Feature, FeatureCollection
+from geojson import loads as geojsonloads
 from numba import njit
 from pydantic import BaseModel
 from pygeofilter.backends.sql import to_sql_where
@@ -25,10 +30,10 @@ from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
 from rich import print as print
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-import aiohttp
 
 # Local application imports
 from src.core.config import settings
+from src.crud.base import ModelType
 from src.schemas.common import CQLQuery
 
 
@@ -509,7 +514,9 @@ async def async_get_with_retry(
                 if response.status != 200:
                     # Server is still processing request, retry shortly
                     if i == num_retries - 1:
-                        raise Exception("GEOAPI-Server took too long to process request. It can be that the layer is not properly processed yet.")
+                        raise Exception(
+                            "GEOAPI-Server took too long to process request. It can be that the layer is not properly processed yet."
+                        )
                     await asyncio.sleep(retry_delay)
                     continue
                 elif response.status == 200:
@@ -523,3 +530,66 @@ async def async_get_with_retry(
 def hex_to_rgb(hex: str) -> tuple:
     hex = hex.lstrip("#")
     return tuple(int(hex[i : i + 2], 16) for i in (0, 2, 4))
+
+
+async def delete_orphans(
+    db: AsyncSession,
+    child_table_model: Type[ModelType],
+    column_name: str,
+    link_table_model: Type[ModelType],
+    link_column_name: str,
+):
+    child_table_name = f"{child_table_model.__table_args__['schema']}.{child_table_model.__tablename__}"
+    link_table_name = (
+        f"{link_table_model.__table_args__['schema']}.{link_table_model.__tablename__}"
+    )
+    sql = text(f"""
+    DELETE FROM {child_table_name}
+    WHERE {column_name} NOT IN (
+        SELECT {link_column_name}
+        FROM {link_table_name}
+    )
+    """)
+    await db.execute(sql)
+
+
+def without_keys(d, keys):
+    """
+    Omit keys from a dict
+    """
+    return {x: d[x] for x in d if x not in keys}
+
+
+def to_feature_collection(
+    sql_result: Any,
+    geometry_name: str = "geom",
+    geometry_type: str = "wkb",  # wkb | geojson (wkb is postgis geometry which is stored as hex)
+    exclude_properties: List = [],
+) -> FeatureCollection:
+    """
+    Generic method to convert sql result to geojson. Geometry field is expected to be in geojson or postgis hex format.
+    """
+    if not isinstance(sql_result, list):
+        sql_result = [sql_result]
+
+    exclude_properties.append(geometry_name)
+    features = []
+    for row in sql_result:
+        if not isinstance(row, dict):
+            dict_row = dict(row)
+        else:
+            dict_row = row
+        geometry = None
+        if geometry_type == "wkb":
+            geometry = to_shape(dict_row[geometry_name])
+        elif geometry_type == "geojson":
+            geometry = geojsonloads(dict_row[geometry_name])
+
+        features.append(
+            Feature(
+                id=dict_row.get("gid") or dict_row.get("id") or 0,
+                geometry=geometry,
+                properties=without_keys(dict_row, exclude_properties),
+            )
+        )
+    return FeatureCollection(features)

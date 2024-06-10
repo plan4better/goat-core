@@ -1,18 +1,22 @@
 from typing import Generator, Optional
 
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Path, Request, status
 from httpx import AsyncClient, Timeout
 from jose import jwt
+from pydantic import UUID4
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
+from src.crud.crud_scenario import scenario as crud_scenario
 from src.db.session import session_manager
 
 http_client: Optional[AsyncClient] = None
 
 
-async def get_db() -> Generator:
+async def get_db() -> Generator:  # type: ignore
     async with session_manager.session() as session:
         yield session
+
 
 def get_user_id(request: Request):
     """Get the user ID from the JWT token or use the pre-defined user_id if running without authentication."""
@@ -35,6 +39,31 @@ def get_user_id(request: Request):
         # This is returned if there is no Authorization header and therefore no authentication.
         scheme, _, token = settings.SAMPLE_AUTHORIZATION.partition(" ")
         return jwt.get_unverified_claims(token)["sub"]
+
+
+async def get_scenario(
+    id: UUID4 = Path(
+        ...,
+        description="The ID of the project",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    scenario_id: UUID4 = Path(
+        ...,
+        description="The ID of the scenario",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    async_session: AsyncSession = Depends(get_db),
+):
+    """Get a scenario by its ID and project ID."""
+
+    scenario = await crud_scenario.get_by_multi_keys(
+        async_session, keys={"project_id": id, "id": scenario_id}
+    )
+    if len(scenario) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found"
+        )
+    return scenario[0]
 
 
 def get_http_client():
