@@ -64,6 +64,7 @@ class MaxFeatureCnt(int, Enum):
     catchment_area_active_mobility = 1000
     catchment_area_pt = 5
     catchment_area_car = 50
+    catchment_area_nearby_station_access = 1000
     oev_gueteklasse = 10000
     aggregate_point = 1000000
     aggregate_polygon = 100000
