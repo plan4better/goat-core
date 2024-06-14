@@ -286,6 +286,11 @@ class OGRFileHandling:
             geometry_type = ogr.GeometryTypeToName(layer_def.GetGeomType()).replace(
                 " ", "_"
             )
+            # Strip the "Measured " from beginning of the the geometry type name
+            geometry_type = geometry_type.replace("Measured_", "")
+            # Strip "Z", "M", "ZM" or "25D" from the end of the geometry type name
+            geometry_type = re.sub(r"(Z|M|ZM|25D)$", "", geometry_type)
+
             if geometry_type not in SupportedOgrGeomType.__members__:
                 return {
                     "msg": "Geometry type not supported.",

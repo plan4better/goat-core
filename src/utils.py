@@ -465,7 +465,9 @@ def build_where(id: UUID, table_name: str, query: str | dict, attribute_mapping:
             r'(?<=\(|\s|,)"', f'{table_name}."', to_sql_where(ast, attribute_mapping)
         )
         # Fixing issue with pygeofilter https://github.com/geopython/pygeofilter/pull/54
-        converted_cql = converted_cql.replace("x'", "E'\\\\x")
+        converted_cql = converted_cql.replace(
+            "ST_GeomFromWKB(x'", "ST_GeomFromWKB(E'\\\\x"
+        )
         # Add SRID to ST_GeomFromWKB otherwise it will be 0 and operations won't work
         converted_cql = re.sub(
             r"(ST_GeomFromWKB\((.*?)\))", r"ST_SetSRID(\1, 4326)", converted_cql

@@ -49,6 +49,18 @@ from src.schemas.toolbox_base import (
 )
 from src.utils import build_where_clause, get_random_string, search_value
 
+def assign_attribute(mapped_column, attribute_mapping, attribute_value):
+    base_attr = mapped_column.split("_")[0]
+    attr1 = base_attr + "_attr1"
+    if attr1 not in attribute_mapping:
+        attribute_mapping[attr1] = attribute_value
+    else:
+        # Get attr of same name with max count
+        count_attr = 1
+        while (base_attr + f"_attr{count_attr}") in attribute_mapping:
+            count_attr += 1
+        attribute_mapping[base_attr + f"_attr{count_attr}"] = attribute_value
+    return attribute_mapping
 
 async def start_calculation(
     job_type: JobType,
