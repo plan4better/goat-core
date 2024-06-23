@@ -52,7 +52,6 @@ class CRUDJob(CRUDBase):
         job = Job(
             user_id=user_id,
             type=job_type.value,
-            payload={},
             status=job_status,
             status_simple=JobStatusType.pending.value,
         )

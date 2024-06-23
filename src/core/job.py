@@ -8,6 +8,7 @@ from sqlalchemy import text
 from src.schemas.error import TimeoutError, JobKilledError
 from src.core.config import settings
 from src.schemas.layer import LayerType, UserDataTable
+from src.schemas.error import ERROR_MAPPING
 
 # Create a logger object for background tasks
 background_logger = logging.getLogger("Background task")

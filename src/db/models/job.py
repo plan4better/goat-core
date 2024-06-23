@@ -47,15 +47,12 @@ class Job(DateTimeBase, table=True):
         ),
         description="Layer IDs that are produced by the job",
     )
-    payload: dict = Field(
-        sa_column=Column(JSONB, nullable=False), description="Payload of the request"
-    )
-    response: dict | None = Field(
-        sa_column=Column(JSONB, nullable=True), description="Metadata response of the job"
-    )
     status: dict = Field(sa_column=Column(JSONB, nullable=False), description="Status of the job")
     status_simple: JobStatusType = Field(
         sa_column=Column(Text, nullable=False, index=True), description="Simple status of the job"
+    )
+    msg_simple: str | None = Field(
+        sa_column=Column(Text, nullable=True), description="Simple message of the job"
     )
     read: bool | None = Field(
         sa_column=Column(Boolean, nullable=False, server_default="False"),
