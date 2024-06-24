@@ -130,15 +130,20 @@ class CRUDNearbyStationAccess(CRUDToolBase):
                 INNER JOIN basic.routes r ON r.route_id = s.route_id
             )
             INSERT INTO {result_table} (layer_id, geom, text_attr1, text_attr2, integer_attr1, integer_attr2, jsonb_attr1)
-            SELECT '{str(layer_stations.id)}', geom, stop_name, dominant_mode.*, access_time, agg_frequency, routes
-            FROM (
-                SELECT geom, stop_name, access_time, ROUND(120 / sum(trip_cnt)) AS agg_frequency,
-                array_agg(DISTINCT route_type) AS route_types,
-                jsonb_agg(jsonb_build_object('route_name', route_short_name, 'mode', '{json.dumps(flat_mode_mapping)}'::JSONB ->> route_type, 'frequency', frequency)) AS routes
-                FROM frequency
-                GROUP BY stop_id, stop_name, access_time, geom
-            ) sub,
-            LATERAL basic.identify_dominant_mode(route_types, '{json.dumps(flat_mode_mapping)}'::JSONB) dominant_mode;
+            SELECT *
+            FROM
+            (
+                SELECT '{str(layer_stations.id)}'::uuid, geom, stop_name, dominant_mode.*, access_time, agg_frequency, routes
+                FROM (
+                    SELECT geom, stop_name, access_time, ROUND(120 / sum(trip_cnt)) AS agg_frequency,
+                    array_agg(DISTINCT route_type) AS route_types,
+                    jsonb_agg(jsonb_build_object('route_name', route_short_name, 'mode', '{json.dumps(flat_mode_mapping)}'::JSONB ->> route_type, 'frequency', frequency)) AS routes
+                    FROM frequency
+                    GROUP BY stop_id, stop_name, access_time, geom
+                ) sub,
+                LATERAL basic.identify_dominant_mode(route_types, '{json.dumps(flat_mode_mapping)}'::JSONB) dominant_mode
+            ) x
+            ORDER BY access_time
         """
         try:
             await self.async_session.execute(sql_compute_nearby_station_access)
