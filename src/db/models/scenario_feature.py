@@ -45,9 +45,8 @@ def generate_field_definitions():
             str,
             Field(
                 sa_column=Column(
-                    Geometry,
-                    nullable=False,
-                )
+                    Geometry(srid="4326", spatial_index=False),
+                ),
             ),
         ),
     }
