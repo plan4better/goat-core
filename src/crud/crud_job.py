@@ -13,7 +13,9 @@ from src.crud.base import CRUDBase
 from src.db.models.job import Job
 from src.schemas.common import OrderEnum
 from src.schemas.job import JobStatusType, JobType, MsgType, job_mapping
+from src.schemas.error import ERROR_MAPPING, UnknownError
 from src.utils import sanitize_error_message
+
 
 class CRUDJob(CRUDBase):
     async def check_and_create(
@@ -68,11 +70,12 @@ class CRUDJob(CRUDBase):
         job_id: UUID,
         job_step_name: str,
         status: JobStatusType = JobStatusType.running,
+        error=None,
         msg_text: str = "",
     ):
         """Update job status."""
 
-        #TODO: Find another way to avoid refetching the job again here.
+        # TODO: Find another way to avoid refetching the job again here.
         # Get job and check if job is killed. This is needed at the moment as the job is not updated in here but in the DB.
         job = await self.get(db=async_session, id=job_id)
         async_session.expire(job)
@@ -83,17 +86,32 @@ class CRUDJob(CRUDBase):
         job.status[job_step_name]["status"] = status
 
         # Populate job step msg
+        msg_text = sanitize_error_message(msg_text.replace("'", "''"))
         job.status[job_step_name]["msg"] = {
             "type": MsgType.info.value,
-            "text": sanitize_error_message(msg_text.replace("'", "''")),
+            "text": msg_text,
         }
         if status == JobStatusType.finished:
             job.status_simple = JobStatusType.running.value
         else:
             job.status_simple = status
 
+        # If error is not None population msg_simple
+        if status == JobStatusType.failed:
+            if error is None:
+                error = UnknownError("Unknown error occurred.")
+            else:
+                # Define msg_simple
+                if error.__class__ not in ERROR_MAPPING:
+                    error = UnknownError("Unknown error occurred.")
+            error_name = error.__class__.__name__
+            error_message = str(error)
+            job.msg_simple = f"{error_name}: {error_message}"
+            flag_modified(job, "msg_simple")
+
         flag_modified(job, "status")
         flag_modified(job, "status_simple")
+
         # Update job
         job = await self.update(db=async_session, db_obj=job)
         return job
@@ -147,11 +165,21 @@ class CRUDJob(CRUDBase):
         )
         return jobs
 
-    async def mark_as_read(self, async_session: AsyncSession, user_id: UUID, job_ids: List[UUID]):
+    async def mark_as_read(
+        self, async_session: AsyncSession, user_id: UUID, job_ids: List[UUID]
+    ):
         """Mark a job as read."""
 
         # Get the jobs owned by the user and ids in the list.
-        query_get = select(Job).where(and_(Job.id.in_(job_ids), Job.user_id == user_id, Job.status_simple.notin_([JobStatusType.pending.value, JobStatusType.running.value])))
+        query_get = select(Job).where(
+            and_(
+                Job.id.in_(job_ids),
+                Job.user_id == user_id,
+                Job.status_simple.notin_(
+                    [JobStatusType.pending.value, JobStatusType.running.value]
+                ),
+            )
+        )
         jobs = await self.get_multi(async_session, query=query_get)
         jobs = [job[0] for job in jobs]
         if jobs == []:

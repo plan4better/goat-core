@@ -142,6 +142,12 @@ class ColumnNotFoundError(Exception):
 
     pass
 
+class UnknownError(Exception):
+    """Raised when an unknown error occurs."""
+
+    pass
+
+
 # Define the mapping between custom errors and HTTP status codes
 ERROR_MAPPING = {
     LayerSizeError: status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -165,6 +171,7 @@ ERROR_MAPPING = {
     R5CatchmentAreaComputeError: status.HTTP_500_INTERNAL_SERVER_ERROR,
     OperationNotSupportedError: status.HTTP_422_UNPROCESSABLE_ENTITY,
     ColumnNotFoundError: status.HTTP_404_NOT_FOUND,
+    ValueError: status.HTTP_400_BAD_REQUEST,
 }
 
 

@@ -8,7 +8,7 @@ from sqlalchemy import text
 from src.schemas.error import TimeoutError, JobKilledError
 from src.core.config import settings
 from src.schemas.layer import LayerType, UserDataTable
-from src.schemas.error import ERROR_MAPPING
+from src.schemas.error import ERROR_MAPPING, UnknownError
 
 # Create a logger object for background tasks
 background_logger = logging.getLogger("Background task")
@@ -84,11 +84,17 @@ def job_init():
                 await async_session.rollback()
                 # Run failure functions for cleanup
                 await run_failure_func(self, func, *args, **kwargs)
+                # Define msg_simple
+                if e.__class__ in ERROR_MAPPING:
+                    error = e
+                else:
+                    error = str(UnknownError("Unknown error occurred."))
+                msg_simple = f"{error.__class__.__name__}: {str(error)}"
                 # Update job status simple to failed
                 job = await crud_job.update(
                     db=async_session,
                     db_obj=job,
-                    obj_in={"status_simple": JobStatusType.failed.value},
+                    obj_in={"status_simple": JobStatusType.failed.value, "msg_simple": msg_simple},
                 )
                 return
 
@@ -177,6 +183,7 @@ def job_log(job_step_name: str, timeout: int = 120):
                     job_id=job_id,
                     status=JobStatusType.failed.value,
                     msg_text=str(e),
+                    error=e,
                     job_step_name=job_step_name,
                 )
                 background_logger.error(f"Job failed with error: {e}")
