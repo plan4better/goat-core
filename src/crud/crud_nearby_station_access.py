@@ -134,7 +134,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             FROM (
                 SELECT geom, stop_name, access_time, ROUND(120 / sum(trip_cnt)) AS agg_frequency,
                 array_agg(DISTINCT route_type) AS route_types,
-                jsonb_agg(jsonb_build_object('route_short_name', route_short_name, 'route_type', route_type, 'frequency', frequency)) AS routes
+                jsonb_agg(jsonb_build_object('route_name', route_short_name, 'mode', '{json.dumps(flat_mode_mapping)}'::JSONB ->> route_type, 'frequency', frequency)) AS routes
                 FROM frequency
                 GROUP BY stop_id, stop_name, access_time, geom
             ) sub,
