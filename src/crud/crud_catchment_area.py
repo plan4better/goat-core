@@ -346,7 +346,7 @@ class CRUDCatchmentAreaPT(CRUDCatchmentAreaBase):
             shapes_sorted = sorted(shapes_sorted, key=lambda x: x[1], reverse=True)
             insert_string = ""
             for shape in shapes_sorted:
-                insert_string += f"('{layer_id}', ST_SetSRID(ST_GeomFromText('{shape[0]}'), 4326), {shape[1]}),"
+                insert_string += f"('{layer_id}', ST_MakeValid(ST_SetSRID(ST_GeomFromText('{shape[0]}'), 4326)), {shape[1]}),"
             insert_string = f"""
                 INSERT INTO {result_table} (layer_id, geom, integer_attr1)
                 VALUES {insert_string.rstrip(",")};
