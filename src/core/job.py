@@ -97,6 +97,12 @@ def job_init():
                     obj_in={"status_simple": JobStatusType.failed.value, "msg_simple": msg_simple},
                 )
                 return
+            
+            if job.layer_ids:
+                if isinstance(job.layer_ids, list):
+                    job.layer_ids = [str(layer_id) for layer_id in job.layer_ids]
+                else:
+                    job.layer_ids = [str(job.layer_ids)]
 
             # Update job status to finished in case it is not killed, timeout or failed
             if result["status"] not in [
@@ -118,7 +124,7 @@ def job_init():
     return decorator
 
 
-def job_log(job_step_name: str, timeout: int = 120):
+def job_log(job_step_name: str, timeout: int = 240):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):

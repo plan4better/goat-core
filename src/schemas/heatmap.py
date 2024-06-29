@@ -46,6 +46,7 @@ class ImpedanceFunctionType(str, Enum):
     linear = "linear"
     exponential = "exponential"
     power = "power"
+    cumulative_gaussian = "cumulative_gaussian"
 
 
 class MaxTravelTimeTransportMode(int, Enum):

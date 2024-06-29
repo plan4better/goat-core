@@ -14,7 +14,7 @@ from src.schemas.heatmap import (
     TRAVELTIME_MATRIX_TABLE,
     TRAVELTIME_MATRIX_RESOLUTION,
 )
-
+from src.crud.crud_job import job as crud_job
 
 class CRUDHeatmapGravity(CRUDHeatmapBase):
 
@@ -75,6 +75,15 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
             return f"SUM((EXP(1) ^ (((sensitivity / {max_sensitivity}) * -1) * (traveltime / {max_traveltime}))) * potential)"
         elif type == ImpedanceFunctionType.power:
             return f"SUM(((traveltime / {max_traveltime}) ^ ((sensitivity / {max_sensitivity}) * -1)) * potential)"
+        elif type == ImpedanceFunctionType.cumulative_gaussian:
+            return f"""
+            SUM(
+                CASE
+                    WHEN traveltime * 60 <= static_time THEN potential
+                    ELSE EXP(1) ^ (-(((traveltime * 60 - static_time) ^ 2) / sensitivity)) * potential
+                END
+            )
+            """
         else:
             raise ValueError(f"Unknown impedance function type: {type}")
 
@@ -157,10 +166,33 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         ))
 
         # Register feature layer
-        await self.create_feature_layer_tool(
+        layer = await self.create_feature_layer_tool(
             layer_in=layer_heatmap,
             params=params,
         )
+
+        # Update job status with additional information
+        job = await crud_job.get(self.async_session, self.job_id)
+
+        # Extract layer IDs
+        new_layer_id = str(layer['layer'].id)
+
+        # Update job with layer_id
+        if job.layer_ids is None:
+            job.layer_ids = []
+
+        # Check and append new_layer_id if not present
+        if new_layer_id not in job.layer_ids:
+            job.layer_ids.append(new_layer_id)
+
+        # Ensure all IDs in job.layer_ids are strings
+        if job.layer_ids:
+            if isinstance(job.layer_ids, list):
+                job.layer_ids = [str(layer_id) for layer_id in job.layer_ids]
+            else:
+                job.layer_ids = [str(job.layer_ids)]
+
+        await self.async_session.commit()
 
         return {
             "status": JobStatusType.finished.value,
