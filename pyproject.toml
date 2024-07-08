@@ -89,7 +89,10 @@ gdal = "3.6.2"
 aiofiles = "^23.2.1"
 pygeofilter = "^0.2.1"
 pycountry = "^23.12.11"
-pymgl = { url = "https://assets.plan4better.de/other/libs/pymgl-0.4.0-cp311-cp311-linux_x86_64.whl" }
+pymgl = [
+    { url = "https://assets.plan4better.de/other/libs/pymgl-0.4.0-cp311-cp311-linux_x86_64.whl", markers = "platform_machine == 'x86_64'" },
+    { url = "https://assets.plan4better.de/other/libs/pymgl-0.4.0-cp310-cp310-linux_aarch64.whl", markers = "platform_machine == 'arm64'" }
+]
 matplotlib = "^3.8.2"
 cairosvg = "^2.7.1"
 
