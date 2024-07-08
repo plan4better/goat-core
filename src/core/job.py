@@ -9,6 +9,7 @@ from src.schemas.error import TimeoutError, JobKilledError
 from src.core.config import settings
 from src.schemas.layer import LayerType, UserDataTable
 from src.schemas.error import ERROR_MAPPING, UnknownError
+import traceback
 
 # Create a logger object for background tasks
 background_logger = logging.getLogger("Background task")
@@ -124,7 +125,7 @@ def job_init():
     return decorator
 
 
-def job_log(job_step_name: str, timeout: int = 240):
+def job_log(job_step_name: str, timeout: int = 480):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -192,7 +193,12 @@ def job_log(job_step_name: str, timeout: int = 240):
                     error=e,
                     job_step_name=job_step_name,
                 )
-                background_logger.error(f"Job failed with error: {e}")
+                error_info = {
+                    "error_type": type(e).__name__,
+                    "error_message": str(e) if str(e) else "No message",
+                    "traceback": traceback.format_exc(),
+                }
+                background_logger.error(f"Job failed with error: {error_info}")
                 raise e
 
             # Check if job was killed. The job needs to be expired as it was fetching old data from cache.

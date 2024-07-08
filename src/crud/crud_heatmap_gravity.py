@@ -61,7 +61,8 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         self,
         type: ImpedanceFunctionType,
         max_traveltime: int,
-        max_sensitivity: float
+        max_sensitivity: float,
+        static_travel_time_component: float = None
     ):
         """Builds impedance function used to compute heatmap gravity."""
 
@@ -76,11 +77,16 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         elif type == ImpedanceFunctionType.power:
             return f"SUM(((traveltime / {max_traveltime}) ^ ((sensitivity / {max_sensitivity}) * -1)) * potential)"
         elif type == ImpedanceFunctionType.cumulative_gaussian:
+            # Ensure static_travel_time_component is not None for this formula
+            if static_travel_time_component is None:
+                raise ValueError("static_travel_time_component is required for cumulative_gaussian impedance function")
+            
+            threshold = 1e-10  # Add a small threshold to avoid underflow
             return f"""
             SUM(
                 CASE
-                    WHEN traveltime * 60 <= static_time THEN potential
-                    ELSE EXP(1) ^ (-(((traveltime * 60 - static_time) ^ 2) / sensitivity)) * potential
+                    WHEN traveltime * 60 <= {static_travel_time_component} * 60 THEN potential
+                    ELSE (EXP(1) ^ (-LEAST((traveltime * 60 - {static_travel_time_component} * 60) ^ 2, {threshold}) / (sensitivity / {max_sensitivity}))) * potential
                 END
             )
             """
@@ -95,6 +101,7 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         max_sensitivity: float,
         result_table: str,
         result_layer_id: str,
+        static_travel_time_component: float = None
     ):
         """Builds SQL query to compute heatmap gravity."""
 
@@ -102,6 +109,7 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
             type=params.impedance_function,
             max_traveltime=max_traveltime,
             max_sensitivity=max_sensitivity,
+            static_travel_time_component=static_travel_time_component,
         )
 
         query = f"""
@@ -154,7 +162,9 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         # Get max traveltime & sensitivity for normalization
         max_traveltime = max([layer["layer"].max_traveltime for layer in layers])
         max_sensitivity = max([layer["layer"].sensitivity for layer in layers])
-
+        static_travel_time_components = [layer["layer"].static_travel_time_component for layer in layers if hasattr(layer["layer"], 'static_travel_time_component')]
+        static_travel_time_component = max(static_travel_time_components) if static_travel_time_components else None
+        
         # Compute heatmap & write to result table
         await self.async_session.execute(self.build_query(
             params=params,
@@ -163,6 +173,8 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
             max_sensitivity=max_sensitivity,
             result_table=result_table,
             result_layer_id=str(layer_heatmap.id),
+            static_travel_time_component=static_travel_time_component
+
         ))
 
         # Register feature layer

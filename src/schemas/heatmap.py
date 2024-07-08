@@ -97,6 +97,11 @@ class OpportunityGravityBased(OpportunityBase):
         title="Destination Potential Column",
         description="The column name of the destination potential.",
     )
+    static_travel_time_component: int | None = Field(
+        None,
+        title="Static travel time component of the cumulative gaussian function impedance function.",
+        description="Static travel time component of the cumulative gaussian function impedance function.",
+    )
 
 
 class HeatmapGravityBase(BaseModel):
