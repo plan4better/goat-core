@@ -17,7 +17,6 @@ env/
 ENV/
 
 # IDEs and editors
-.vscode/
 .idea/
 *.sublime-project
 *.sublime-workspace
