@@ -1,9 +1,16 @@
 from enum import Enum
-from pydantic import Field, BaseModel, validator
 from typing import List
-from src.schemas.layer import ToolType
-from src.schemas.toolbox_base import input_layer_type_point, input_layer_type_polygon, DefaultResultLayerName
+
+from pydantic import BaseModel, Field, validator
+
+from src.core.config import settings
 from src.schemas.colors import ColorRangeType
+from src.schemas.layer import ToolType
+from src.schemas.toolbox_base import (
+    DefaultResultLayerName,
+    input_layer_type_point,
+    input_layer_type_polygon,
+)
 
 
 class ActiveRoutingHeatmapType(str, Enum):
@@ -97,6 +104,15 @@ class OpportunityGravityBased(OpportunityBase):
         description="The column name of the destination potential.",
     )
 
+    # Ensure sensitivity doesn't exceed the configured limit
+    @validator("sensitivity", pre=True, always=True)
+    def valid_sensitivity(cls, v):
+        if v > settings.HEATMAP_GRAVITY_MAX_SENSITIVITY:
+            raise ValueError(
+                f"The sensitivity must not exceed {settings.HEATMAP_GRAVITY_MAX_SENSITIVITY}."
+            )
+        return v
+
 
 class HeatmapGravityBase(BaseModel):
     """Gravity based heatmap schema."""
@@ -106,7 +122,7 @@ class HeatmapGravityBase(BaseModel):
         title="Impedance Function",
         description="The impedance function of the heatmap.",
     )
-    #TODO: Limit 10 opportunities layers
+    # TODO: Limit 10 opportunities layers
     opportunities: List[OpportunityGravityBased] = Field(
         ...,
         title="Opportunities",
@@ -210,7 +226,6 @@ class IHeatmapGravityActive(HeatmapGravityBase):
         }
 
 
-
 class IHeatmapGravityMotorized(HeatmapGravityBase):
     """Gravity based heatmap for motorized mobility schema."""
 
@@ -303,6 +318,7 @@ class IHeatmapClosestAverageMotorized(HeatmapClosestAverageBase):
             }
         }
 
+
 class IHeatmapConnectivityActive(HeatmapConnectivityBase):
     """Connectivity based heatmap for active mobility schema."""
 
@@ -363,4 +379,3 @@ class IHeatmapConnectivityMotorized(HeatmapConnectivityBase):
                 "color_scale": "quantile",
             }
         }
-

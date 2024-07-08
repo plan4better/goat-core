@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     CRUD_NUM_RETRIES: Optional[int] = 20 # Number of times to retry calling an endpoint
     CRUD_RETRY_INTERVAL: Optional[int] = 2 # Number of seconds to wait between retries
 
+    HEATMAP_GRAVITY_MAX_SENSITIVITY: int = 1000000
+
     SENTRY_DSN: Optional[HttpUrl] = None
     POSTGRES_SERVER: str
     POSTGRES_USER: str
