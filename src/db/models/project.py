@@ -55,6 +55,13 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         ),
         description="Project folder ID",
     )
+    active_scenario_id: UUID | None = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            nullable=True,
+        ),
+        description="Active scenario ID",
+    )
     layer_order: List[int] | None = Field(
         sa_column=Column(
             ARRAY(Integer),

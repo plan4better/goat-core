@@ -71,11 +71,13 @@ class IProjectRead(ContentBaseAttributes, DateTimeBase):
     id: UUID = Field(..., description="Project ID")
     layer_order: list[int] | None = Field(None, description="Layer order in project")
     thumbnail_url: HttpUrl | None = Field(description="Project thumbnail URL")
+    active_scenario_id: UUID | None = Field(None, description="Active scenario ID")
 
 
 @optional
 class IProjectBaseUpdate(ContentBaseAttributes):
     layer_order: list[int] | None = Field(None, description="Layer order in project")
+    active_scenario_id: UUID | None = Field(None, description="Active scenario ID")
 
 
 class dict(dict):
