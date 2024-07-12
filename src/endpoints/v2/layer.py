@@ -146,7 +146,18 @@ async def create_layer_internal(
         )
 
     # Get metadata from file in folder
-    with open(os.path.join(folder_path, "metadata.json"), "r") as f:
+    metadata_path = None
+    for root, dirs, files in os.walk(folder_path):
+        if 'metadata.json' in files:
+            metadata_path = os.path.join(root, 'metadata.json')
+
+    if metadata_path is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Metadata file not found.",
+        )
+
+    with open(os.path.join(metadata_path)) as f:
         file_metadata = json.loads(json.load(f))
 
     # Create job and check if user can create a new job
