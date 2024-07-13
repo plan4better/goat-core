@@ -10,7 +10,7 @@ from src.db.models.layer import ToolType
 
 
 async def read_chart_data(
-    async_session: AsyncSession, project_id: UUID, layer_project_id: int
+    async_session: AsyncSession, project_id: UUID, layer_project_id: int, cumsum: bool = False
 ):
 
     # Get layer project data
@@ -29,56 +29,103 @@ async def read_chart_data(
     y_label = charts["y_label"]
     group_by = charts.get("group_by")
 
+    if cumsum:
+        operation = ColumnStatisticsOperation.sum.value
+
+
     # Get y_query
     x_label_mapped = search_value(layer_project.attribute_mapping, x_label)
     y_label_mapped = search_value(layer_project.attribute_mapping, y_label)
-    y_query = get_statistics_sql(y_label_mapped, operation)
 
     # Replace count with sum in case operation is count
-    if operation == ColumnStatisticsOperation.count:
-        y_query = y_query.replace("COUNT", "SUM")
+    if operation == ColumnStatisticsOperation.count.value:
+        operation = ColumnStatisticsOperation.sum.value
 
     if not group_by:
+        # Define statistics query
+        y_query = get_statistics_sql(y_label_mapped, operation)
         # Get data from layer
-        sql = f"""
-        WITH data AS (
+
+        sql_base = f"""
             SELECT {x_label_mapped} AS x, {y_query} AS y
             FROM {layer_project.table_name}
             WHERE layer_id = '{layer_project.layer_id}'
             GROUP BY {x_label_mapped}
             ORDER BY {x_label_mapped}
-        )
-        SELECT ARRAY_AGG(x), ARRAY_AGG(y)
-        FROM data
         """
+        if cumsum is False:
+            sql = f"""
+                WITH data AS (
+                    {sql_base}
+                )
+                SELECT jsonb_agg(x), jsonb_agg(y)
+                FROM data
+            """
+        else:
+            sql = f"""
+                WITH data AS (
+                    {sql_base}
+                ),
+                cumsum AS (
+                    SELECT x, SUM(y) OVER (ORDER BY x) AS y
+                    FROM data
+                )
+                SELECT jsonb_agg(x), jsonb_agg(y)
+                FROM cumsum
+            """
     else:
         # Define statistics query
         y_query = get_statistics_sql("value", operation)
 
         # Cast value inside query to float
         y_query = y_query.replace("value", "value::float")
+        # Use the original operation here since operation might have been changed
         data_column = search_value(
-            layer_project.attribute_mapping, operation + "_grouped"
+            layer_project.attribute_mapping, charts["operation"] + "_grouped"
         )
 
         # Build query
-        sql = f"""
-        WITH unnested AS (
+        sql_base = f"""
             SELECT {x_label_mapped} x, key AS group, {y_query} AS y
             FROM {layer_project.table_name}, LATERAL JSONB_EACH({data_column})
             WHERE layer_id = '{layer_project.layer_id}'
             GROUP BY {x_label_mapped}, key
             ORDER BY {x_label_mapped}, key
-        ),
-        grouped AS
-        (
-            SELECT ARRAY_AGG(x) AS x, ARRAY_AGG(y) as y, "group"
-            FROM unnested
-            GROUP BY "group"
-        )
-        SELECT ARRAY_AGG(x), ARRAY_AGG(y), ARRAY_AGG("group")
-        FROM grouped
         """
+        # Adjust query based on cumsum
+        if cumsum is False:
+            sql = f"""
+                WITH unnested AS (
+                    {sql_base}
+                ),
+                grouped AS
+                (
+                    SELECT jsonb_agg(x) AS x, jsonb_agg(y) as y, "group"
+                    FROM unnested
+                    GROUP BY "group"
+                )
+                SELECT jsonb_agg(x) x, jsonb_agg(y), jsonb_agg("group")
+                FROM grouped
+            """
+        else:
+            sql = f"""
+                WITH unnested AS (
+                    {sql_base}
+                ),
+                grouped AS (
+                    SELECT x, "group",
+                    SUM(y) OVER (PARTITION BY "group" ORDER BY x) AS y -- Calculate cumulative sum of y within each group
+                    FROM unnested
+                ),
+                second_grouped AS
+                (
+                    SELECT jsonb_agg(x) AS x, jsonb_agg(y) AS y, "group"
+                    FROM grouped
+                    GROUP BY "group"
+                )
+                SELECT jsonb_agg(x) AS x, jsonb_agg(y) AS y, jsonb_agg("group")
+                FROM second_grouped
+            """
 
     result = await async_session.execute(sql)
     data = result.fetchall()

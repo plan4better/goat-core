@@ -41,6 +41,7 @@ from src.schemas.scenario import (
 from src.schemas.scenario import (
     request_examples as scenario_request_examples,
 )
+from src.schemas.error import HTTPErrorHandler
 from src.utils import delete_orphans, to_feature_collection
 
 router = APIRouter()
@@ -499,15 +500,22 @@ async def get_chart_data(
         description="Layer Project ID to get chart data",
         example="1",
     ),
+    cumsum: bool = Query(
+        False,
+        description="Specify if the data should be cumulated. This only works if the x-axis is a number.",
+        example=False,
+    ),
 ):
     """Get chart data from a layer in a project by its ID."""
 
     # Get chart data
-    return await read_chart_data(
-        async_session=async_session,
-        project_id=id,
-        layer_project_id=layer_project_id,
-    )
+    with HTTPErrorHandler():
+        return await read_chart_data(
+            async_session=async_session,
+            project_id=id,
+            layer_project_id=layer_project_id,
+            cumsum=cumsum,
+        )
 
 
 ##############################################
