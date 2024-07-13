@@ -46,6 +46,27 @@ async def setup(conn):
         format="text"
     )
 
+    # Register biginteger array type
+    await set_type_codec(
+        conn,
+        ["_int8"],
+        encode=lambda a: "{" + ",".join(map(str, a)) + "}",  # Convert list to PostgreSQL array literal
+        decode=lambda a: list(map(int, a.strip("{}").split(","))) if a else [],  # Convert PostgreSQL array literal to list
+        schema="pg_catalog",
+        format="text"
+    )
+
+    # # Register float array type
+    await set_type_codec(
+        conn,
+        ["_float8"],
+        encode=lambda a: "{" + ",".join(map(str, a)) + "}",  # Convert list to PostgreSQL array literal
+        decode=lambda a: list(map(float, a.strip("{}").split(","))) if a else [],  # Convert PostgreSQL array literal to list
+        schema="pg_catalog",
+        format="text"
+    )
+
+
     # Register UUID array type
     await set_type_codec(
         conn,
@@ -66,6 +87,7 @@ class DatabaseSessionManager:
         self._engine = create_async_engine(
             host,
             isolation_level="AUTOCOMMIT",
+            connect_args={"server_settings": {"application_name": "GOAT Core"}},
         )
         self._session_maker = sessionmaker(
             bind=self._engine,
