@@ -4,6 +4,13 @@ from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
 from sqlalchemy import and_, select
 
+from src.core.content import (
+    create_content,
+    delete_content_by_id,
+    read_content_by_id,
+    read_contents_by_ids,
+    update_content_by_id,
+)
 from src.crud.crud_report import report as crud_report
 from src.db.models.report import Report
 from src.db.session import AsyncSession
@@ -13,14 +20,9 @@ from src.schemas.report import (
     IReportCreate,
     IReportRead,
     IReportUpdate,
-    request_examples as report_request_examples,
 )
-from src.core.content import (
-    create_content,
-    delete_content_by_id,
-    read_content_by_id,
-    read_contents_by_ids,
-    update_content_by_id,
+from src.schemas.report import (
+    request_examples as report_request_examples,
 )
 
 router = APIRouter()
@@ -78,7 +80,7 @@ async def read_reports_by_ids(
 
 
 @router.get(
-    "/{id}",
+    "/{report_id}",
     summary="Retrieve a report by its ID",
     response_model=IReportRead,
     response_model_exclude_none=True,
@@ -86,7 +88,7 @@ async def read_reports_by_ids(
 )
 async def read_report(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    report_id: UUID4 = Path(
         ...,
         description="The ID of the report to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -94,7 +96,10 @@ async def read_report(
 ):
     """Retrieve a report by its ID."""
     return await read_content_by_id(
-        async_session=async_session, id=id, model=Report, crud_content=crud_report
+        async_session=async_session,
+        id=report_id,
+        model=Report,
+        crud_content=crud_report,
     )
 
 
@@ -140,20 +145,22 @@ async def read_reports(
     )
 
     if len(reports.items) == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No Reports Found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No Reports Found"
+        )
 
     return reports
 
 
 @router.put(
-    "/{id}",
+    "/{report_id}",
     response_model=IReportRead,
     response_model_exclude_none=True,
     status_code=200,
 )
 async def update_report(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    report_id: UUID4 = Path(
         ...,
         description="The ID of the report to update",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -164,7 +171,7 @@ async def update_report(
 ):
     return await update_content_by_id(
         async_session=async_session,
-        id=id,
+        id=report_id,
         model=Report,
         crud_content=crud_report,
         content_in=report_in,
@@ -172,18 +179,21 @@ async def update_report(
 
 
 @router.delete(
-    "/{id}",
+    "/{report_id}",
     response_model=None,
     status_code=204,
 )
 async def delete_report(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    report_id: UUID4 = Path(
         ...,
         description="The ID of the report to update",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
 ):
     return await delete_content_by_id(
-        async_session=async_session, id=id, model=Report, crud_content=crud_report
+        async_session=async_session,
+        id=report_id,
+        model=Report,
+        crud_content=crud_report,
     )
