@@ -74,7 +74,7 @@ async def create_project(
 
 
 @router.get(
-    "/{id}",
+    "/{project_id}",
     summary="Retrieve a project by its ID",
     response_model=IProjectRead,
     response_model_exclude_none=True,
@@ -82,8 +82,8 @@ async def create_project(
 )
 async def read_project(
     async_session: AsyncSession = Depends(get_db),
-    user_id: UUID4 = Depends(get_user_id),
-    id: UUID4 = Path(
+    user_=Depends(get_user_id),
+    project_id: UUID4 = Path(
         ...,
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -92,7 +92,7 @@ async def read_project(
     """Retrieve a project by its ID."""
 
     # Get project
-    project = await crud_project.get(async_session, id=id)
+    project = await crud_project.get(async_session, id=project_id)
     if project is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
@@ -170,14 +170,14 @@ async def read_projects_by_ids(
 
 
 @router.put(
-    "/{id}",
+    "/{project_id}",
     response_model=IProjectRead,
     response_model_exclude_none=True,
     status_code=200,
 )
 async def update_project(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    project_id: UUID4 = Path(
         ...,
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -191,20 +191,20 @@ async def update_project(
     # Update project
     project = await crud_project.update_base(
         async_session=async_session,
-        id=id,
+        id=project_id,
         project=project_in,
     )
     return project
 
 
 @router.delete(
-    "/{id}",
+    "/{project_id}",
     response_model=None,
     status_code=204,
 )
 async def delete_project(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    project_id: UUID4 = Path(
         ...,
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -213,19 +213,19 @@ async def delete_project(
     """Delete a project by its ID."""
 
     # Get project
-    project = await crud_project.get(async_session, id=id)
+    project = await crud_project.get(async_session, id=project_id)
     if project is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
         )
 
     # Delete project
-    await crud_project.delete(db=async_session, id=id)
+    await crud_project.delete(db=async_session, id=project_id)
     return
 
 
 @router.get(
-    "/{id}/initial-view-state",
+    "/{project_id}/initial-view-state",
     response_model=InitialViewState,
     response_model_exclude_none=True,
     status_code=200,
@@ -233,7 +233,7 @@ async def delete_project(
 async def read_project_initial_view_state(
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
-    id: UUID4 = Path(
+    project_id: UUID4 = Path(
         ...,
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -243,13 +243,13 @@ async def read_project_initial_view_state(
 
     # Get initial view state
     user_project = await crud_user_project.get_by_multi_keys(
-        async_session, keys={"user_id": user_id, "project_id": id}
+        async_session, keys={"user_id": user_id, "project_id": project_id}
     )
     return user_project[0].initial_view_state
 
 
 @router.put(
-    "/{id}/initial-view-state",
+    "/{project_id}/initial-view-state",
     response_model=InitialViewState,
     response_model_exclude_none=True,
     status_code=200,
@@ -257,7 +257,7 @@ async def read_project_initial_view_state(
 async def update_project_initial_view_state(
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
-    id: UUID4 = Path(
+    project_id: UUID4 = Path(
         ...,
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -274,7 +274,7 @@ async def update_project_initial_view_state(
     user_project = await crud_user_project.update_initial_view_state(
         async_session,
         user_id=user_id,
-        project_id=id,
+        project_id=project_id,
         initial_view_state=initial_view_state,
     )
     return user_project.initial_view_state
@@ -286,7 +286,7 @@ async def update_project_initial_view_state(
 
 
 @router.post(
-    "/{id}/layer",
+    "/{project_id}/layer",
     response_model=List[
         IFeatureStandardProjectRead
         | IFeatureToolProjectRead
@@ -299,7 +299,7 @@ async def update_project_initial_view_state(
 )
 async def add_layers_to_project(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    project_id: UUID4 = Path(
         ...,
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -315,7 +315,7 @@ async def add_layers_to_project(
     # Add layers to project
     layers_project = await crud_layer_project.create(
         async_session=async_session,
-        project_id=id,
+        project_id=project_id,
         layer_ids=layer_ids,
     )
 
@@ -323,7 +323,7 @@ async def add_layers_to_project(
 
 
 @router.get(
-    "/{id}/layer",
+    "/{project_id}/layer",
     response_model=List[
         IFeatureStandardProjectRead
         | IFeatureToolProjectRead
@@ -336,7 +336,7 @@ async def add_layers_to_project(
 )
 async def get_layers_from_project(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    project_id: UUID4 = Path(
         ...,
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -347,13 +347,13 @@ async def get_layers_from_project(
     # Get all layers from project
     layers_project = await crud_layer_project.get_layers(
         async_session,
-        project_id=id,
+        project_id=project_id,
     )
     return layers_project
 
 
 @router.get(
-    "/{id}/layer/{layer_project_id}",
+    "/{project_id}/layer/{layer_project_id}",
     response_model=IFeatureStandardProjectRead
     | IFeatureToolProjectRead
     | ITableProjectRead
@@ -364,7 +364,7 @@ async def get_layers_from_project(
 )
 async def get_layer_from_project(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    project_id: UUID4 = Path(
         ...,
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -382,7 +382,7 @@ async def get_layer_from_project(
 
 
 @router.put(
-    "/{id}/layer/{layer_project_id}",
+    "/{project_id}/layer/{layer_project_id}",
     response_model=IFeatureStandardProjectRead
     | IFeatureToolProjectRead
     | ITableProjectRead
@@ -393,7 +393,7 @@ async def get_layer_from_project(
 )
 async def update_layer_in_project(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    project_id: UUID4 = Path(
         ...,
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -421,7 +421,7 @@ async def update_layer_in_project(
     )
     # Update the last updated at of the project
     # Get project to update it
-    project = await crud_project.get(async_session, id=id)
+    project = await crud_project.get(async_session, id=project_id)
 
     # Update project updated_at
     await crud_project.update(
@@ -435,13 +435,13 @@ async def update_layer_in_project(
 
 
 @router.delete(
-    "/{id}/layer",
+    "/{project_id}/layer",
     response_model=None,
     status_code=204,
 )
 async def delete_layer_from_project(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    project_id: UUID4 = Path(
         ...,
         description="The ID of the project",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -469,7 +469,7 @@ async def delete_layer_from_project(
     )
 
     # Delete layer from project layer order
-    project = await crud_project.get(async_session, id=id)
+    project = await crud_project.get(async_session, id=project_id)
     layer_order = project.layer_order.copy()
     layer_order.remove(layer_project.id)
 
@@ -483,14 +483,14 @@ async def delete_layer_from_project(
 
 
 @router.get(
-    "/{id}/layer/{layer_project_id}/chart-data",
+    "/{project_id}/layer/{layer_project_id}/chart-data",
     response_model=dict,
     response_model_exclude_none=True,
     status_code=200,
 )
 async def get_chart_data(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    project_id: UUID4 = Path(
         ...,
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -512,7 +512,7 @@ async def get_chart_data(
     with HTTPErrorHandler():
         return await read_chart_data(
             async_session=async_session,
-            project_id=id,
+            project_id=project_id,
             layer_project_id=layer_project_id,
             cumsum=cumsum,
         )
@@ -524,7 +524,7 @@ async def get_chart_data(
 
 
 @router.get(
-    "/{id}/scenario",
+    "/{project_id}/scenario",
     summary="Retrieve a list of scenarios",
     response_model=Page[Scenario],
     status_code=200,
@@ -532,7 +532,7 @@ async def get_chart_data(
 async def read_scenarios(
     async_session: AsyncSession = Depends(get_db),
     page_params: PaginationParams = Depends(),
-    id: UUID4 = Path(
+    project_id: UUID4 = Path(
         ...,
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -550,7 +550,7 @@ async def read_scenarios(
     ),
 ):
     """Retrieve a list of scenarios."""
-    query = select(Scenario).where(Scenario.project_id == id)
+    query = select(Scenario).where(Scenario.project_id == project_id)
     scenarios = await crud_scenario.get_multi(
         db=async_session,
         query=query,
@@ -564,7 +564,7 @@ async def read_scenarios(
 
 
 @router.post(
-    "/{id}/scenario",
+    "/{project_id}/scenario",
     summary="Create scenario",
     status_code=201,
     response_model=Scenario,
@@ -573,7 +573,7 @@ async def read_scenarios(
 async def create_scenario(
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
-    id: UUID4 = Path(
+    project_id: UUID4 = Path(
         ...,
         description="The ID of the project to create a scenario",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -589,13 +589,15 @@ async def create_scenario(
     return await crud_scenario.create(
         db=async_session,
         obj_in=Scenario(
-            **scenario_in.dict(exclude_none=True), user_id=user_id, project_id=id
+            **scenario_in.dict(exclude_none=True),
+            user_id=user_id,
+            project_id=project_id,
         ),
     )
 
 
 @router.put(
-    "/{id}/scenario/{scenario_id}",
+    "/{project_id}/scenario/{scenario_id}",
     summary="Update scenario",
     status_code=201,
 )
@@ -618,7 +620,7 @@ async def update_scenario(
 
 
 @router.delete(
-    "/{id}/scenario/{scenario_id}",
+    "/{project_id}/scenario/{scenario_id}",
     summary="Delete scenario",
     status_code=204,
 )
@@ -642,7 +644,7 @@ async def delete_scenario(
 
 
 @router.get(
-    "/{id}/scenario/{scenario_id}/features",
+    "/{project_id}/scenario/{scenario_id}/features",
     summary="Retrieve a list of scenario features",
     response_class=JSONResponse,
     status_code=200,
@@ -664,7 +666,7 @@ async def read_scenario_features(
 
 
 @router.post(
-    "/{id}/scenario/{scenario_id}/features",
+    "/{project_id}/scenario/{scenario_id}/features",
     summary="Create scenario features",
     response_class=JSONResponse,
     status_code=201,
@@ -700,7 +702,7 @@ async def create_scenario_features(
 
 
 @router.put(
-    "/{id}/scenario/{scenario_id}/features",
+    "/{project_id}/scenario/{scenario_id}/features",
     summary="Update scenario features",
     status_code=201,
 )
@@ -718,7 +720,7 @@ async def update_scenario_features(
 
 
 @router.delete(
-    "/{id}/scenario/{scenario_id}/features",
+    "/{project_id}/scenario/{scenario_id}/features",
     summary="Delete scenario features",
     status_code=204,
 )

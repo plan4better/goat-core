@@ -42,7 +42,7 @@ def get_user_id(request: Request):
 
 
 async def get_scenario(
-    id: UUID4 = Path(
+    project_id: UUID4 = Path(
         ...,
         description="The ID of the project",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -57,7 +57,7 @@ async def get_scenario(
     """Get a scenario by its ID and project ID."""
 
     scenario = await crud_scenario.get_by_multi_keys(
-        async_session, keys={"project_id": id, "id": scenario_id}
+        async_session, keys={"project_id": project_id, "id": scenario_id}
     )
     if len(scenario) == 0:
         raise HTTPException(

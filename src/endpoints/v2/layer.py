@@ -43,17 +43,17 @@ from src.db.models.layer import (
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_user_id
 from src.schemas.common import ContentIdList, OrderEnum
-from src.schemas.error import HTTPErrorHandler, http_error_handler
+from src.schemas.error import HTTPErrorHandler
 from src.schemas.job import JobType
 from src.schemas.layer import (
     AreaStatisticsOperation,
     ComputeBreakOperation,
+    ICatalogLayerGet,
     IFileUploadMetadata,
     IInternalLayerCreate,
     IInternalLayerExport,
     ILayerExternalCreate,
     ILayerGet,
-    ICatalogLayerGet,
     ILayerRead,
     IMetadataAggregate,
     IMetadataAggregateRead,
@@ -183,7 +183,7 @@ async def create_layer_internal(
 
 
 @router.post(
-    "/internal/{id}/export",
+    "/internal/{layer_id}/export",
     summary="Export a layer to a file",
     response_class=FileResponse,
     status_code=201,
@@ -192,7 +192,7 @@ async def create_layer_internal(
 async def export_layer(
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
-    id: UUID4 = Path(
+    layer_id: UUID4 = Path(
         ...,
         description="The ID of the layer to export",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -205,7 +205,7 @@ async def export_layer(
 ):
     # Run the export
     crud_export = CRUDLayerExport(
-        id=id,
+        id=layer_id,
         async_session=async_session,
         user_id=user_id,
     )
@@ -240,7 +240,7 @@ async def create_layer_external(
 
 
 @router.get(
-    "/{id}",
+    "/{layer_id}",
     summary="Retrieve a layer by its ID",
     response_model=ILayerRead,
     response_model_exclude_none=True,
@@ -248,7 +248,7 @@ async def create_layer_external(
 )
 async def read_layer(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    layer_id: UUID4 = Path(
         ...,
         description="The ID of the layer to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -326,6 +326,7 @@ async def read_layers(
         )
     return layers
 
+
 @router.post(
     "/catalog",
     response_model=Page[ILayerRead],
@@ -369,14 +370,14 @@ async def read_catalog_layers(
 
 
 @router.put(
-    "/{id}",
+    "/{layer_id}",
     response_model=ILayerRead,
     response_model_exclude_none=True,
     status_code=200,
 )
 async def update_layer(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    layer_id: UUID4 = Path(
         ...,
         description="The ID of the layer to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -388,20 +389,20 @@ async def update_layer(
     with HTTPErrorHandler():
         return await crud_layer.update(
             async_session=async_session,
-            id=id,
+            id=layer_id,
             layer_in=layer_in,
         )
 
 
 @router.delete(
-    "/{id}",
+    "/{layer_id}",
     response_model=None,
     summary="Delete a layer and its data in case of an internal layer.",
     status_code=204,
 )
 async def delete_layer(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    layer_id: UUID4 = Path(
         ...,
         description="The ID of the layer to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -412,20 +413,20 @@ async def delete_layer(
     with HTTPErrorHandler():
         await crud_layer.delete(
             async_session=async_session,
-            id=id,
+            id=layer_id,
         )
     return
 
 
 @router.get(
-    "/{id}/feature-count",
+    "/{layer_id}/feature-count",
     summary="Get feature count",
     response_class=JSONResponse,
     status_code=200,
 )
 async def get_feature_count(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    layer_id: UUID4 = Path(
         ...,
         description="The ID of the layer to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -442,7 +443,7 @@ async def get_feature_count(
         # Get layer
         layer = await crud_layer.get_internal(
             async_session=async_session,
-            id=id,
+            id=layer_id,
         )
         where_query = build_where(
             layer.id, layer.table_name, query, layer.attribute_mapping
@@ -458,14 +459,14 @@ async def get_feature_count(
 
 
 @router.get(
-    "/{id}/area/{operation}",
+    "/{layer_id}/area/{operation}",
     summary="Get area statistics of a layer",
     response_class=JSONResponse,
     status_code=200,
 )
 async def get_area_statistics(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    layer_id: UUID4 = Path(
         ...,
         description="The ID of the layer to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -486,7 +487,7 @@ async def get_area_statistics(
     with HTTPErrorHandler():
         statistics = await crud_layer.get_area_statistics(
             async_session=async_session,
-            id=id,
+            id=layer_id,
             operation=operation,
             query=query,
         )
@@ -496,7 +497,7 @@ async def get_area_statistics(
 
 
 @router.get(
-    "/{id}/unique-values/{column_name}",
+    "/{layer_id}/unique-values/{column_name}",
     summary="Get unique values of a column",
     response_model=Page[IUniqueValue],
     status_code=200,
@@ -504,7 +505,7 @@ async def get_area_statistics(
 async def get_unique_values(
     async_session: AsyncSession = Depends(get_db),
     page_params: PaginationParams = Depends(),
-    id: UUID4 = Path(
+    layer_id: UUID4 = Path(
         ...,
         description="The ID of the layer to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -530,7 +531,7 @@ async def get_unique_values(
     with HTTPErrorHandler():
         values = await crud_layer.get_unique_values(
             async_session=async_session,
-            id=id,
+            id=layer_id,
             column_name=column_name,
             query=query,
             page_params=page_params,
@@ -542,14 +543,14 @@ async def get_unique_values(
 
 
 @router.get(
-    "/{id}/class-breaks/{operation}/{column_name}",
+    "/{layer_id}/class-breaks/{operation}/{column_name}",
     summary="Get statistics of a column",
     response_class=JSONResponse,
     status_code=200,
 )
 async def class_breaks(
     async_session: AsyncSession = Depends(get_db),
-    id: UUID4 = Path(
+    layer_id: UUID4 = Path(
         ...,
         description="The ID of the layer to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -585,7 +586,7 @@ async def class_breaks(
     with HTTPErrorHandler():
         statistics = await crud_layer.get_class_breaks(
             async_session=async_session,
-            id=id,
+            id=layer_id,
             operation=operation,
             column_name=column_name,
             breaks=breaks,
