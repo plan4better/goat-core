@@ -15,7 +15,7 @@ class IScenarioUpdate(BaseModel):
 
 
 class IScenarioFeatureCreate(UserData):
-    layer_id: str
+    project_layer_id: str
     edit_type: ScenarioFeatureEditType
 
 
@@ -29,7 +29,7 @@ request_examples = {
     "create_scenario_features": [
         {
             "geom": "POINT (35.5 47.8)",
-            "layer_id": "4f7924a8-9699-41ef-8998-8d33a98e1604",
+            "id": 127,
             "edit_type": "n",
         }
     ],

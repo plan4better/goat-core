@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 from uuid import UUID
 
 from sqlalchemy.dialects.postgresql import JSONB
@@ -68,6 +68,10 @@ class LayerProjectLink(DateTimeBase, table=True):
     # Relationships
     project: "Project" = Relationship(back_populates="layer_projects")
     layer: "Layer" = Relationship(back_populates="layer_projects")
+
+    scenario_features: List["ScenarioFeature"] = Relationship(
+        back_populates="project_layer"
+    )
 
 
 class ScenarioScenarioFeatureLink(DateTimeBase, table=True):

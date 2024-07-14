@@ -27,7 +27,6 @@ from src.db.models._base_class import ContentBaseAttributes, DateTimeBase
 if TYPE_CHECKING:
     from ._link_model import LayerProjectLink
     from .data_store import DataStore
-    from .scenario_feature import ScenarioFeature
 
 
 class ToolType(str, Enum):
@@ -445,10 +444,6 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     # Relationships
     data_store: "DataStore" = Relationship(back_populates="layers")
     layer_projects: List["LayerProjectLink"] = Relationship(back_populates="layer")
-
-    scenario_features: List["ScenarioFeature"] = Relationship(
-        back_populates="original_layer"
-    )
 
     @validator("extent", pre=True)
     def wkt_to_geojson(cls, v):

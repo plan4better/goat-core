@@ -27,8 +27,7 @@ from sqlmodel import (
 from ._base_class import DateTimeBase
 
 if TYPE_CHECKING:
-    from ._link_model import ScenarioScenarioFeatureLink
-    from .layer import Layer
+    from ._link_model import LayerProjectLink, ScenarioScenarioFeatureLink
 
 
 class ScenarioFeatureEditType(str, Enum):
@@ -123,19 +122,20 @@ class ScenarioFeature(DateTimeBase, UserData, table=True):
         sa_column=Column(Integer, nullable=True),
         description="Feature ID of the modified feature",
     )
-    layer_id: str = Field(
+    project_layer_id: int | None = Field(
         sa_column=Column(
-            UUID_PG(as_uuid=True),
-            ForeignKey("customer.layer.id", ondelete="CASCADE"),
+            Integer,
+            ForeignKey("customer.layer_project.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        description="Layer ID of the modified layer",
+        description="Project layer ID",
     )
+
     edit_type: ScenarioFeatureEditType = Field(
         sa_column=Column(Text, nullable=False), description="Type of the edit"
     )
     # Relationships
-    original_layer: "Layer" = Relationship(back_populates="scenario_features")
+    project_layer: "LayerProjectLink" = Relationship(back_populates="scenario_features")
 
     scenarios_links: List["ScenarioScenarioFeatureLink"] = Relationship(
         back_populates="scenario_feature"
