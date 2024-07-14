@@ -100,6 +100,7 @@ async def read_project(
     return IProjectRead(**project.dict())
 
 
+
 @router.get(
     "",
     summary="Retrieve a list of projects",
