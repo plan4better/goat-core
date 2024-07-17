@@ -1,14 +1,15 @@
+import asyncio
+import inspect
 import logging
 from functools import wraps
-from src.crud.crud_job import job as crud_job
-from src.schemas.job import JobStatusType
-import inspect
-import asyncio
+
 from sqlalchemy import text
-from src.schemas.error import TimeoutError, JobKilledError
+
 from src.core.config import settings
+from src.crud.crud_job import job as crud_job
+from src.schemas.error import ERROR_MAPPING, JobKilledError, TimeoutError, UnknownError
+from src.schemas.job import JobStatusType
 from src.schemas.layer import LayerType, UserDataTable
-from src.schemas.error import ERROR_MAPPING, UnknownError
 
 # Create a logger object for background tasks
 background_logger = logging.getLogger("Background task")
@@ -94,7 +95,10 @@ def job_init():
                 job = await crud_job.update(
                     db=async_session,
                     db_obj=job,
-                    obj_in={"status_simple": JobStatusType.failed.value, "msg_simple": msg_simple},
+                    obj_in={
+                        "status_simple": JobStatusType.failed.value,
+                        "msg_simple": msg_simple,
+                    },
                 )
                 return
 
@@ -109,6 +113,17 @@ def job_init():
                     db_obj=job,
                     obj_in={"status_simple": JobStatusType.finished.value},
                 )
+
+                try:
+                    # Get the delete temp tables function from class
+                    delete_temp_tables_func = getattr(self, "delete_temp_tables", None)
+                    # Run delete temp tables function
+                    await delete_temp_tables_func()
+                except Exception:
+                    # Don't cause the job to fail if the temp tables can't be deleted
+                    background_logger.warn(
+                        f"Job {str(job_id)} failed to cleanup temp tables."
+                    )
 
             background_logger.info(f"Job {job_id} finished.")
             return result
