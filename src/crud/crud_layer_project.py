@@ -171,7 +171,7 @@ class CRUDLayerProject(CRUDLayerBase):
 
         # Check if maximum number of layers in project is reached. In case layer_project is empty just go on.
         if layer_projects != []:
-            if len(layer_projects) + len(layer_ids) >= 300:
+            if len(layer_projects) + len(layer_ids) >= 700:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Maximum number of layers in project reached",
