@@ -15,7 +15,7 @@ from src.schemas.heatmap import (
 from src.schemas.job import JobStatusType
 from src.schemas.layer import FeatureGeometryType, IFeatureLayerToolCreate
 from src.schemas.toolbox_base import DefaultResultLayerName
-from src.crud.crud_job import job as crud_job
+
 
 class CRUDHeatmapGravity(CRUDHeatmapBase):
 
@@ -66,7 +66,6 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         type: ImpedanceFunctionType,
         max_traveltime: int,
         max_sensitivity: float,
-        static_travel_time_component: float = None
     ):
         """Builds impedance function used to compute heatmap gravity."""
 
@@ -80,20 +79,6 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
             return f"SUM((EXP(1) ^ (((sensitivity / {max_sensitivity}) * -1) * (traveltime / {max_traveltime}))) * potential)"
         elif type == ImpedanceFunctionType.power:
             return f"SUM(((traveltime / {max_traveltime}) ^ ((sensitivity / {max_sensitivity}) * -1)) * potential)"
-        elif type == ImpedanceFunctionType.cumulative_gaussian:
-            # Ensure static_travel_time_component is not None for this formula
-            if static_travel_time_component is None:
-                raise ValueError("static_travel_time_component is required for cumulative_gaussian impedance function")
-            
-            threshold = 1e-10  # Add a small threshold to avoid underflow
-            return f"""
-            SUM(
-                CASE
-                    WHEN traveltime * 60 <= {static_travel_time_component} * 60 THEN potential
-                    ELSE (EXP(1) ^ (-LEAST((traveltime * 60 - {static_travel_time_component} * 60) ^ 2, {threshold}) / (sensitivity / {max_sensitivity}))) * potential
-                END
-            )
-            """
         else:
             raise ValueError(f"Unknown impedance function type: {type}")
 
@@ -105,7 +90,6 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         max_sensitivity: float,
         result_table: str,
         result_layer_id: str,
-        static_travel_time_component: float = None
     ):
         """Builds SQL query to compute heatmap gravity."""
 
@@ -113,7 +97,6 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
             type=params.impedance_function,
             max_traveltime=max_traveltime,
             max_sensitivity=max_sensitivity,
-            static_travel_time_component=static_travel_time_component,
         )
 
         query = f"""
@@ -167,50 +150,24 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
 
         # Get max traveltime & sensitivity for normalization
         max_traveltime = max([layer["layer"].max_traveltime for layer in layers])
-        max_sensitivity = max([layer["layer"].sensitivity for layer in layers])
-        static_travel_time_components = [layer["layer"].static_travel_time_component for layer in layers if hasattr(layer["layer"], 'static_travel_time_component')]
-        static_travel_time_component = max(static_travel_time_components) if static_travel_time_components else None
-        
-        # Compute heatmap & write to result table
-        await self.async_session.execute(self.build_query(
-            params=params,
-            opportunity_table=opportunity_table,
-            max_traveltime=max_traveltime,
-            max_sensitivity=max_sensitivity,
-            result_table=result_table,
-            result_layer_id=str(layer_heatmap.id),
-            static_travel_time_component=static_travel_time_component
 
-        ))
+        # Compute heatmap & write to result table
+        await self.async_session.execute(
+            self.build_query(
+                params=params,
+                opportunity_table=opportunity_table,
+                max_traveltime=max_traveltime,
+                max_sensitivity=settings.HEATMAP_GRAVITY_MAX_SENSITIVITY,
+                result_table=result_table,
+                result_layer_id=str(layer_heatmap.id),
+            )
+        )
 
         # Register feature layer
-        layer = await self.create_feature_layer_tool(
+        await self.create_feature_layer_tool(
             layer_in=layer_heatmap,
             params=params,
         )
-
-        # Update job status with additional information
-        job = await crud_job.get(self.async_session, self.job_id)
-
-        # Extract layer IDs
-        new_layer_id = str(layer['layer'].id)
-
-        # Update job with layer_id
-        if job.layer_ids is None:
-            job.layer_ids = []
-
-        # Check and append new_layer_id if not present
-        if new_layer_id not in job.layer_ids:
-            job.layer_ids.append(new_layer_id)
-
-        # Ensure all IDs in job.layer_ids are strings
-        if job.layer_ids:
-            if isinstance(job.layer_ids, list):
-                job.layer_ids = [str(layer_id) for layer_id in job.layer_ids]
-            else:
-                job.layer_ids = [str(job.layer_ids)]
-
-        await self.async_session.commit()
 
         return {
             "status": JobStatusType.finished.value,

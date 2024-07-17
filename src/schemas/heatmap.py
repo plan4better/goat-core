@@ -53,7 +53,6 @@ class ImpedanceFunctionType(str, Enum):
     linear = "linear"
     exponential = "exponential"
     power = "power"
-    cumulative_gaussian = "cumulative_gaussian"
 
 
 class MaxTravelTimeTransportMode(int, Enum):
@@ -103,11 +102,6 @@ class OpportunityGravityBased(OpportunityBase):
         None,
         title="Destination Potential Column",
         description="The column name of the destination potential.",
-    )
-    static_travel_time_component: int | None = Field(
-        None,
-        title="Static travel time component of the cumulative gaussian function impedance function.",
-        description="Static travel time component of the cumulative gaussian function impedance function.",
     )
 
     # Ensure sensitivity doesn't exceed the configured limit

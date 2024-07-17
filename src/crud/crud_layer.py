@@ -179,7 +179,7 @@ class CRUDLayer(CRUDLayerBase):
         )
 
         # Save file
-        timeout = 360
+        timeout = 120
         try:
             file_path = await asyncio.wait_for(
                 file_upload.save_file(file=file),

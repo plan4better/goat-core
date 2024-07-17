@@ -10,8 +10,6 @@ from src.crud.crud_job import job as crud_job
 from src.schemas.error import ERROR_MAPPING, JobKilledError, TimeoutError, UnknownError
 from src.schemas.job import JobStatusType
 from src.schemas.layer import LayerType, UserDataTable
-from src.schemas.error import ERROR_MAPPING, UnknownError
-import traceback
 
 # Create a logger object for background tasks
 background_logger = logging.getLogger("Background task")
@@ -103,12 +101,6 @@ def job_init():
                     },
                 )
                 return
-            
-            if job.layer_ids:
-                if isinstance(job.layer_ids, list):
-                    job.layer_ids = [str(layer_id) for layer_id in job.layer_ids]
-                else:
-                    job.layer_ids = [str(job.layer_ids)]
 
             # Update job status to finished in case it is not killed, timeout or failed
             if result["status"] not in [
@@ -141,7 +133,7 @@ def job_init():
     return decorator
 
 
-def job_log(job_step_name: str, timeout: int = 480):
+def job_log(job_step_name: str, timeout: int = 120):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -209,12 +201,7 @@ def job_log(job_step_name: str, timeout: int = 480):
                     error=e,
                     job_step_name=job_step_name,
                 )
-                error_info = {
-                    "error_type": type(e).__name__,
-                    "error_message": str(e) if str(e) else "No message",
-                    "traceback": traceback.format_exc(),
-                }
-                background_logger.error(f"Job failed with error: {error_info}")
+                background_logger.error(f"Job failed with error: {e}")
                 raise e
 
             # Check if job was killed. The job needs to be expired as it was fetching old data from cache.
