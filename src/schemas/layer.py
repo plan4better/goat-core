@@ -131,6 +131,8 @@ class UserDataTable(str, Enum):
     line = "line"
     polygon = "polygon"
     no_geometry = "no_geometry"
+    street_network_line = "street_network_line"
+    street_network_point = "street_network_point"
 
 
 class LayerReadBaseAttributes(BaseModel):
@@ -256,10 +258,20 @@ class IFeatureToolRead(
 
     charts: dict | None = Field(None, description="Chart configuration")
 
-
 @optional
 class IFeatureToolUpdate(FeatureUpdateBase):
     """Model to update a feature layer tool."""
+
+    pass
+
+
+class IFeatureStreetNetworkRead(IFeatureStandardRead):
+    """Model to read a street network feature layer."""
+
+    pass
+
+class IFeatureStreetNetworkUpdate(IFeatureStandardUpdate):
+    """Model to update a street network feature layer."""
 
     pass
 
@@ -472,7 +484,7 @@ def get_layer_class(class_type: str, layer_creator_class: dict, **kwargs):
 layer_creator_class = {
     "internal": {
         "table": ITableRead,
-        "feature": {"standard": IFeatureStandardRead, "tool": IFeatureToolRead},
+        "feature": {"standard": IFeatureStandardRead, "tool": IFeatureToolRead, "street_network": IFeatureStreetNetworkRead},
     },
     "external": {
         "external_imagery": IExternalImageryRead,
@@ -484,7 +496,7 @@ layer_creator_class = {
 layer_update_class = {
     "internal": {
         "table": ITableUpdate,
-        "feature": {"standard": IFeatureStandardUpdate, "tool": IFeatureToolUpdate},
+        "feature": {"standard": IFeatureStandardUpdate, "tool": IFeatureToolUpdate, "street_network": IFeatureStreetNetworkUpdate},
     },
     "external": {
         "external_imagery": IExternalImageryUpdate,

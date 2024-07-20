@@ -143,11 +143,18 @@ class IFeatureToolProjectRead(
 ):
     pass
 
+class IFeatureStreetNetworkProjectRead(
+    LayerProjectIds, IFeatureStandardRead, IFeatureBaseProjectRead
+):
+    pass
 
 @optional
 class IFeatureStandardProjectUpdate(IFeatureBaseProject):
     pass
 
+@optional
+class IFeatureStreetNetworkProjectUpdate(IFeatureBaseProject):
+    pass
 
 @optional
 class IFeatureToolProjectUpdate(IFeatureBaseProject):
@@ -228,6 +235,7 @@ class IExternalImageryProjectUpdate(BaseModel):
 layer_type_mapping_read = {
     "feature_standard": IFeatureStandardProjectRead,
     "feature_tool": IFeatureToolProjectRead,
+    "feature_street_network": IFeatureStreetNetworkProjectRead,
     "table": ITableProjectRead,
     "external_vector_tile": IExternalVectorTileProjectRead,
     "external_imagery": IExternalImageryProjectRead,
@@ -236,6 +244,7 @@ layer_type_mapping_read = {
 layer_type_mapping_update = {
     "feature_standard": IFeatureStandardProjectUpdate,
     "feature_tool": IFeatureToolProjectUpdate,
+    "feature_street_network": IFeatureStreetNetworkProjectUpdate,
     "table": ITableProjectUpdate,
     "external_vector_tile": IExternalVectorTileProjectUpdate,
     "external_imagery": IExternalImageryProjectUpdate,
