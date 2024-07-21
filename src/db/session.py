@@ -43,6 +43,12 @@ async def setup(conn):
         "geometry", encoder=str, decoder=str, schema="public", format="text"
     )
 
+
+    # Register h3 index type
+    await conn.set_type_codec(
+        "h3index", encoder=str, decoder=str, schema="public", format="text"
+    )
+
     # Register integer array type
     await set_type_codec(
         conn,

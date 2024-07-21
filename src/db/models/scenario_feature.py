@@ -119,10 +119,10 @@ class ScenarioFeature(DateTimeBase, UserData, table=True):
         )
     )
     feature_id: int | None = Field(
-        sa_column=Column(Integer, nullable=True),
+        sa_column=Column(BigInteger, nullable=True),
         description="Feature ID of the modified feature",
     )
-    project_layer_id: int | None = Field(
+    layer_project_id: int | None = Field(
         sa_column=Column(
             Integer,
             ForeignKey("customer.layer_project.id", ondelete="CASCADE"),
@@ -135,10 +135,11 @@ class ScenarioFeature(DateTimeBase, UserData, table=True):
         sa_column=Column(Text, nullable=False), description="Type of the edit"
     )
     # Relationships
-    project_layer: "LayerProjectLink" = Relationship(back_populates="scenario_features")
+    layer_project: "LayerProjectLink" = Relationship(back_populates="scenario_features")
 
     scenarios_links: List["ScenarioScenarioFeatureLink"] = Relationship(
-        back_populates="scenario_feature"
+        back_populates="scenario_feature",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
 
 

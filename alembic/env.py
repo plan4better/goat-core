@@ -1,8 +1,8 @@
 from __future__ import with_statement
 
 import asyncio
-import os
 from logging.config import fileConfig
+
 from sqlalchemy import engine_from_config, pool
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel import SQLModel
@@ -27,19 +27,23 @@ target_metadata = SQLModel.metadata
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
+
 def include_object(object, name, type_, reflected, compare_to):
-    
     if type_ == "table" and object.schema != "customer":
         return False
     print(type_)
-    if (
-        type_ in ["table"]
-        and reflected
-        and compare_to is None
-    ):
+    if type_ in ["table"] and reflected and compare_to is None:
         return False
     else:
         return True
+
+
+def include_name(name, type_, parent_names):
+    if type_ == "schema":
+        return name in ["customer"]
+    else:
+        return True
+
 
 def run_migrations_offline():
     """Run migrations in 'offline' mode.
@@ -73,6 +77,7 @@ def do_run_migrations(connection):
         compare_type=True,
         include_object=include_object,
         include_schemas=True,
+        include_name=include_name,
     )
 
     with context.begin_transaction():

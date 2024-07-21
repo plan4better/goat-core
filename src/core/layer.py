@@ -2,53 +2,53 @@
 import asyncio
 import csv
 import os
+import re
 import time
 import zipfile
+from typing import Union
 from uuid import UUID
-from typing import Dict, List, Union
 
 # Third party imports
 import aiofiles
 import aiofiles.os as aos
 import pandas as pd
-import re
 from fastapi import UploadFile
 from openpyxl import load_workbook
 from osgeo import ogr, osr
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql import text, select
+from pydantic import BaseModel
 from pyproj import CRS
 from shapely import wkb
-from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import select, text
 from sqlmodel import SQLModel
 
 # Local application imports
 from src.core.config import settings
 from src.core.job import job_log
 from src.crud.base import CRUDBase
+from src.db.models._link_model import LayerProjectLink
+from src.db.models.layer import (
+    FeatureLayerExportType,
+    FeatureType,
+    FileUploadType,
+    Layer,
+    LayerType,
+    TableLayerExportType,
+)
+from src.schemas.error import DataOutCRSBoundsError, Ogr2OgrError
 from src.schemas.job import JobStatusType, Msg, MsgType
 from src.schemas.layer import (
     NumberColumnsPerType,
-    OgrPostgresType,
     OgrDriverType,
+    OgrPostgresType,
     SupportedOgrGeomType,
 )
-from src.db.models.layer import (
-    FileUploadType,
-    TableLayerExportType,
-    FeatureLayerExportType,
-    Layer,
-    LayerType,
-    FeatureType,
-)
-from src.db.models._link_model import LayerProjectLink
 from src.utils import (
     async_delete_dir,
-    async_scandir,
     async_run_command,
+    async_scandir,
     sanitize_error_message,
 )
-from src.schemas.error import DataOutCRSBoundsError, Ogr2OgrError
 
 
 async def delete_old_files(max_time: int):
@@ -58,6 +58,7 @@ async def delete_old_files(max_time: int):
         stat_result = await aos.stat(os.path.join(settings.DATA_DIR, folder.name))
         if stat_result.st_mtime < (time.time() - 2 * 3600):
             await async_delete_dir(os.path.join(settings.DATA_DIR, folder.name))
+
 
 def get_user_table(layer: Union[dict, SQLModel, BaseModel]):
     """Get the table with the user data based on the layer metadata."""
@@ -71,7 +72,11 @@ def get_user_table(layer: Union[dict, SQLModel, BaseModel]):
             if layer["feature_layer_type"] in (FeatureType.standard, FeatureType.tool):
                 table_prefix = layer["feature_layer_geometry_type"]
             elif layer["feature_layer_type"] == FeatureType.street_network:
-                table_prefix = FeatureType.street_network.value + "_" + layer["feature_layer_geometry_type"]
+                table_prefix = (
+                    FeatureType.street_network.value
+                    + "_"
+                    + layer["feature_layer_geometry_type"]
+                )
         elif layer["type"] == LayerType.table.value:
             table_prefix = "no_geometry"
         else:
@@ -79,9 +84,14 @@ def get_user_table(layer: Union[dict, SQLModel, BaseModel]):
     user_id = layer["user_id"]
     return f"{settings.USER_DATA_SCHEMA}.{table_prefix}_{str(user_id).replace('-', '')}"
 
+
 class CRUDLayerBase(CRUDBase):
     async def check_and_alter_layer_name(
-        self, async_session: AsyncSession, folder_id: UUID, layer_name: str, project_id: UUID = None 
+        self,
+        async_session: AsyncSession,
+        folder_id: UUID,
+        layer_name: str,
+        project_id: UUID = None,
     ) -> str:
         """Check if layer name already exists in project and alter it like layer (n+1) if necessary"""
 
@@ -90,20 +100,24 @@ class CRUDLayerBase(CRUDBase):
 
         # Get all layer names in project
         if project_id:
-            names_in_project = await async_session.execute(select(LayerProjectLink.name).where(
-                LayerProjectLink.project_id == project_id,
-                LayerProjectLink.name.like(f"{layer_name}%"),
-            ))
+            names_in_project = await async_session.execute(
+                select(LayerProjectLink.name).where(
+                    LayerProjectLink.project_id == project_id,
+                    LayerProjectLink.name.like(f"{layer_name}%"),
+                )
+            )
             names_in_project = [row[0] for row in names_in_project.fetchall()]
             layer_names = names_in_project
         else:
             layer_names = []
 
         # Get all layer names in folder
-        names_in_folder = await async_session.execute(select(Layer.name).where(
-            Layer.folder_id == folder_id,
-            Layer.name.like(f"{layer_name}%"),
-        ))
+        names_in_folder = await async_session.execute(
+            select(Layer.name).where(
+                Layer.folder_id == folder_id,
+                Layer.name.like(f"{layer_name}%"),
+            )
+        )
         names_in_folder = [row[0] for row in names_in_folder.fetchall()]
         layer_names = list(set(layer_names + names_in_folder))
 
@@ -300,7 +314,9 @@ class OGRFileHandling:
                 ).GetName()
             field_types["geometry"]["type"] = geometry_type
             field_types["geometry"]["extent"] = self.get_layer_extent(layer)
-            field_types["geometry"]["srs"] = "EPSG:" + layer.GetSpatialRef().GetAuthorityCode(None)
+            field_types["geometry"][
+                "srs"
+            ] = "EPSG:" + layer.GetSpatialRef().GetAuthorityCode(None)
 
         for i in range(layer_def.GetFieldCount()):
             field_def = layer_def.GetFieldDefn(i)
@@ -553,9 +569,9 @@ class OGRFileHandling:
 
         # Prepare the ogr2ogr command
         if self.file_ending == FileUploadType.gpkg.value:
-            layer_name = file_name
+            pass
         else:
-            layer_name = ""
+            pass
 
         # Create folder if not exists
         await async_delete_dir(
@@ -685,6 +701,7 @@ class OGRFileHandling:
             text(f"DELETE FROM {target_table} WHERE layer_id = '{str(layer_id)}'")
         )
         await self.async_session.commit()
+
 
 async def delete_layer_data(async_session: AsyncSession, layer: Layer):
     """Delete layer data which is in the user data tables."""

@@ -12,13 +12,14 @@ from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.crud.crud_project import project as crud_project
 from src.crud.crud_scenario import scenario as crud_scenario
 from src.crud.crud_user_project import user_project as crud_user_project
-from src.db.models._link_model import ScenarioScenarioFeatureLink
+from src.db.models._link_model import LayerProjectLink, ScenarioScenarioFeatureLink
 from src.db.models.project import Project
 from src.db.models.scenario import Scenario
 from src.db.models.scenario_feature import ScenarioFeature
 from src.db.session import AsyncSession
 from src.endpoints.deps import get_db, get_scenario, get_user_id
 from src.schemas.common import ContentIdList, OrderEnum
+from src.schemas.error import HTTPErrorHandler
 from src.schemas.project import (
     IExternalImageryProjectRead,
     IExternalVectorTileProjectRead,
@@ -36,12 +37,12 @@ from src.schemas.project import (
 from src.schemas.scenario import (
     IScenarioCreate,
     IScenarioFeatureCreate,
+    IScenarioFeatureUpdate,
     IScenarioUpdate,
 )
 from src.schemas.scenario import (
     request_examples as scenario_request_examples,
 )
-from src.schemas.error import HTTPErrorHandler
 from src.utils import delete_orphans, to_feature_collection
 
 router = APIRouter()
@@ -702,37 +703,82 @@ async def create_scenario_features(
 
 
 @router.put(
-    "/{project_id}/scenario/{scenario_id}/features",
+    "/{project_id}/layer/{layer_project_id}/scenario/{scenario_id}/features",
     summary="Update scenario features",
     status_code=201,
 )
-async def update_scenario_features(
+async def update_scenario_feature(
     async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+    layer_project_id: int = Path(
+        ...,
+        description="Layer Project ID",
+        example="1",
+    ),
     scenario: Scenario = Depends(get_scenario),
-    features: List[IScenarioFeatureCreate] = Body(
+    features: List[IScenarioFeatureUpdate] = Body(
         ...,
         description="Scenario features to update",
     ),
 ):
     """Update scenario features."""
 
+    layer_project = await crud_layer_project.get(
+        async_session, id=layer_project_id, extra_fields=[LayerProjectLink.layer]
+    )
+    if layer_project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Layer project relation not found",
+        )
+
+    for feature in features:
+        await crud_scenario.update_feature(
+            async_session=async_session,
+            user_id=user_id,
+            layer_project=layer_project,
+            scenario=scenario,
+            feature=feature,
+        )
+
     return None
 
 
 @router.delete(
-    "/{project_id}/scenario/{scenario_id}/features",
-    summary="Delete scenario features",
+    "/{project_id}/layer/{layer_project_id}/scenario/{scenario_id}/features/{feature_id}",
+    summary="Delete scenario feature",
     status_code=204,
 )
 async def delete_scenario_features(
     async_session: AsyncSession = Depends(get_db),
-    scenario: Scenario = Depends(get_scenario),
-    feature_ids: List[UUID4] = Query(
+    user_id: UUID4 = Depends(get_user_id),
+    layer_project_id: int = Path(
         ...,
-        description="List of feature IDs to delete",
-        example=["3fa85f64-5717-4562-b3fc-2c963f66afa6"],
+        description="Layer Project ID",
+        example="1",
+    ),
+    scenario: Scenario = Depends(get_scenario),
+    feature_id: UUID4 | int = Path(
+        ...,
+        description="Feature ID to delete",
     ),
 ):
-    """Delete scenario features."""
+
+    layer_project = await crud_layer_project.get(
+        async_session, id=layer_project_id, extra_fields=[LayerProjectLink.layer]
+    )
+    if layer_project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Layer project relation not found",
+        )
+
+    await crud_scenario.delete_feature(
+        async_session=async_session,
+        user_id=user_id,
+        layer_project=layer_project,
+        scenario=scenario,
+        feature_id=feature_id,
+    )
 
     return None

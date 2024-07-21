@@ -70,7 +70,8 @@ class LayerProjectLink(DateTimeBase, table=True):
     layer: "Layer" = Relationship(back_populates="layer_projects")
 
     scenario_features: List["ScenarioFeature"] = Relationship(
-        back_populates="project_layer"
+        back_populates="layer_project",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
 
 
