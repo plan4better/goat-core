@@ -7,6 +7,7 @@ import time
 import zipfile
 from typing import Union
 from uuid import UUID
+from enum import Enum
 
 # Third party imports
 import aiofiles
@@ -60,12 +61,22 @@ async def delete_old_files(max_time: int):
             await async_delete_dir(os.path.join(settings.DATA_DIR, folder.name))
 
 
+def model_to_dict(model):
+    if isinstance(model, (SQLModel, BaseModel)):
+        model_dict = model.dict()
+        for key, value in model_dict.items():
+            if isinstance(value, Enum):
+                model_dict[key] = value.value
+        return model_dict
+    else:
+        return model  # Return the model as is if it's not an instance of SQLModel or BaseModel
+
 def get_user_table(layer: Union[dict, SQLModel, BaseModel]):
     """Get the table with the user data based on the layer metadata."""
 
     # Check if layer is of type dict or SQLModel/BaseModel
     if isinstance(layer, (SQLModel, BaseModel)):
-        layer = layer.dict()
+        layer = model_to_dict(layer)
 
     if isinstance(layer, dict):
         if layer["type"] == LayerType.feature.value:

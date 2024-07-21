@@ -4,13 +4,15 @@ import random
 import string
 from typing import List
 from uuid import uuid4
+from uuid import UUID
 
 from httpx import AsyncClient
-
+from sqlalchemy.sql import text
 from src.core.config import settings
 from src.schemas.job import JobStatusType
 from src.schemas.toolbox_base import ColumnStatisticsOperation
-
+from src.core.layer import get_user_table
+from src.db.session import session_manager
 
 async def check_job_status(
     client: AsyncClient, job_id: str, target_status: str = JobStatusType.finished.value
@@ -185,7 +187,14 @@ def generate_random_string(length):
 
 
 async def test_aggregate(
-    client: AsyncClient, fixture, area_type, aggregate_type, statistics_field, group_by_field=None, filters=None, other_properties={}
+    client: AsyncClient,
+    fixture,
+    area_type,
+    aggregate_type,
+    statistics_field,
+    group_by_field=None,
+    filters=None,
+    other_properties={},
 ):
     aggregation_layer_project_id = fixture.get("aggregation_layer_project_id")
     source_layer_project_id = fixture.get("source_layer_project_id")
@@ -212,7 +221,7 @@ async def test_aggregate(
                 "operation": operation.value,
                 "field": statistics_field,
             },
-            **other_properties
+            **other_properties,
         }
         if aggregation_layer_project_id:
             params["aggregation_layer_project_id"] = aggregation_layer_project_id
@@ -220,7 +229,6 @@ async def test_aggregate(
             params["source_group_by_field"] = group_by_field
         if area_type == "h3_grid":
             params["h3_resolution"] = 10
-
 
         response = await client.post(
             f"{settings.API_V2_STR}/tool/aggregate-{aggregate_type}?project_id={project_id}",
@@ -230,3 +238,19 @@ async def test_aggregate(
         job = await check_job_status(client, response.json()["job_id"])
         assert job["status_simple"] == "finished"
 
+
+async def check_user_data_deleted(
+    layer: dict,
+):
+    # Get table name
+    table_name = get_user_table(layer)
+
+    # Check if there is data for the layer_id
+    async with session_manager.session() as session:
+        result = await session.execute(
+            text(
+                f"""SELECT COUNT(*) FROM {table_name} WHERE layer_id = :layer_id LIMIT 1""",
+            ),
+            {"layer_id": layer["id"]},
+        )
+        assert result.scalar() == 0

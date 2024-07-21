@@ -289,7 +289,7 @@ class CRUDFailedJob:
         # Get user_id
         user_id = self.user_id
 
-        for table in UserDataTable:
+        for table in (UserDataTable.polygon, UserDataTable.line, UserDataTable.point, UserDataTable.no_geometry):
             table_name = f"{table.value}_{str(user_id).replace('-', '')}"
 
             # Build condition for layer filtering

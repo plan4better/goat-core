@@ -12,7 +12,7 @@ BEGIN
         EXECUTE format(
             'DROP TABLE IF EXISTS %s;
             CREATE TABLE %s (
-                id int,
+                id UUID,
                 h3_index h3index,
                 h3_3 int
             );',

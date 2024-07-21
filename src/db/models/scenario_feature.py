@@ -118,8 +118,8 @@ class ScenarioFeature(DateTimeBase, UserData, table=True):
             server_default=text("uuid_generate_v4()"),
         )
     )
-    feature_id: int | None = Field(
-        sa_column=Column(BigInteger, nullable=True),
+    feature_id: UUID | None = Field(
+        sa_column=Column(UUID_PG(as_uuid=True), nullable=True),
         description="Feature ID of the modified feature",
     )
     layer_project_id: int | None = Field(

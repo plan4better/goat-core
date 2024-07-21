@@ -14,8 +14,8 @@ from .base import CRUDBase
 class CRUDUser(CRUDBase):
     async def create_user_data_tables(self, async_session: AsyncSession, user_id: UUID):
         """Create the user data tables."""
-
-        for table_type in UserDataTable:
+        # Don't create the network table for all users yet
+        for table_type in (UserDataTable.point, UserDataTable.line, UserDataTable.polygon, UserDataTable.no_geometry):
             table_name = f"{table_type.value}_{str(user_id).replace('-', '')}"
 
             # Check if table exists
@@ -48,15 +48,11 @@ class CRUDUser(CRUDBase):
                             ,h3_3 integer NULL
                             ,h3_group h3index NULL
                         """
-                if table_type.value in (UserDataTable.street_network_point.value, UserDataTable.street_network_line.value):
-                    serial_type = "BIGSERIAL"
-                else:
-                    serial_type = "SERIAL"
- 
+
                 # SQL for
                 sql_create_table = f"""
                 CREATE TABLE {settings.USER_DATA_SCHEMA}."{table_name}" (
-                    id {serial_type},
+                    id UUID DEFAULT basic.uuid_generate_v7() NOT NULL,
                     layer_id UUID NOT NULL,
                     {geom_column}
                     {', '.join([f'integer_attr{i+1} INTEGER' for i in range(NumberColumnsPerType.integer.value)])},

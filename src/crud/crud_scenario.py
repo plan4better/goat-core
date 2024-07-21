@@ -23,7 +23,7 @@ class CRUDScenario(CRUDBase[Scenario, IScenarioCreate, IScenarioUpdate]):
         self,
         async_session: AsyncSession,
         layer_project: LayerProjectLink,
-        feature_id: int,
+        feature_id: UUID,
     ):
         """Get all features from the origin table."""
 

@@ -24,6 +24,7 @@ class CRUDJob(CRUDBase):
         user_id: UUID,
         job_type: JobType,
         project_id: UUID = None,
+        read: bool = None,
     ):
         """Create a job."""
 
@@ -59,6 +60,8 @@ class CRUDJob(CRUDBase):
         )
         if project_id:
             job.project_id = project_id
+        if read:
+            job.read = read
 
         # Create job
         job = await self.create(db=async_session, obj_in=job)

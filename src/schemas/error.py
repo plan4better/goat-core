@@ -72,6 +72,11 @@ class LayerNotFoundError(LayerError):
 
     pass
 
+class FolderNotFoundError(Exception):
+    """Raised when the layer is not found."""
+
+    pass
+
 
 class SQLError(Exception):
     """Base class for exceptions related to SQL."""

@@ -9,9 +9,10 @@ from sqlmodel import (
     text,
     UniqueConstraint
 )
-
+from typing import List
 from src.db.models._base_class import DateTimeBase
 from src.db.models.user import User
+from src.db.models.layer import Layer
 
 class Folder(DateTimeBase, table=True):
     __tablename__ = "folder"
@@ -37,6 +38,7 @@ class Folder(DateTimeBase, table=True):
 
     # Relationships
     user: "User" = Relationship(back_populates="folders")
+    layers: List["Layer"] = Relationship(back_populates="folder", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 # Constraints
 UniqueConstraint(Folder.__table__.c.user_id, Folder.__table__.c.name)
