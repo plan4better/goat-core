@@ -1,18 +1,21 @@
+from uuid import UUID
+
 from pydantic import BaseModel
+
 from src.core.config import settings
-from src.core.tool import CRUDToolBase
-from src.schemas.job import JobStatusType
-from src.schemas.toolbox_base import DefaultResultLayerName
 from src.core.job import job_init, job_log, run_background_or_immediately
-from src.schemas.layer import IFeatureLayerToolCreate, FeatureGeometryType
+from src.core.tool import CRUDToolBase
 from src.schemas.heatmap import (
-    IHeatmapConnectivityActive,
+    TRAVELTIME_MATRIX_RESOLUTION,
+    TRAVELTIME_MATRIX_TABLE,
     ActiveRoutingHeatmapType,
+    IHeatmapConnectivityActive,
     IHeatmapConnectivityMotorized,
     MotorizedRoutingHeatmapType,
-    TRAVELTIME_MATRIX_TABLE,
-    TRAVELTIME_MATRIX_RESOLUTION,
 )
+from src.schemas.job import JobStatusType
+from src.schemas.layer import FeatureGeometryType, IFeatureLayerToolCreate
+from src.schemas.toolbox_base import DefaultResultLayerName
 
 
 class CRUDHeatmapConnectivity(CRUDToolBase):
@@ -23,6 +26,7 @@ class CRUDHeatmapConnectivity(CRUDToolBase):
         self,
         routing_type: ActiveRoutingHeatmapType | MotorizedRoutingHeatmapType,
         layer_project: BaseModel,
+        scenario_id: UUID,
     ):
         """Create distributed table for user-specified opportunities."""
 
@@ -30,12 +34,13 @@ class CRUDHeatmapConnectivity(CRUDToolBase):
         temp_points = await self.create_temp_table_name("points")
 
         # Create distributed point table using sql
-        where_query_point = "WHERE " + layer_project.where_query.replace("'", "''")
-
+        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
         await self.async_session.execute(
             f"""SELECT basic.create_heatmap_connectivity_opportunity_table(
+                {layer_project.id},
                 '{layer_project.table_name}',
-                '{where_query_point}',
+                {scenario_id},
+                '{layer_project.where_query.replace("'", "''")}',
                 '{temp_points}',
                 {TRAVELTIME_MATRIX_RESOLUTION[routing_type]},
                 {False}
@@ -80,6 +85,7 @@ class CRUDHeatmapConnectivity(CRUDToolBase):
         reference_area_table = await self.create_distributed_opportunity_table(
             params.routing_type,
             reference_area_layer["reference_area_layer_project_id"],
+            params.scenario_id,
         )
 
         # Initialize result table
@@ -87,25 +93,29 @@ class CRUDHeatmapConnectivity(CRUDToolBase):
 
         # Create feature layer to store computed heatmap output
         layer_heatmap = IFeatureLayerToolCreate(
-            name=DefaultResultLayerName.heatmap_connectivity_active_mobility.value
+            name=(
+                DefaultResultLayerName.heatmap_connectivity_active_mobility.value
                 if type(params.routing_type) == ActiveRoutingHeatmapType
-                else DefaultResultLayerName.heatmap_connectivity_motorized_mobility.value,
+                else DefaultResultLayerName.heatmap_connectivity_motorized_mobility.value
+            ),
             feature_layer_geometry_type=FeatureGeometryType.polygon,
             attribute_mapping={
                 "text_attr1": "h3_index",
-                "float_attr1": "accessibility"
+                "float_attr1": "accessibility",
             },
             tool_type=params.tool_type.value,
             job_id=self.job_id,
         )
 
         # Compute heatmap & write to output table
-        await self.async_session.execute(self.build_query(
-            params=params,
-            reference_area_table=reference_area_table,
-            result_table=result_table,
-            result_layer_id=str(layer_heatmap.id),
-        ))
+        await self.async_session.execute(
+            self.build_query(
+                params=params,
+                reference_area_table=reference_area_table,
+                result_table=result_table,
+                result_layer_id=str(layer_heatmap.id),
+            )
+        )
 
         # Register feature layer
         await self.create_feature_layer_tool(

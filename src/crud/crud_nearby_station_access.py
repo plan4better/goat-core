@@ -1,21 +1,21 @@
 import json
 from datetime import timedelta
 
-from src.core.tool import CRUDToolBase
-from src.schemas.nearby_station_access import INearbyStationAccess
-from src.schemas.toolbox_base import DefaultResultLayerName
-from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
 from src.core.config import settings
-from src.schemas.error import SQLError
-from src.schemas.job import JobStatusType
-from src.core.job import job_log, job_init, run_background_or_immediately
+from src.core.job import job_init, job_log, run_background_or_immediately
+from src.core.tool import CRUDToolBase
+from src.crud.crud_catchment_area import CRUDCatchmentAreaActiveMobility
+from src.endpoints.deps import get_http_client
 from src.schemas.catchment_area import (
     CatchmentAreaNearbyStationAccess,
-    CatchmentAreaTypeActiveMobility,
     CatchmentAreaTravelTimeCostActiveMobility,
+    CatchmentAreaTypeActiveMobility,
 )
-from src.endpoints.deps import get_http_client
-from src.crud.crud_catchment_area import CRUDCatchmentAreaActiveMobility
+from src.schemas.error import SQLError
+from src.schemas.job import JobStatusType
+from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
+from src.schemas.nearby_station_access import INearbyStationAccess
+from src.schemas.toolbox_base import DefaultResultLayerName
 from src.schemas.trip_count_station import public_transport_types
 
 
@@ -77,6 +77,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             ),
             catchment_area_type=CatchmentAreaTypeActiveMobility.polygon,
             polygon_difference=True,
+            scenario_id=params.scenario_id,
         )
 
         # Compute catchment area
@@ -86,7 +87,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             async_session=self.async_session,
             user_id=self.user_id,
             project_id=self.project_id,
-            http_client=get_http_client()
+            http_client=get_http_client(),
         ).catchment_area(
             params=catchment_area_request,
             result_params={
@@ -154,7 +155,9 @@ class CRUDNearbyStationAccess(CRUDToolBase):
 
         try:
             # Delete temporary catchment area result table
-            await self.async_session.execute(f"DROP TABLE IF EXISTS {catchment_area_table};")
+            await self.async_session.execute(
+                f"DROP TABLE IF EXISTS {catchment_area_table};"
+            )
         except Exception as e:
             await self.async_session.rollback()
             raise SQLError(e)
@@ -164,8 +167,8 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             params=params,
         )
 
-        #TODO: Return the job id.
-        #TO BE DISCUSSED: For the tests we should consider mocking the catchment area request as otherswise it is very hard to test the catchment area in isolation.
+        # TODO: Return the job id.
+        # TO BE DISCUSSED: For the tests we should consider mocking the catchment area request as otherswise it is very hard to test the catchment area in isolation.
         return {
             "status": JobStatusType.finished.value,
             "msg": "Nearby station access created.",

@@ -7,13 +7,14 @@ from httpx import AsyncClient
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
+
 from src.core.job import CRUDFailedJob
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import layer as crud_layer
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.crud.crud_project import project as crud_project
 from src.db.models.layer import FeatureType, Layer, LayerType, ToolType
-from src.schemas.common import OrderEnum
+from src.schemas.common import CQLQueryObject, OrderEnum
 from src.schemas.error import (
     AreaSizeError,
     ColumnTypeError,
@@ -31,23 +32,23 @@ from src.schemas.layer import (
     OgrPostgresType,
     UserDataGeomType,
 )
-from src.schemas.common import CQLQueryObject
 from src.schemas.style import (
-    get_base_style,
-    get_tool_style_with_breaks,
-    get_tool_style_ordinal,
     custom_styles,
+    get_base_style,
+    get_tool_style_ordinal,
+    get_tool_style_with_breaks,
 )
 from src.schemas.tool import IToolParam
 from src.schemas.toolbox_base import (
-    ColumnStatisticsOperation,
     ColumnStatistic,
+    ColumnStatisticsOperation,
+    DefaultResultLayerName,
     GeofenceTable,
     MaxFeatureCnt,
     MaxFeaturePolygonArea,
-    DefaultResultLayerName,
 )
 from src.utils import build_where_clause, get_random_string, search_value
+
 
 def assign_attribute(mapped_column, attribute_mapping, attribute_value):
     base_attr = mapped_column.split("_")[0]
@@ -61,6 +62,7 @@ def assign_attribute(mapped_column, attribute_mapping, attribute_value):
             count_attr += 1
         attribute_mapping[base_attr + f"_attr{count_attr}"] = attribute_value
     return attribute_mapping
+
 
 async def start_calculation(
     job_type: JobType,
@@ -167,7 +169,9 @@ class CRUDToolBase(CRUDFailedJob):
         if layer_project.query is None:
             query = {"cql": spatial_filter}
         else:
-            query = {"cql": {"op": "and", "args": [layer_project.query.cql, spatial_filter]}}
+            query = {
+                "cql": {"op": "and", "args": [layer_project.query.cql, spatial_filter]}
+            }
 
         layer_project.query = CQLQueryObject(**query)
         return layer_project
@@ -631,6 +635,38 @@ class CRUDToolBase(CRUDFailedJob):
         # Create temp table name
         table_suffix = str(self.job_id).replace("-", "")
         temp_table = f"temporal.{prefix}_{get_random_string(6)}_{table_suffix}"
+        return temp_table
+
+    async def create_combined_input_layer_scenario_table(
+        self,
+        input_table: str,
+        input_layer_project_id: int,
+        scenario_id: UUID,
+        attribute_columns: list[str],
+        where_filter: str,
+    ):
+        """Creates a temporary table combining features from an input layer and a specified scenario."""
+
+        # Create temp table name
+        temp_table = await self.create_temp_table_name("combined_input_layer_scenario")
+
+        # Create combined input layer scenario table using sql
+        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
+        additional_columns = (
+            f", {', '.join(attribute_columns)}" if attribute_columns else ""
+        )
+        await self.async_session.execute(
+            f"""SELECT basic.create_combined_input_layer_scenario_table(
+                '{input_table}',
+                {input_layer_project_id},
+                {scenario_id},
+                '{additional_columns}',
+                '{where_filter.replace("'", "''")}',
+                '{temp_table}'
+            )"""
+        )
+        # Commit changes
+        await self.async_session.commit()
         return temp_table
 
     async def create_distributed_polygon_table(

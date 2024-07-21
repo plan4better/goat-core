@@ -1,18 +1,20 @@
 from typing import List
+from uuid import UUID
+
 from src.core.config import settings
-from src.schemas.job import JobStatusType
-from src.crud.crud_heatmap import CRUDHeatmapBase
-from src.schemas.toolbox_base import DefaultResultLayerName
 from src.core.job import job_init, job_log, run_background_or_immediately
-from src.schemas.layer import IFeatureLayerToolCreate, FeatureGeometryType
+from src.crud.crud_heatmap import CRUDHeatmapBase
 from src.schemas.heatmap import (
-    IHeatmapClosestAverageActive,
+    TRAVELTIME_MATRIX_RESOLUTION,
+    TRAVELTIME_MATRIX_TABLE,
     ActiveRoutingHeatmapType,
+    IHeatmapClosestAverageActive,
     IHeatmapClosestAverageMotorized,
     MotorizedRoutingHeatmapType,
-    TRAVELTIME_MATRIX_TABLE,
-    TRAVELTIME_MATRIX_RESOLUTION,
 )
+from src.schemas.job import JobStatusType
+from src.schemas.layer import FeatureGeometryType, IFeatureLayerToolCreate
+from src.schemas.toolbox_base import DefaultResultLayerName
 
 
 class CRUDHeatmapClosestAverage(CRUDHeatmapBase):
@@ -23,6 +25,7 @@ class CRUDHeatmapClosestAverage(CRUDHeatmapBase):
         self,
         routing_type: ActiveRoutingHeatmapType | MotorizedRoutingHeatmapType,
         layers: List[dict],
+        scenario_id: UUID,
     ):
         """Create distributed table for user-specified opportunities."""
 
@@ -32,14 +35,15 @@ class CRUDHeatmapClosestAverage(CRUDHeatmapBase):
         append_to_existing = False
         for layer in layers:
             # Create distributed point table using sql
-            where_query_point = "WHERE " + layer["where_query"].replace("'", "''")
-
+            scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
             await self.async_session.execute(
                 f"""SELECT basic.create_heatmap_closest_average_opportunity_table(
+                    {layer["layer"].opportunity_layer_project_id},
                     '{layer["table_name"]}',
+                    {scenario_id},
                     {layer["layer"].max_traveltime},
                     {layer["layer"].number_of_destinations},
-                    '{where_query_point}',
+                    '{layer["where_query"].replace("'", "''")}',
                     '{temp_points}',
                     {TRAVELTIME_MATRIX_RESOLUTION[routing_type]},
                     {append_to_existing}
@@ -95,6 +99,7 @@ class CRUDHeatmapClosestAverage(CRUDHeatmapBase):
         opportunity_table = await self.create_distributed_opportunity_table(
             params.routing_type,
             layers,
+            params.scenario_id,
         )
 
         # Initialize result table
@@ -102,25 +107,29 @@ class CRUDHeatmapClosestAverage(CRUDHeatmapBase):
 
         # Create feature layer to store computed heatmap output
         layer_heatmap = IFeatureLayerToolCreate(
-            name=DefaultResultLayerName.heatmap_closest_average_active_mobility.value
+            name=(
+                DefaultResultLayerName.heatmap_closest_average_active_mobility.value
                 if type(params.routing_type) == ActiveRoutingHeatmapType
-                else DefaultResultLayerName.heatmap_closest_average_motorized_mobility.value,
+                else DefaultResultLayerName.heatmap_closest_average_motorized_mobility.value
+            ),
             feature_layer_geometry_type=FeatureGeometryType.polygon,
             attribute_mapping={
                 "text_attr1": "h3_index",
-                "float_attr1": "accessibility"
+                "float_attr1": "accessibility",
             },
             tool_type=params.tool_type.value,
             job_id=self.job_id,
         )
 
         # Compute heatmap & write to result table
-        await self.async_session.execute(self.build_query(
-            params=params,
-            opportunity_table=opportunity_table,
-            result_table=result_table,
-            result_layer_id=str(layer_heatmap.id),
-        ))
+        await self.async_session.execute(
+            self.build_query(
+                params=params,
+                opportunity_table=opportunity_table,
+                result_table=result_table,
+                result_layer_id=str(layer_heatmap.id),
+            )
+        )
 
         # Register feature layer
         await self.create_feature_layer_tool(

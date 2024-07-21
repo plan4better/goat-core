@@ -1,24 +1,25 @@
 import json
 from datetime import timedelta
-from pydantic import BaseModel
 from uuid import UUID, uuid4
+
+from pydantic import BaseModel
+
 from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
 from src.core.tool import CRUDToolBase
-from src.db.models.layer import ToolType
-from src.schemas.error import AreaSizeError
-from src.schemas.job import JobStatusType
-from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
-from src.schemas.oev_gueteklasse import IOevGueteklasse, CatchmentType
-from src.schemas.toolbox_base import DefaultResultLayerName
-from src.utils import build_where_clause
-from src.schemas.catchment_area import CatchmentAreaRoutingModeActiveMobility
 from src.crud.crud_catchment_area import (
     call_routing_endpoint,
     create_temp_isochrone_table,
 )
+from src.db.models.layer import ToolType
 from src.endpoints.deps import get_http_client
-from src.schemas.toolbox_base import MaxFeaturePolygonArea
+from src.schemas.catchment_area import CatchmentAreaRoutingModeActiveMobility
+from src.schemas.error import AreaSizeError
+from src.schemas.job import JobStatusType
+from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
+from src.schemas.oev_gueteklasse import CatchmentType, IOevGueteklasse
+from src.schemas.toolbox_base import DefaultResultLayerName, MaxFeaturePolygonArea
+from src.utils import build_where_clause
 
 
 class CRUDOevGueteklasse(CRUDToolBase):
@@ -43,13 +44,24 @@ class CRUDOevGueteklasse(CRUDToolBase):
     ):
         """Get station category."""
 
+        input_table = reference_layer_project.table_name
         where_query = build_where_clause([reference_layer_project.where_query])
+        if params.scenario_id is not None:
+            # Create a temporary table combining features from the input layer and specified scenario
+            input_table = await self.create_combined_input_layer_scenario_table(
+                input_table=input_table,
+                input_layer_project_id=reference_layer_project.id,
+                scenario_id=params.scenario_id,
+                attribute_columns=None,
+                where_filter=where_query,
+            )
+            where_query = ""
         query = f"""
             INSERT INTO {self.table_stations}({', '.join(station_category_layer.attribute_mapping.keys())}, layer_id, geom)
             WITH child_stops AS (
                 SELECT *
                 FROM basic.count_public_transport_services_station (
-                    '{reference_layer_project.table_name}',
+                    '{input_table}',
                     :where_query,
                     '{str(timedelta(seconds=params.time_window.from_time))}',
                     '{str(timedelta(seconds=params.time_window.to_time))}',
@@ -271,7 +283,7 @@ class CRUDOevGueteklasse(CRUDToolBase):
                 await call_routing_endpoint(
                     CatchmentAreaRoutingModeActiveMobility.walking,
                     request_payload,
-                    self.http_client
+                    self.http_client,
                 )
 
                 # Insert into temp_catchment_stations
@@ -358,7 +370,10 @@ class CRUDOevGueteklasse(CRUDToolBase):
         catchment_layer = IFeatureLayerToolCreate(
             name=DefaultResultLayerName.oev_gueteklasse.value,
             feature_layer_geometry_type=UserDataGeomType.polygon.value,
-            attribute_mapping={"text_attr1": "pt_class", "integer_attr1": "pt_class_number"},
+            attribute_mapping={
+                "text_attr1": "pt_class",
+                "integer_attr1": "pt_class_number",
+            },
             tool_type=ToolType.oev_gueteklasse.value,
             job_id=self.job_id,
         )

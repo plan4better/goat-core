@@ -1,15 +1,20 @@
-from typing import List
 from enum import Enum
+from typing import List
+from uuid import UUID
+
 from pydantic import BaseModel, Field
+
 from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import (
     PTTimeWindow,
     input_layer_type_polygon,
 )
 
+
 class CatchmentType(Enum):
     buffer = "buffer"
     network = "network"
+
 
 class OevGueteklasseStationConfig(BaseModel):
     groups: dict = Field(
@@ -54,6 +59,11 @@ class IOevGueteklasse(BaseModel):
         CatchmentType.buffer,
         title="Catchment Type",
         description="The catchment type of the ÖV-Güteklasse.",
+    )
+    scenario_id: UUID | None = Field(
+        None,
+        title="Scenario ID",
+        description="The ID of the scenario that is to be applied on the input layer or base network.",
     )
 
     @property

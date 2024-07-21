@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import List
+from uuid import UUID
 
 from pydantic import BaseModel, Field, validator
 
@@ -128,6 +129,11 @@ class HeatmapGravityBase(BaseModel):
         title="Opportunities",
         description="The opportunities the heatmap should be calculated for heatmap.",
     )
+    scenario_id: UUID | None = Field(
+        None,
+        title="Scenario ID",
+        description="The ID of the scenario that is to be applied on the input layer or base network.",
+    )
 
     def validate_max_traveltime(routing_type, values):
         max_traveltime = MaxTravelTimeTransportMode[routing_type].value
@@ -150,6 +156,11 @@ class HeatmapClosestAverageBase(BaseModel):
         ...,
         title="Opportunities",
         description="The opportunities the heatmap should be calculated for heatmap.",
+    )
+    scenario_id: UUID | None = Field(
+        None,
+        title="Scenario ID",
+        description="The ID of the scenario that is to be applied on the input layer or base network.",
     )
 
     def validate_max_traveltime(routing_type, values):
@@ -180,6 +191,11 @@ class HeatmapConnectivityBase(BaseModel):
         description="The maximum travel time in minutes.",
         ge=1,
         le=60,
+    )
+    scenario_id: UUID | None = Field(
+        None,
+        title="Scenario ID",
+        description="The ID of the scenario that is to be applied on the input layer or base network.",
     )
 
     def validate_max_traveltime(routing_type, values):

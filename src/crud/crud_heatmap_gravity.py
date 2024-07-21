@@ -1,4 +1,5 @@
 from typing import List
+from uuid import UUID
 
 from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
@@ -26,6 +27,7 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         self,
         routing_type: ActiveRoutingHeatmapType | MotorizedRoutingHeatmapType,
         layers: List[dict],
+        scenario_id: UUID,
     ):
         """Create distributed table for user-specified opportunities."""
 
@@ -35,20 +37,21 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         append_to_existing = False
         for layer in layers:
             # Create distributed point table using sql
-            where_query_point = "WHERE " + layer["where_query"].replace("'", "''")
             potential_column = (
                 1
                 if not layer["layer"].destination_potential_column
                 else layer["layer"].destination_potential_column
             )
-
+            scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
             await self.async_session.execute(
                 f"""SELECT basic.create_heatmap_gravity_opportunity_table(
+                    {layer["layer"].opportunity_layer_project_id},
                     '{layer["table_name"]}',
+                    {scenario_id},
                     {layer["layer"].max_traveltime},
                     {layer["layer"].sensitivity},
                     {potential_column}::text,
-                    '{where_query_point}',
+                    '{layer["where_query"].replace("'", "''")}',
                     '{temp_points}',
                     {TRAVELTIME_MATRIX_RESOLUTION[routing_type]},
                     {append_to_existing}
@@ -127,6 +130,7 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         opportunity_table = await self.create_distributed_opportunity_table(
             params.routing_type,
             layers,
+            params.scenario_id,
         )
 
         # Initialize result table

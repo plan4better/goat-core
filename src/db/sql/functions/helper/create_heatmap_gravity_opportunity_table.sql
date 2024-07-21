@@ -1,8 +1,8 @@
 DROP FUNCTION IF EXISTS basic.create_heatmap_gravity_opportunity_table;
 CREATE OR REPLACE FUNCTION basic.create_heatmap_gravity_opportunity_table(
-    input_table text, max_traveltime int, sensitivity float, potential_column text,
-    where_filter text, result_table_name text, grid_resolution int,
-    append_existing boolean
+    input_layer_project_id int, input_table text, scenario_id text, max_traveltime int,
+    sensitivity float, potential_column text, where_filter text, result_table_name text,
+    grid_resolution int, append_existing boolean
 )
 RETURNS SETOF void
 LANGUAGE plpgsql
@@ -31,12 +31,31 @@ BEGIN
 		RAISE EXCEPTION 'Unsupported grid resolution specified';
 	END IF;
 
-    -- Produce h3 grid at specified resolution
+    -- Produce h3 grid at specified resolution while applying a scenario if specified
     EXECUTE format(
-        'INSERT INTO %s 
+        'INSERT INTO %s
         SELECT id, h3_lat_lng_to_cell(geom::point, %s) AS h3_index, %s AS max_traveltime, %s AS sensitivity,
-            %s AS potential, basic.to_short_h3_3(h3_lat_lng_to_cell(geom::point, 3)::bigint) AS h3_3
-        FROM (SELECT * FROM %s %s) input_table;', result_table_name, grid_resolution, max_traveltime, sensitivity, potential_column, input_table, where_filter 
+            potential, basic.to_short_h3_3(h3_lat_lng_to_cell(geom::point, 3)::bigint) AS h3_3
+        FROM (
+            WITH scenario_features AS (
+                SELECT sf.feature_id AS id, sf.geom, sf.edit_type, %s AS potential
+                FROM customer.scenario_scenario_feature ssf
+                INNER JOIN customer.scenario_feature sf ON sf.id = ssf.scenario_feature_id
+                WHERE ssf.scenario_id = %L
+                AND sf.layer_project_id = %s
+            )
+                SELECT original_features.id, original_features.geom, %s AS potential
+                FROM (SELECT * FROM %s WHERE %s) original_features
+                LEFT JOIN scenario_features ON original_features.id = scenario_features.id
+                WHERE scenario_features.id IS NULL
+            UNION ALL
+                SELECT scenario_features.id, scenario_features.geom, scenario_features.potential
+                FROM scenario_features
+                WHERE edit_type IN (''n'', ''m'')
+        ) input_features;',
+        result_table_name, grid_resolution, max_traveltime, sensitivity,
+        potential_column, scenario_id, input_layer_project_id, potential_column,
+        input_table, where_filter
     );
 
     IF NOT append_existing THEN

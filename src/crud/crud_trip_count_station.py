@@ -16,7 +16,7 @@ from src.utils import build_where_clause
 
 
 class CRUDTripCountStation(CRUDToolBase):
-    """CRUD for OEV-Gueteklasse."""
+    """CRUD for PT Trip Count."""
 
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
@@ -29,6 +29,19 @@ class CRUDTripCountStation(CRUDToolBase):
         # Get Layer
         layer_project = await self.get_layers_project(params=params)
         layer_project = layer_project["reference_area_layer_project_id"]
+
+        input_table = layer_project.table_name
+        where_query = build_where_clause([layer_project.where_query])
+        if params.scenario_id is not None:
+            # Create a temporary table combining features from the input layer and specified scenario
+            input_table = await self.create_combined_input_layer_scenario_table(
+                input_table=input_table,
+                input_layer_project_id=layer_project.id,
+                scenario_id=params.scenario_id,
+                attribute_columns=None,
+                where_filter=where_query,
+            )
+            where_query = ""
 
         # Create result layer object
         pt_modes = list(public_transport_types.keys())
@@ -67,14 +80,13 @@ class CRUDTripCountStation(CRUDToolBase):
             (summarized ->> 'bus')::integer + (summarized ->> 'tram')::integer + (summarized ->> 'metro')::integer +
             (summarized ->> 'rail')::integer + (summarized ->> 'other')::integer AS total
             FROM basic.count_public_transport_services_station(
-                '{layer_project.table_name}',
+                '{input_table}',
                 :where_query,
                 '{str(timedelta(seconds=params.time_window.from_time))}',
                 '{str(timedelta(seconds=params.time_window.to_time))}',
                 {params.time_window.weekday_integer}
             ) s, LATERAL basic.summarize_trip_count(trip_cnt, '{json.dumps(flat_mode_mapping)}'::JSONB) summarized
         """
-        where_query = build_where_clause([layer_project.where_query])
         await self.async_session.execute(sql_query, {"where_query": where_query})
         await self.async_session.commit()
 
