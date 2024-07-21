@@ -1,15 +1,21 @@
 import pytest
 from httpx import AsyncClient
+
 from src.core.config import settings
-from tests.utils import get_with_wrong_id
+from tests.utils import check_user_data_deleted, get_with_wrong_id
+
 
 @pytest.mark.asyncio
 async def test_create_folder(client: AsyncClient, fixture_create_folder):
     assert fixture_create_folder["id"] is not None
 
+
 @pytest.mark.asyncio
-async def test_created_exceed_folders(client: AsyncClient, fixture_create_exceed_folders):
+async def test_created_exceed_folders(
+    client: AsyncClient, fixture_create_exceed_folders
+):
     return
+
 
 @pytest.mark.asyncio
 async def test_get_folder(
@@ -43,7 +49,8 @@ async def test_get_folders(
 @pytest.mark.asyncio
 async def test_update_folder(client: AsyncClient, fixture_create_folder):
     response = await client.put(
-        f"{settings.API_V2_STR}/folder/{fixture_create_folder['id']}", json={"name": "test2"}
+        f"{settings.API_V2_STR}/folder/{fixture_create_folder['id']}",
+        json={"name": "test2"},
     )
     assert response.status_code == 200
     assert response.json()["name"] == "test2"

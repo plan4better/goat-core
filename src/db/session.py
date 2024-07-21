@@ -12,7 +12,14 @@ from sqlalchemy import event
 import asyncpg
 
 
-async def set_type_codec(conn, typenames, encode=lambda a: a, decode=lambda a: a, schema="pg_catalog", format="text"):
+async def set_type_codec(
+    conn,
+    typenames,
+    encode=lambda a: a,
+    decode=lambda a: a,
+    schema="pg_catalog",
+    format="text",
+):
     conn._check_open()
     for typename in typenames:
         typeinfo = await conn.fetchrow(
@@ -36,45 +43,71 @@ async def setup(conn):
         "geometry", encoder=str, decoder=str, schema="public", format="text"
     )
 
+
+    # Register h3 index type
+    await conn.set_type_codec(
+        "h3index", encoder=str, decoder=str, schema="public", format="text"
+    )
+
     # Register integer array type
     await set_type_codec(
         conn,
         ["_int4"],
-        encode=lambda a: "{" + ",".join(map(str, a)) + "}",  # Convert list to PostgreSQL array literal
-        decode=lambda a: list(map(int, a.strip("{}").split(","))) if a else [],  # Convert PostgreSQL array literal to list
+        encode=lambda a: "{"
+        + ",".join(map(str, a))
+        + "}",  # Convert list to PostgreSQL array literal
+        decode=lambda a: (
+            list(map(int, a.strip("{}").split(",")))
+            if a is not None and a != "{}"
+            else []
+        ),  # Convert PostgreSQL array literal to list, handling None and empty array
         schema="pg_catalog",
-        format="text"
+        format="text",
     )
-
     # Register biginteger array type
     await set_type_codec(
         conn,
         ["_int8"],
-        encode=lambda a: "{" + ",".join(map(str, a)) + "}",  # Convert list to PostgreSQL array literal
-        decode=lambda a: list(map(int, a.strip("{}").split(","))) if a else [],  # Convert PostgreSQL array literal to list
+        encode=lambda a: "{"
+        + ",".join(map(str, a))
+        + "}",  # Convert list to PostgreSQL array literal
+        decode=lambda a: (
+            list(map(int, a.strip("{}").split(",")))
+            if a is not None and a != "{}"
+            else []
+        ),  # Convert PostgreSQL array literal to list
         schema="pg_catalog",
-        format="text"
+        format="text",
     )
 
     # # Register float array type
     await set_type_codec(
         conn,
         ["_float8"],
-        encode=lambda a: "{" + ",".join(map(str, a)) + "}",  # Convert list to PostgreSQL array literal
-        decode=lambda a: list(map(float, a.strip("{}").split(","))) if a else [],  # Convert PostgreSQL array literal to list
+        encode=lambda a: "{"
+        + ",".join(map(str, a))
+        + "}",  # Convert list to PostgreSQL array literal
+        decode=lambda a: (
+            list(map(float, a.strip("{}").split(",")))
+            if a is not None and a != "{}"
+            else []
+        ),  # Convert PostgreSQL array literal to list
         schema="pg_catalog",
-        format="text"
+        format="text",
     )
-
 
     # Register UUID array type
     await set_type_codec(
         conn,
         ["_uuid"],
         encode=lambda a: "{" + ",".join(a) + "}",  # Directly join UUID strings
-        decode=lambda a: a.strip("{}").split(",") if a else [],  # Split string into UUID strings
+        decode=lambda a: (
+            a.strip("{}").split(",")
+            if a is not None and a != "{}"
+            else []
+        ),  # Split string into UUID strings
         schema="pg_catalog",
-        format="text"
+        format="text",
     )
 
 

@@ -273,12 +273,12 @@ async def test_get_area_statistics(
 ):
     layer_id = fixture_create_internal_feature_polygon_layer["id"]
     expected_result = {
-        "sum": 5813696342.208582,
-        "min": 83206235.43294483,
-        "max": 5730490106.775637,
+        "sum": 978867237.0440512,
+        "min": 239195114.2226817,
+        "max": 739672122.8213694,
     }
 
-    query = '{"op": ">", "args": [{"property": "id"}, "3"]}'
+    query = '{"op": "=", "args": [{"property": "gen"}, "Hamburg"]}'
     # Request each statistical operation
     for operation in AreaStatisticsOperation:
         response = await client.get(

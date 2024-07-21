@@ -11,7 +11,6 @@ from sqlalchemy import text
 
 # Local application imports
 from src.core.config import settings
-from src.core.layer import get_user_table
 from src.endpoints.deps import get_db, session_manager
 from src.main import app
 from src.schemas.catchment_area import request_examples_catchment_area_active_mobility as active_mobility_request_examples
@@ -31,6 +30,7 @@ from tests.utils import (
     upload_invalid_file,
     upload_valid_file,
     upload_valid_files,
+    check_user_data_deleted,
 )
 
 
@@ -872,19 +872,9 @@ async def fixture_delete_internal_layers(
     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}")
     assert response.status_code == 404  # Not Found
 
-    # Get table name
-    table_name = get_user_table(layer)
-
-    # Check if there is data for the layer_id
-    async with session_manager.session() as session:
-        result = await session.execute(
-            text(
-                f"""SELECT COUNT(*) FROM {table_name} WHERE layer_id = :layer_id LIMIT 1""",
-            ),
-            {"layer_id": layer_id},
-        )
-        assert result.scalar() == 0
-
+    await check_user_data_deleted(
+        layer=layer,
+    )
 
 @pytest.fixture
 async def fixture_delete_external_layers(

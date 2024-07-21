@@ -256,7 +256,7 @@ async def read_layer(
 ):
     """Retrieve a layer by its ID."""
     return await read_content_by_id(
-        async_session=async_session, id=id, model=Layer, crud_content=crud_layer
+        async_session=async_session, id=layer_id, model=Layer, crud_content=crud_layer
     )
 
 

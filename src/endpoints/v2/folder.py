@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status, BackgroundTasks
 from pydantic import UUID4
 from sqlalchemy import select, func
 from src.crud.crud_folder import folder as crud_folder
@@ -35,7 +35,9 @@ async def create_folder(
 ):
     """Create a new folder."""
     # Count already existing folders for the user
-    folder_cnt = await async_session.execute(select(func.count(Folder.id)).filter(Folder.user_id == user_id))
+    folder_cnt = await async_session.execute(
+        select(func.count(Folder.id)).filter(Folder.user_id == user_id)
+    )
     folder_cnt = folder_cnt.scalar()
 
     # Check if the user has already reached the maximum number of folders
@@ -162,16 +164,9 @@ async def delete_folder(
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
     user_id: UUID4 = Depends(get_user_id),
+    background_tasks: BackgroundTasks,
 ):
     """Delete a folder and all its contents"""
-    db_obj = await crud_folder.get_by_multi_keys(
-        async_session, keys={"id": folder_id, "user_id": user_id}
-    )
-    # Check if folder exists
-    if len(db_obj) == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
-        )
 
-    await crud_folder.remove(async_session, id=db_obj[0].id)
+    await crud_folder.delete(async_session, background_tasks=background_tasks, id=folder_id, user_id=user_id)
     return

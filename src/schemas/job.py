@@ -22,9 +22,12 @@ class JobType(str, Enum):
     heatmap_gravity_active_mobility = "heatmap_gravity_active_mobility"
     heatmap_gravity_motorized_mobility = "heatmap_gravity_motorized_mobility"
     heatmap_closest_average_active_mobility = "heatmap_closest_average_active_mobility"
-    heatmap_closest_average_motorized_mobility = "heatmap_closest_average_motorized_mobility"
+    heatmap_closest_average_motorized_mobility = (
+        "heatmap_closest_average_motorized_mobility"
+    )
     heatmap_connectivity_active_mobility = "heatmap_connectivity_active_mobility"
     heatmap_connectivity_motorized_mobility = "heatmap_connectivity_motorized_mobility"
+    data_delete_multi = "data_delete_multi"
 
 
 class JobStatusType(str, Enum):
@@ -112,35 +115,51 @@ class JobStatusTripCountStation(BaseModel):
 class JobStatusOriginDestination(BaseModel):
     origin_destination: JobStep = {}
 
+
 class JobStatusNearbyStationAccess(BaseModel):
     nearby_station_access: JobStep = {}
+
 
 class JobStatusHeatmapGravityBase(BaseModel):
     heatmap_gravity: JobStep = {}
 
+
 class JobStatusHeatmapGravityActiveMobility(JobStatusHeatmapGravityBase):
     pass
+
 
 class JobStatusHeatmapGravityMotorizedMobility(JobStatusHeatmapGravityBase):
     pass
 
+
 class JobStatusHeatmapClosestAverageBase(BaseModel):
     heatmap_closest_average: JobStep = {}
+
 
 class JobStatusHeatmapClosestAverageActiveMobility(JobStatusHeatmapClosestAverageBase):
     pass
 
-class JobStatusHeatmapClosestAverageMotorizedMobility(JobStatusHeatmapClosestAverageBase):
+
+class JobStatusHeatmapClosestAverageMotorizedMobility(
+    JobStatusHeatmapClosestAverageBase
+):
     pass
+
 
 class JobStatusHeatmapConnectivityBase(BaseModel):
     heatmap_connectivity: JobStep = {}
 
+
 class JobStatusHeatmapConnectivityActiveMobility(JobStatusHeatmapConnectivityBase):
     pass
 
+
 class JobStatusHeatmapConnectivityMotorizedMobility(JobStatusHeatmapConnectivityBase):
     pass
+
+
+class JobStatusLayerDeleteMulti(BaseModel):
+    data_delete_multi: JobStep = {}
 
 
 # Only add jobs here that are consisting of multiple steps
@@ -163,4 +182,5 @@ job_mapping = {
     JobType.heatmap_closest_average_motorized_mobility: JobStatusHeatmapClosestAverageMotorizedMobility,
     JobType.heatmap_connectivity_active_mobility: JobStatusHeatmapConnectivityActiveMobility,
     JobType.heatmap_connectivity_motorized_mobility: JobStatusHeatmapConnectivityMotorizedMobility,
+    JobType.data_delete_multi: JobStatusLayerDeleteMulti,
 }

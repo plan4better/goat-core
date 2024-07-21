@@ -1,9 +1,11 @@
-from pydantic import BaseModel
+from uuid import UUID
+
+from pydantic import BaseModel, Extra
 
 from src.db.models.scenario_feature import (
     ScenarioFeatureEditType,
-    UserData,
 )
+from src.utils import optional
 
 
 class IScenarioCreate(BaseModel):
@@ -14,9 +16,25 @@ class IScenarioUpdate(BaseModel):
     name: str
 
 
-class IScenarioFeatureCreate(UserData):
-    layer_id: str
+class IScenarioFeatureCreate(BaseModel):
+    layer_project_id: int
     edit_type: ScenarioFeatureEditType
+    geom: str
+
+    class Config:
+        extra = Extra.allow
+
+
+@optional
+class IScenarioFeatureUpdate(BaseModel):
+    id: UUID | int
+    feature_id: int
+    edit_type: ScenarioFeatureEditType
+    layer_project_id: int
+    geom: str
+
+    class Config:
+        extra = Extra.allow
 
 
 request_examples = {
@@ -29,7 +47,7 @@ request_examples = {
     "create_scenario_features": [
         {
             "geom": "POINT (35.5 47.8)",
-            "layer_id": "4f7924a8-9699-41ef-8998-8d33a98e1604",
+            "id": 127,
             "edit_type": "n",
         }
     ],

@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Python: FastAPI",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "module": "uvicorn",
             "justMyCode": false,
@@ -20,7 +20,7 @@
         },
         {
             "name": "Python: Remote Attach",
-            "type": "python",
+            "type": "debug",
             "request": "attach",
             "port": 5678,
             "host": "localhost",

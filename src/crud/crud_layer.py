@@ -18,10 +18,15 @@ from sqlmodel import SQLModel
 # Local application imports
 from src.core.config import settings
 from src.core.job import CRUDFailedJob, job_init, job_log, run_background_or_immediately
-from src.core.layer import FileUpload, OGRFileHandling, delete_old_files, CRUDLayerBase
-from src.crud.crud_layer_project import layer_project as crud_layer_project
-
+from src.core.layer import (
+    CRUDLayerBase,
+    FileUpload,
+    OGRFileHandling,
+    delete_layer_data,
+    delete_old_files,
+)
 from src.crud.base import CRUDBase
+from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.db.models.layer import Layer
 from src.schemas.error import (
     ColumnNotFoundError,
@@ -34,12 +39,12 @@ from src.schemas.job import JobStatusType
 from src.schemas.layer import (
     ComputeBreakOperation,
     FeatureType,
+    ICatalogLayerGet,
     IFeatureStandardCreateAdditionalAttributes,
     IFileUploadMetadata,
     IInternalLayerCreate,
     IInternalLayerExport,
     ILayerGet,
-    ICatalogLayerGet,
     IMetadataAggregate,
     IMetadataAggregateRead,
     ITableCreateAdditionalAttributes,
@@ -141,7 +146,7 @@ class CRUDLayer(CRUDLayerBase):
         # Check if internal or external layer
         if layer.type in [LayerType.table.value, LayerType.feature.value]:
             # Delete layer data
-            await self.delete_layer_data(async_session=async_session, layer=layer)
+            await delete_layer_data(async_session=async_session, layer=layer)
 
         # Delete layer metadata
         await CRUDBase(Layer).delete(
@@ -259,15 +264,6 @@ class CRUDLayer(CRUDLayerBase):
 
         # Add layer_type and file_size to validation_result
         return metadata
-
-    async def delete_layer_data(self, async_session: AsyncSession, layer):
-        """Delete layer data which is in the user data tables."""
-
-        # Delete layer data
-        await async_session.execute(
-            text(f"DELETE FROM {layer.table_name} WHERE layer_id = '{layer.id}'")
-        )
-        await async_session.commit()
 
     async def get_feature_layer_size(
         self, async_session: AsyncSession, layer: BaseModel | SQLModel
@@ -429,6 +425,7 @@ class CRUDLayer(CRUDLayerBase):
             where_query=where_query,
         )
         where_query = "WHERE " + where_query
+
         # Call SQL function
         sql_query = f"""
             SELECT * FROM basic.area_statistics('{operation.value}', '{layer.table_name}', '{where_query.replace("'", "''")}')
@@ -515,12 +512,23 @@ class CRUDLayer(CRUDLayerBase):
         result = result.fetchall()
         return result[0][0]
 
-    async def get_base_filter(self, user_id: UUID, params: ILayerGet | ICatalogLayerGet, attributes_to_exclude: list = []):
+    async def get_base_filter(
+        self,
+        user_id: UUID,
+        params: ILayerGet | ICatalogLayerGet,
+        attributes_to_exclude: list = [],
+    ):
         """Get filter for get layer queries."""
         filters = []
         for key, value in params.dict().items():
             if (
-                key not in ("search", "spatial_search", "in_catalog", *attributes_to_exclude)
+                key
+                not in (
+                    "search",
+                    "spatial_search",
+                    "in_catalog",
+                    *attributes_to_exclude,
+                )
                 and value is not None
             ):
                 # Convert value to list if not list
@@ -531,7 +539,12 @@ class CRUDLayer(CRUDLayerBase):
         # Check if ILayer get then it is for user owned layers
         if isinstance(params, ILayerGet):
             if params.in_catalog is not None:
-                filters.append(and_(Layer.in_catalog == bool(params.in_catalog), Layer.user_id == user_id))
+                filters.append(
+                    and_(
+                        Layer.in_catalog == bool(params.in_catalog),
+                        Layer.user_id == user_id,
+                    )
+                )
             else:
                 filters.append(Layer.user_id == user_id)
         else:
@@ -618,7 +631,9 @@ class CRUDLayer(CRUDLayerBase):
                 continue
 
             # Build filter for respective group
-            filters = await self.get_base_filter(user_id=user_id, params=params, attributes_to_exclude=[key])
+            filters = await self.get_base_filter(
+                user_id=user_id, params=params, attributes_to_exclude=[key]
+            )
             # Get attribute from layer
             group_by = getattr(Layer, key)
             sql_query = (
@@ -925,3 +940,32 @@ class CRUDLayerExport:
 
     async def export_file_run(self, layer_in: IInternalLayerExport):
         return await self.export_file(layer_in=layer_in)
+
+
+class CRUDDataDelete(CRUDFailedJob):
+    """CRUD class for Layer import."""
+
+    def __init__(self, job_id, background_tasks, async_session, user_id):
+        super().__init__(job_id, background_tasks, async_session, user_id)
+
+    @job_log(job_step_name="data_delete_multi")
+    async def delete_multi(
+        self,
+        async_session: AsyncSession,
+        layers: list[Layer],
+    ):
+        for layer in layers:
+            await delete_layer_data(async_session=async_session, layer=layer)
+        return {
+            "status": JobStatusType.finished.value,
+            "msg": "Data was successfuly deleted.",
+        }
+
+    @run_background_or_immediately(settings)
+    @job_init()
+    async def delete_multi_run(
+        self,
+        async_session: AsyncSession,
+        layers: list[Layer],
+    ):
+        return await self.delete_multi(async_session=async_session, layers=layers)

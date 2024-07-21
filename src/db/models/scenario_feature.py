@@ -27,8 +27,7 @@ from sqlmodel import (
 from ._base_class import DateTimeBase
 
 if TYPE_CHECKING:
-    from ._link_model import ScenarioScenarioFeatureLink
-    from .layer import Layer
+    from ._link_model import LayerProjectLink, ScenarioScenarioFeatureLink
 
 
 class ScenarioFeatureEditType(str, Enum):
@@ -119,26 +118,28 @@ class ScenarioFeature(DateTimeBase, UserData, table=True):
             server_default=text("uuid_generate_v4()"),
         )
     )
-    feature_id: int | None = Field(
-        sa_column=Column(Integer, nullable=True),
+    feature_id: UUID | None = Field(
+        sa_column=Column(UUID_PG(as_uuid=True), nullable=True),
         description="Feature ID of the modified feature",
     )
-    layer_id: str = Field(
+    layer_project_id: int | None = Field(
         sa_column=Column(
-            UUID_PG(as_uuid=True),
-            ForeignKey("customer.layer.id", ondelete="CASCADE"),
+            Integer,
+            ForeignKey("customer.layer_project.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        description="Layer ID of the modified layer",
+        description="Project layer ID",
     )
+
     edit_type: ScenarioFeatureEditType = Field(
         sa_column=Column(Text, nullable=False), description="Type of the edit"
     )
     # Relationships
-    original_layer: "Layer" = Relationship(back_populates="scenario_features")
+    layer_project: "LayerProjectLink" = Relationship(back_populates="scenario_features")
 
     scenarios_links: List["ScenarioScenarioFeatureLink"] = Relationship(
-        back_populates="scenario_feature"
+        back_populates="scenario_feature",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
 
 

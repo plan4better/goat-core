@@ -18,8 +18,6 @@ if TYPE_CHECKING:
     from .layer import Layer
 
 # TODO: Add further attributes for the different data store types
-
-
 class DataStoreBase(SQLModel):
     type: "DataStoreType" = Field(
         sa_column=Column(Text, nullable=False), description="Data store type"
