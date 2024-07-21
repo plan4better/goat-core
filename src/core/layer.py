@@ -39,6 +39,7 @@ from src.db.models.layer import (
     FeatureLayerExportType,
     Layer,
     LayerType,
+    FeatureType,
 )
 from src.db.models._link_model import LayerProjectLink
 from src.utils import (
@@ -62,28 +63,21 @@ def get_user_table(layer: Union[dict, SQLModel, BaseModel]):
     """Get the table with the user data based on the layer metadata."""
 
     # Check if layer is of type dict or SQLModel/BaseModel
+    if isinstance(layer, (SQLModel, BaseModel)):
+        layer = layer.dict()
+
     if isinstance(layer, dict):
         if layer["type"] == LayerType.feature.value:
-            feature_layer_geometry_type = layer["feature_layer_geometry_type"]
+            if layer["feature_layer_type"] in (FeatureType.standard, FeatureType.tool):
+                table_prefix = layer["feature_layer_geometry_type"]
+            elif layer["feature_layer_type"] == FeatureType.street_network:
+                table_prefix = FeatureType.street_network.value + "_" + layer["feature_layer_geometry_type"]
         elif layer["type"] == LayerType.table.value:
-            feature_layer_geometry_type = "no_geometry"
+            table_prefix = "no_geometry"
         else:
             raise ValueError(f"The passed layer type {layer['type']} is not supported.")
-        user_id = layer["user_id"]
-    elif isinstance(layer, (SQLModel, BaseModel)):
-        if layer.type == LayerType.feature.value:
-            feature_layer_geometry_type = layer.feature_layer_geometry_type.value
-        elif layer.type == LayerType.table.value:
-            feature_layer_geometry_type = "no_geometry"
-        else:
-            raise ValueError(
-                f"The passed layer type {layer.type} is not supported as internal layer."
-            )
-        user_id = layer.user_id
-    else:
-        raise ValueError(f"The passed layer type {type(layer)} is not supported.")
-
-    return f"{settings.USER_DATA_SCHEMA}.{feature_layer_geometry_type}_{str(user_id).replace('-', '')}"
+    user_id = layer["user_id"]
+    return f"{settings.USER_DATA_SCHEMA}.{table_prefix}_{str(user_id).replace('-', '')}"
 
 class CRUDLayerBase(CRUDBase):
     async def check_and_alter_layer_name(
@@ -692,3 +686,11 @@ class OGRFileHandling:
         )
         await self.async_session.commit()
 
+async def delete_layer_data(async_session: AsyncSession, layer: Layer):
+    """Delete layer data which is in the user data tables."""
+
+    # Delete layer data
+    await async_session.execute(
+        text(f"DELETE FROM {layer.table_name} WHERE layer_id = '{layer.id}'")
+    )
+    await async_session.commit()
