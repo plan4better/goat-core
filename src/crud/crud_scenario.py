@@ -1,3 +1,4 @@
+from typing import List
 from uuid import UUID
 
 from sqlalchemy import select, text
@@ -16,6 +17,7 @@ from src.schemas.scenario import (
     IScenarioFeatureUpdate,
     IScenarioUpdate,
 )
+from src.utils import to_feature_collection
 
 
 class CRUDScenario(CRUDBase[Scenario, IScenarioCreate, IScenarioUpdate]):
@@ -91,47 +93,33 @@ class CRUDScenario(CRUDBase[Scenario, IScenarioCreate, IScenarioUpdate]):
 
         return transformed_features
 
-    async def create_feature(
+    async def create_features(
         self,
         async_session: AsyncSession,
         user_id: UUID,
-        layer_project: LayerProjectLink,
         scenario: Scenario,
-        feature: IScenarioFeatureCreate,
+        features: List[IScenarioFeatureCreate],
     ):
         """Create a feature in a scenario."""
 
-        feature_id = feature.get("id")
-        if feature_id:
-            feature_db = await CRUDBase(ScenarioFeature).get(
-                db=async_session, id=feature_id
-            )
-            if feature_db:
-                return feature_db
-
-        user_table = get_user_table(layer_project.layer.dict())
-        origin_feature_result = await async_session.execute(
-            text(f"""SELECT * FROM {user_table} WHERE id = :id"""),
-            {"id": feature["feature_id"]},
-        )
-        origin_feature_obj = origin_feature_result.fetchone()
-        if origin_feature_obj:
-            scenario_feature_dict = {
-                **origin_feature_obj,
-                "id": None,
-                "feature_id": feature["feature_id"],
-                "layer_project_id": layer_project.id,
-                "edit_type": feature["edit_type"],
-            }
-            scenario_feature_obj = ScenarioFeature(**scenario_feature_dict)
+        scenario_features = []
+        for feature in features:
+            scenario_feature = ScenarioFeature.from_orm(feature)
             scenario_scenario_feature_link = ScenarioScenarioFeatureLink(
-                scenario=scenario, scenario_feature=scenario_feature_obj
+                scenario=scenario, scenario_feature=scenario_feature
             )
+            async_session.add(scenario_feature)
             async_session.add(scenario_scenario_feature_link)
-            await async_session.commit()
-            return scenario_feature_obj
+            scenario_features.append(scenario_feature)
 
-        raise ValueError("Feature does not exist")
+        await async_session.commit()
+
+        for scenario_feature in scenario_features:
+            await async_session.refresh(scenario_feature)
+
+        fc = to_feature_collection(scenario_features)
+
+        return fc
 
     async def update_feature(
         self,
@@ -145,12 +133,11 @@ class CRUDScenario(CRUDBase[Scenario, IScenarioCreate, IScenarioUpdate]):
 
         attribute_mapping = self._get_rev_attr_mapping(layer_project)
 
-        feature_db = None
         # Check if feature exists in the scenario_feature table
-        if isinstance(feature.id, UUID):
-            feature_db = await CRUDBase(ScenarioFeature).get(
-                db=async_session, id=feature.id
-            )
+        feature_db = feature_db = await CRUDBase(ScenarioFeature).get(
+            db=async_session, id=feature.id
+        )
+        if feature_db:
             for key, value in feature.dict().items():
                 if value is not None and key in attribute_mapping:
                     setattr(feature_db, attribute_mapping[key], value)
@@ -161,29 +148,28 @@ class CRUDScenario(CRUDBase[Scenario, IScenarioCreate, IScenarioUpdate]):
             return feature_db
 
         # New modified feature. Create a new feature in the scenario_feature table
-        elif isinstance(feature.id, int):
-            origin_feature_obj = await self._get_origin_features(
-                async_session, layer_project, feature.id
-            )
-            if origin_feature_obj:
-                scenario_feature_dict = {
-                    **origin_feature_obj,
-                    "id": None,
-                    "feature_id": feature.id,
-                    "layer_project_id": layer_project.id,
-                    "edit_type": ScenarioFeatureEditType.modified,
-                }
-                for key, value in feature.dict().items():
-                    if value is not None and key in attribute_mapping:
-                        scenario_feature_dict[attribute_mapping[key]] = value
+        origin_feature_obj = await self._get_origin_features(
+            async_session, layer_project, feature.id
+        )
+        if origin_feature_obj:
+            scenario_feature_dict = {
+                **origin_feature_obj,
+                "id": None,
+                "feature_id": feature.id,
+                "layer_project_id": layer_project.id,
+                "edit_type": ScenarioFeatureEditType.modified,
+            }
+            for key, value in feature.dict().items():
+                if value is not None and key in attribute_mapping:
+                    scenario_feature_dict[attribute_mapping[key]] = value
 
-                scenario_feature_obj = ScenarioFeature(**scenario_feature_dict)
-                scenario_scenario_feature_link = ScenarioScenarioFeatureLink(
-                    scenario=scenario, scenario_feature=scenario_feature_obj
-                )
-                async_session.add(scenario_scenario_feature_link)
-                await async_session.commit()
-                return scenario_feature_obj
+            scenario_feature_obj = ScenarioFeature(**scenario_feature_dict)
+            scenario_scenario_feature_link = ScenarioScenarioFeatureLink(
+                scenario=scenario, scenario_feature=scenario_feature_obj
+            )
+            async_session.add(scenario_scenario_feature_link)
+            await async_session.commit()
+            return scenario_feature_obj
 
         raise ValueError("Cannot update feature")
 
@@ -193,40 +179,38 @@ class CRUDScenario(CRUDBase[Scenario, IScenarioCreate, IScenarioUpdate]):
         user_id: UUID,
         layer_project: LayerProjectLink,
         scenario: Scenario,
-        feature_id: UUID | int,
+        feature_id: UUID,
     ):
         """Delete a feature from a scenario."""
 
         # Check if feature exists in the scenario_feature table
-        feature_db = None
-        if isinstance(feature_id, UUID):
-            feature_db = await CRUDBase(ScenarioFeature).get(
-                db=async_session, id=feature_id
+        feature_db = await CRUDBase(ScenarioFeature).get(
+            db=async_session, id=feature_id
+        )
+        if feature_db:
+            return await CRUDBase(ScenarioFeature).remove(
+                db=async_session, id=feature_db.id
             )
-            if feature_db:
-                return await CRUDBase(ScenarioFeature).remove(
-                    db=async_session, id=feature_db.id
-                )
 
-        elif isinstance(feature_id, int):
-            origin_feature_obj = await self._get_origin_features(
-                async_session, layer_project, feature_id
+        # New deleted feature. Create a new feature in the scenario_feature table
+        origin_feature_obj = await self._get_origin_features(
+            async_session, layer_project, feature_id
+        )
+        if origin_feature_obj:
+            scenario_feature_dict = {
+                **origin_feature_obj,
+                "id": None,
+                "feature_id": feature_id,
+                "layer_project_id": layer_project.id,
+                "edit_type": ScenarioFeatureEditType.deleted,
+            }
+            scenario_feature_obj = ScenarioFeature(**scenario_feature_dict)
+            scenario_scenario_feature_link = ScenarioScenarioFeatureLink(
+                scenario=scenario, scenario_feature=scenario_feature_obj
             )
-            if origin_feature_obj:
-                scenario_feature_dict = {
-                    **origin_feature_obj,
-                    "id": None,
-                    "feature_id": feature_id,
-                    "layer_project_id": layer_project.id,
-                    "edit_type": ScenarioFeatureEditType.deleted,
-                }
-                scenario_feature_obj = ScenarioFeature(**scenario_feature_dict)
-                scenario_scenario_feature_link = ScenarioScenarioFeatureLink(
-                    scenario=scenario, scenario_feature=scenario_feature_obj
-                )
-                async_session.add(scenario_scenario_feature_link)
-                await async_session.commit()
-                return scenario_feature_obj
+            async_session.add(scenario_scenario_feature_link)
+            await async_session.commit()
+            return scenario_feature_obj
 
         # Throw error if feature does not exist
         raise ValueError("Feature does not exist")
