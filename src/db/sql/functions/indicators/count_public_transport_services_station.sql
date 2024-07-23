@@ -1,6 +1,8 @@
 DROP FUNCTION IF EXISTS basic.count_public_transport_services_station;
 CREATE OR REPLACE FUNCTION basic.count_public_transport_services_station(
-	table_area TEXT, 
+	table_area TEXT,
+	area_layer_project_id INT,
+	scenario_id TEXT,
 	where_filter TEXT,
 	start_time interval,
 	end_time interval,
@@ -18,7 +20,9 @@ BEGIN
 	PERFORM basic.create_distributed_polygon_table
 	(
 		table_area,
-		'id',
+		area_layer_project_id,
+		'',
+		scenario_id,
 		where_filter,
 		30, 
 		temp_table_area

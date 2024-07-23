@@ -32,16 +32,9 @@ class CRUDTripCountStation(CRUDToolBase):
 
         input_table = layer_project.table_name
         where_query = build_where_clause([layer_project.where_query])
-        if params.scenario_id is not None:
-            # Create a temporary table combining features from the input layer and specified scenario
-            input_table = await self.create_combined_input_layer_scenario_table(
-                input_table=input_table,
-                input_layer_project_id=layer_project.id,
-                scenario_id=params.scenario_id,
-                attribute_columns=None,
-                where_filter=where_query,
-            )
-            where_query = ""
+        scenario_id = (
+            "NULL" if params.scenario_id is None else f"'{str(params.scenario_id)}'"
+        )
 
         # Create result layer object
         pt_modes = list(public_transport_types.keys())
@@ -81,6 +74,8 @@ class CRUDTripCountStation(CRUDToolBase):
             (summarized ->> 'rail')::integer + (summarized ->> 'other')::integer AS total
             FROM basic.count_public_transport_services_station(
                 '{input_table}',
+                {layer_project.id},
+                {scenario_id},
                 :where_query,
                 '{str(timedelta(seconds=params.time_window.from_time))}',
                 '{str(timedelta(seconds=params.time_window.to_time))}',

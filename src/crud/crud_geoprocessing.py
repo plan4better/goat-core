@@ -1,9 +1,9 @@
-from src.core.tool import CRUDToolBase
-from src.schemas.tool import IBuffer
-from src.schemas.job import JobStatusType
-from src.core.job import job_log, job_init, run_background_or_immediately
 from src.core.config import settings
-from src.schemas.layer import IFeatureLayerToolCreate, FeatureGeometryType
+from src.core.job import job_init, job_log, run_background_or_immediately
+from src.core.tool import CRUDToolBase
+from src.schemas.job import JobStatusType
+from src.schemas.layer import FeatureGeometryType, IFeatureLayerToolCreate
+from src.schemas.tool import IBuffer
 from src.schemas.toolbox_base import DefaultResultLayerName
 
 
@@ -37,8 +37,7 @@ class CRUDBuffer(CRUDToolBase):
         }
         temp_table_name = await function_mapping[
             layer_project.feature_layer_geometry_type
-        ](layer_project=layer_project)
-
+        ](layer_project=layer_project, scenario_id=params.scenario_id)
 
         # Buffer steps based on params.max_distance and params.distance_step
         steps = []
@@ -118,7 +117,6 @@ class CRUDBuffer(CRUDToolBase):
             "status": JobStatusType.finished.value,
             "msg": "Feature were successfully buffered.",
         }
-
 
     @run_background_or_immediately(settings)
     @job_init()

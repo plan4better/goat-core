@@ -1,14 +1,15 @@
 from sqlalchemy import text
 
+from src.core.chart import Chart
 from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
 from src.core.tool import (
     CRUDToolBase,
-    get_statistics_sql,
-    convert_geom_measurement_field,
     assign_attribute,
+    convert_geom_measurement_field,
+    get_statistics_sql,
 )
-from src.core.chart import Chart
+from src.schemas.error import ColumnTypeError
 from src.schemas.job import JobStatusType
 from src.schemas.layer import (
     FeatureGeometryType,
@@ -17,7 +18,6 @@ from src.schemas.layer import (
 )
 from src.schemas.tool import IAggregationPoint, IAggregationPolygon, IOriginDestination
 from src.schemas.toolbox_base import ColumnStatisticsOperation, DefaultResultLayerName
-from src.schemas.error import ColumnTypeError
 from src.utils import (
     get_result_column,
     search_value,
@@ -60,6 +60,7 @@ class CRUDAggregateBase(CRUDToolBase, Chart):
         ):
             temp_source = await self.create_distributed_point_table(
                 layer_project=source_layer_project,
+                scenario_id=params.scenario_id,
             )
         elif (
             source_layer_project.feature_layer_geometry_type
@@ -67,6 +68,7 @@ class CRUDAggregateBase(CRUDToolBase, Chart):
         ):
             temp_source = await self.create_distributed_polygon_table(
                 layer_project=source_layer_project,
+                scenario_id=params.scenario_id,
             )
 
         # Check if aggregation_layer_project_id exists
@@ -74,6 +76,7 @@ class CRUDAggregateBase(CRUDToolBase, Chart):
             # Create distributed polygon table
             temp_aggregation = await self.create_distributed_polygon_table(
                 layer_project=aggregation_layer_project,
+                scenario_id=params.scenario_id,
             )
             attribute_mapping_aggregation = (
                 aggregation_layer_project.attribute_mapping.copy()

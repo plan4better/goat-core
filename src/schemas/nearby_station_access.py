@@ -62,7 +62,7 @@ class INearbyStationAccess(BaseModel):
     scenario_id: UUID | None = Field(
         None,
         title="Scenario ID",
-        description="The ID of the scenario that is used for the routing.",
+        description="The ID of the scenario that is to be applied on the input layer or base network.",
     )
 
     # Check that starting points are a layer if scenario ID is specified

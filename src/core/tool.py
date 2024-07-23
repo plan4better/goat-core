@@ -637,53 +637,29 @@ class CRUDToolBase(CRUDFailedJob):
         temp_table = f"temporal.{prefix}_{get_random_string(6)}_{table_suffix}"
         return temp_table
 
-    async def create_combined_input_layer_scenario_table(
-        self,
-        input_table: str,
-        input_layer_project_id: int,
-        scenario_id: UUID,
-        attribute_columns: list[str],
-        where_filter: str,
-    ):
-        """Creates a temporary table combining features from an input layer and a specified scenario."""
-
-        # Create temp table name
-        temp_table = await self.create_temp_table_name("combined_input_layer_scenario")
-
-        # Create combined input layer scenario table using sql
-        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
-        additional_columns = (
-            f", {', '.join(attribute_columns)}" if attribute_columns else ""
-        )
-        await self.async_session.execute(
-            f"""SELECT basic.create_combined_input_layer_scenario_table(
-                '{input_table}',
-                {input_layer_project_id},
-                {scenario_id},
-                '{additional_columns}',
-                '{where_filter.replace("'", "''")}',
-                '{temp_table}'
-            )"""
-        )
-        # Commit changes
-        await self.async_session.commit()
-        return temp_table
-
     async def create_distributed_polygon_table(
         self,
         layer_project: BaseModel,
+        scenario_id: UUID,
     ):
         # Create table name
         temp_polygons = await self.create_temp_table_name("polygons")
 
         # Create distributed polygon table using sql
         where_query_polygon = "WHERE " + layer_project.where_query.replace("'", "''")
-        arr_columns = ["id"] + list(layer_project.attribute_mapping.keys())
+        arr_columns = (
+            f", {', '.join(list(layer_project.attribute_mapping.keys()))}"
+            if layer_project.attribute_mapping
+            else ""
+        )
+        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
 
         await self.async_session.execute(
             f"""SELECT basic.create_distributed_polygon_table(
                 '{layer_project.table_name}',
-                '{', '.join(arr_columns)}',
+                {layer_project.id},
+                '{arr_columns}',
+                {scenario_id},
                 '{where_query_polygon}',
                 30,
                 '{temp_polygons}'
@@ -696,18 +672,26 @@ class CRUDToolBase(CRUDFailedJob):
     async def create_distributed_line_table(
         self,
         layer_project: BaseModel,
+        scenario_id: UUID,
     ):
         # Create temp table name for lines
         temp_lines = await self.create_temp_table_name("lines")
 
         # Create distributed line table using sql
         where_query_line = "WHERE " + layer_project.where_query.replace("'", "''")
-        arr_columns = ["id"] + list(layer_project.attribute_mapping.keys())
+        arr_columns = (
+            f", {', '.join(list(layer_project.attribute_mapping.keys()))}"
+            if layer_project.attribute_mapping
+            else ""
+        )
+        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
 
         await self.async_session.execute(
             f"""SELECT basic.create_distributed_line_table(
                 '{layer_project.table_name}',
-                '{', '.join(arr_columns)}',
+                {layer_project.id},
+                '{arr_columns}',
+                {scenario_id},
                 '{where_query_line}',
                 '{temp_lines}'
             )"""
@@ -719,18 +703,26 @@ class CRUDToolBase(CRUDFailedJob):
     async def create_distributed_point_table(
         self,
         layer_project: BaseModel,
+        scenario_id: UUID,
     ):
         # Create temp table name for points
         temp_points = await self.create_temp_table_name("points")
 
         # Create distributed point table using sql
         where_query_point = "WHERE " + layer_project.where_query.replace("'", "''")
-        arr_columns = ["id"] + list(layer_project.attribute_mapping.keys())
+        arr_columns = (
+            f", {', '.join(list(layer_project.attribute_mapping.keys()))}"
+            if layer_project.attribute_mapping
+            else ""
+        )
+        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
 
         await self.async_session.execute(
             f"""SELECT basic.create_distributed_point_table(
                 '{layer_project.table_name}',
-                '{', '.join(arr_columns)}',
+                {layer_project.id},
+                '{arr_columns}',
+                {scenario_id},
                 '{where_query_point}',
                 '{temp_points}'
             )"""
