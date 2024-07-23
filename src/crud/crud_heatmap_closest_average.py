@@ -32,10 +32,12 @@ class CRUDHeatmapClosestAverage(CRUDHeatmapBase):
         # Create temp table name for points
         temp_points = await self.create_temp_table_name("points")
 
+        # Create formatted scenario ID string for SQL query
+        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
+
         append_to_existing = False
         for layer in layers:
             # Create distributed point table using sql
-            scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
             await self.async_session.execute(
                 f"""SELECT basic.create_heatmap_closest_average_opportunity_table(
                     {layer["layer"].opportunity_layer_project_id},

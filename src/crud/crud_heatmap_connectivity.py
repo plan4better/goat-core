@@ -33,8 +33,10 @@ class CRUDHeatmapConnectivity(CRUDToolBase):
         # Create temp table name for points
         temp_points = await self.create_temp_table_name("points")
 
-        # Create distributed point table using sql
+        # Create formatted scenario ID string for SQL query
         scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
+
+        # Create distributed point table using sql
         await self.async_session.execute(
             f"""SELECT basic.create_heatmap_connectivity_opportunity_table(
                 {layer_project.id},
