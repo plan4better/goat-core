@@ -27,8 +27,8 @@ class IScenarioFeatureCreate(BaseModel):
 
 @optional
 class IScenarioFeatureUpdate(BaseModel):
-    id: UUID | int
-    feature_id: int
+    id: UUID
+    feature_id: UUID
     edit_type: ScenarioFeatureEditType
     layer_project_id: int
     geom: str
