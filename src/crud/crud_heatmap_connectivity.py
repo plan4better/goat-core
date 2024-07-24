@@ -38,7 +38,7 @@ class CRUDHeatmapConnectivity(CRUDToolBase):
 
         # Create distributed point table using sql
         await self.async_session.execute(
-            f"""SELECT basic.create_heatmap_connectivity_opportunity_table(
+            f"""SELECT basic.create_heatmap_connectivity_reference_area_table(
                 {layer_project.id},
                 '{layer_project.table_name}',
                 {scenario_id},

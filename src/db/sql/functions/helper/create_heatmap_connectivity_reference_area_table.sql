@@ -1,5 +1,5 @@
-DROP FUNCTION IF EXISTS basic.create_heatmap_connectivity_opportunity_table; 
-CREATE OR REPLACE FUNCTION basic.create_heatmap_connectivity_opportunity_table(
+DROP FUNCTION IF EXISTS basic.create_heatmap_connectivity_reference_area_table; 
+CREATE OR REPLACE FUNCTION basic.create_heatmap_connectivity_reference_area_table(
     input_layer_project_id int, input_table text, scenario_id text, where_filter text,
     result_table_name text, grid_resolution int, append_existing boolean
 )
