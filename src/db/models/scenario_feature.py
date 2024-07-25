@@ -131,6 +131,16 @@ class ScenarioFeature(DateTimeBase, UserData, table=True):
         description="Project layer ID",
     )
 
+    h3_3: int | None = Field(
+        sa_column=Column(Integer, nullable=True),
+        description="H3 resolution 3",
+    )
+
+    h3_6: int | None = Field(
+        sa_column=Column(Integer, nullable=True),
+        description="H3 resolution 6",
+    )
+
     edit_type: ScenarioFeatureEditType = Field(
         sa_column=Column(Text, nullable=False), description="Type of the edit"
     )

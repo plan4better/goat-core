@@ -737,7 +737,7 @@ async def update_scenario_feature(
 
 
 @router.delete(
-    "/{project_id}/layer/{layer_project_id}/scenario/{scenario_id}/features/{feature_id}",
+    "/{project_id}/layer/{layer_project_id}/scenario/{scenario_id}/h33/{h3_3}features/{feature_id}",
     summary="Delete scenario feature",
     status_code=204,
 )
@@ -753,6 +753,11 @@ async def delete_scenario_features(
     feature_id: UUID = Path(
         ...,
         description="Feature ID to delete",
+    ),
+    h3_3: int = Path(
+        ...,
+        description="H3 3 resolution",
+        example="1",
     ),
 ):
 
@@ -771,6 +776,7 @@ async def delete_scenario_features(
         layer_project=layer_project,
         scenario=scenario,
         feature_id=feature_id,
+        h3_3=h3_3,
     )
 
     return None
