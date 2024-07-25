@@ -1,11 +1,14 @@
+from uuid import UUID
+
 from pydantic import BaseModel, Field
+
+from src.schemas.colors import ColorRangeType
 from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import (
+    DefaultResultLayerName,
     PTTimeWindow,
     input_layer_type_polygon,
-    DefaultResultLayerName,
 )
-from src.schemas.colors import ColorRangeType
 
 
 class ITripCountStation(BaseModel):
@@ -20,6 +23,11 @@ class ITripCountStation(BaseModel):
         ...,
         title="Time Window",
         description="The time window for the trip count.",
+    )
+    scenario_id: UUID | None = Field(
+        None,
+        title="Scenario ID",
+        description="The ID of the scenario that is to be applied on the input layer or base network.",
     )
 
     @property

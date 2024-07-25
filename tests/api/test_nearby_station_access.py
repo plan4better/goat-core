@@ -15,39 +15,39 @@ from src.schemas.toolbox_base import PTSupportedDay
     [
         (
             "point_single",
-            CatchmentAreaRoutingModeActiveMobility.walking.value, 5, 15,
-            [CatchmentAreaRoutingModePT.bus.value, CatchmentAreaRoutingModePT.tram.value, CatchmentAreaRoutingModePT.subway.value, CatchmentAreaRoutingModePT.rail.value],
-            PTSupportedDay.weekday.value, 25200, 32400
+            CatchmentAreaRoutingModeActiveMobility.walking, 5, 15,
+            [CatchmentAreaRoutingModePT.bus, CatchmentAreaRoutingModePT.tram, CatchmentAreaRoutingModePT.subway, CatchmentAreaRoutingModePT.rail],
+            PTSupportedDay.weekday, 25200, 32400
         ),
         (
             "point_single",
-            CatchmentAreaRoutingModeActiveMobility.pedelec.value, 23, 8,
-            [CatchmentAreaRoutingModePT.funicular.value, CatchmentAreaRoutingModePT.gondola.value],
-            PTSupportedDay.sunday.value, 61200, 79200
+            CatchmentAreaRoutingModeActiveMobility.pedelec, 23, 8,
+            [CatchmentAreaRoutingModePT.funicular, CatchmentAreaRoutingModePT.gondola],
+            PTSupportedDay.sunday, 61200, 79200
         ),
         (
             "point_multiple",
-            CatchmentAreaRoutingModeActiveMobility.walking.value, 7, 13,
-            [CatchmentAreaRoutingModePT.bus.value, CatchmentAreaRoutingModePT.tram.value, CatchmentAreaRoutingModePT.subway.value, CatchmentAreaRoutingModePT.rail.value],
-            PTSupportedDay.saturday.value, 25200, 32400
+            CatchmentAreaRoutingModeActiveMobility.walking, 7, 13,
+            [CatchmentAreaRoutingModePT.bus, CatchmentAreaRoutingModePT.tram, CatchmentAreaRoutingModePT.subway, CatchmentAreaRoutingModePT.rail],
+            PTSupportedDay.saturday, 25200, 32400
         ),
         (
             "point_multiple",
-            CatchmentAreaRoutingModeActiveMobility.bicycle.value, 15, 11,
-            [CatchmentAreaRoutingModePT.tram.value, CatchmentAreaRoutingModePT.ferry.value, CatchmentAreaRoutingModePT.cable_car.value, CatchmentAreaRoutingModePT.rail.value],
-            PTSupportedDay.weekday.value, 68400, 82800
+            CatchmentAreaRoutingModeActiveMobility.bicycle, 15, 11,
+            [CatchmentAreaRoutingModePT.tram, CatchmentAreaRoutingModePT.ferry, CatchmentAreaRoutingModePT.cable_car, CatchmentAreaRoutingModePT.rail],
+            PTSupportedDay.weekday, 68400, 82800
         ),
         (
             "point_layer",
-            CatchmentAreaRoutingModeActiveMobility.walking.value, 13, 5,
-            [CatchmentAreaRoutingModePT.bus.value, CatchmentAreaRoutingModePT.tram.value, CatchmentAreaRoutingModePT.subway.value, CatchmentAreaRoutingModePT.rail.value],
-            PTSupportedDay.saturday.value, 46800, 57600
+            CatchmentAreaRoutingModeActiveMobility.walking, 13, 5,
+            [CatchmentAreaRoutingModePT.bus, CatchmentAreaRoutingModePT.tram, CatchmentAreaRoutingModePT.subway, CatchmentAreaRoutingModePT.rail],
+            PTSupportedDay.saturday, 46800, 57600
         ),
         (
             "point_layer",
-            CatchmentAreaRoutingModeActiveMobility.pedelec.value, 20, 15,
-            [CatchmentAreaRoutingModePT.subway.value, CatchmentAreaRoutingModePT.rail.value, CatchmentAreaRoutingModePT.ferry.value],
-            PTSupportedDay.weekday.value, 25200, 61200
+            CatchmentAreaRoutingModeActiveMobility.pedelec, 20, 15,
+            [CatchmentAreaRoutingModePT.subway, CatchmentAreaRoutingModePT.rail, CatchmentAreaRoutingModePT.ferry],
+            PTSupportedDay.weekday, 25200, 61200
         ),
     ]
 )
@@ -76,7 +76,7 @@ async def test_nearby_station_access(
         layer_project_id = fixture_add_aggregate_point_layer_to_project["source_layer_project_id"]
         starting_points = {"layer_project_id": layer_project_id}
 
-    # Produce nearby stations access request payload
+    # Produce request payload
     params = {
         "starting_points": starting_points,
         "access_mode": access_mode,

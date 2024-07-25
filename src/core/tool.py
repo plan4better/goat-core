@@ -7,13 +7,14 @@ from httpx import AsyncClient
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
+
 from src.core.job import CRUDFailedJob
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import layer as crud_layer
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.crud.crud_project import project as crud_project
 from src.db.models.layer import FeatureType, Layer, LayerType, ToolType
-from src.schemas.common import OrderEnum
+from src.schemas.common import CQLQueryObject, OrderEnum
 from src.schemas.error import (
     AreaSizeError,
     ColumnTypeError,
@@ -31,23 +32,23 @@ from src.schemas.layer import (
     OgrPostgresType,
     UserDataGeomType,
 )
-from src.schemas.common import CQLQueryObject
 from src.schemas.style import (
-    get_base_style,
-    get_tool_style_with_breaks,
-    get_tool_style_ordinal,
     custom_styles,
+    get_base_style,
+    get_tool_style_ordinal,
+    get_tool_style_with_breaks,
 )
 from src.schemas.tool import IToolParam
 from src.schemas.toolbox_base import (
-    ColumnStatisticsOperation,
     ColumnStatistic,
+    ColumnStatisticsOperation,
+    DefaultResultLayerName,
     GeofenceTable,
     MaxFeatureCnt,
     MaxFeaturePolygonArea,
-    DefaultResultLayerName,
 )
 from src.utils import build_where_clause, get_random_string, search_value
+
 
 def assign_attribute(mapped_column, attribute_mapping, attribute_value):
     base_attr = mapped_column.split("_")[0]
@@ -61,6 +62,7 @@ def assign_attribute(mapped_column, attribute_mapping, attribute_value):
             count_attr += 1
         attribute_mapping[base_attr + f"_attr{count_attr}"] = attribute_value
     return attribute_mapping
+
 
 async def start_calculation(
     job_type: JobType,
@@ -167,7 +169,9 @@ class CRUDToolBase(CRUDFailedJob):
         if layer_project.query is None:
             query = {"cql": spatial_filter}
         else:
-            query = {"cql": {"op": "and", "args": [layer_project.query.cql, spatial_filter]}}
+            query = {
+                "cql": {"op": "and", "args": [layer_project.query.cql, spatial_filter]}
+            }
 
         layer_project.query = CQLQueryObject(**query)
         return layer_project
@@ -636,18 +640,26 @@ class CRUDToolBase(CRUDFailedJob):
     async def create_distributed_polygon_table(
         self,
         layer_project: BaseModel,
+        scenario_id: UUID,
     ):
         # Create table name
         temp_polygons = await self.create_temp_table_name("polygons")
 
         # Create distributed polygon table using sql
         where_query_polygon = "WHERE " + layer_project.where_query.replace("'", "''")
-        arr_columns = ["id"] + list(layer_project.attribute_mapping.keys())
+        arr_columns = (
+            f", {', '.join(list(layer_project.attribute_mapping.keys()))}"
+            if layer_project.attribute_mapping
+            else ""
+        )
+        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
 
         await self.async_session.execute(
             f"""SELECT basic.create_distributed_polygon_table(
                 '{layer_project.table_name}',
-                '{', '.join(arr_columns)}',
+                {layer_project.id},
+                '{arr_columns}',
+                {scenario_id},
                 '{where_query_polygon}',
                 30,
                 '{temp_polygons}'
@@ -660,18 +672,26 @@ class CRUDToolBase(CRUDFailedJob):
     async def create_distributed_line_table(
         self,
         layer_project: BaseModel,
+        scenario_id: UUID,
     ):
         # Create temp table name for lines
         temp_lines = await self.create_temp_table_name("lines")
 
         # Create distributed line table using sql
         where_query_line = "WHERE " + layer_project.where_query.replace("'", "''")
-        arr_columns = ["id"] + list(layer_project.attribute_mapping.keys())
+        arr_columns = (
+            f", {', '.join(list(layer_project.attribute_mapping.keys()))}"
+            if layer_project.attribute_mapping
+            else ""
+        )
+        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
 
         await self.async_session.execute(
             f"""SELECT basic.create_distributed_line_table(
                 '{layer_project.table_name}',
-                '{', '.join(arr_columns)}',
+                {layer_project.id},
+                '{arr_columns}',
+                {scenario_id},
                 '{where_query_line}',
                 '{temp_lines}'
             )"""
@@ -683,18 +703,26 @@ class CRUDToolBase(CRUDFailedJob):
     async def create_distributed_point_table(
         self,
         layer_project: BaseModel,
+        scenario_id: UUID,
     ):
         # Create temp table name for points
         temp_points = await self.create_temp_table_name("points")
 
         # Create distributed point table using sql
         where_query_point = "WHERE " + layer_project.where_query.replace("'", "''")
-        arr_columns = ["id"] + list(layer_project.attribute_mapping.keys())
+        arr_columns = (
+            f", {', '.join(list(layer_project.attribute_mapping.keys()))}"
+            if layer_project.attribute_mapping
+            else ""
+        )
+        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
 
         await self.async_session.execute(
             f"""SELECT basic.create_distributed_point_table(
                 '{layer_project.table_name}',
-                '{', '.join(arr_columns)}',
+                {layer_project.id},
+                '{arr_columns}',
+                {scenario_id},
                 '{where_query_point}',
                 '{temp_points}'
             )"""

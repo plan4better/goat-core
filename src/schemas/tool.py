@@ -1,28 +1,28 @@
 from enum import Enum
+from uuid import UUID
 
-from pydantic import BaseModel, Field, validator, conlist
+from pydantic import BaseModel, Field, conlist, validator
 
-from src.schemas.catchment_area import ICatchmentAreaActiveMobility
+from src.db.models.layer import LayerType, ToolType
 from src.schemas.catchment_area import (
-    ICatchmentAreaPT,
+    ICatchmentAreaActiveMobility,
     ICatchmentAreaCar,
+    ICatchmentAreaPT,
 )
+from src.schemas.colors import ColorRangeType
+from src.schemas.layer import FeatureGeometryType
 from src.schemas.oev_gueteklasse import IOevGueteklasse
 from src.schemas.toolbox_base import (
     ColumnStatistic,
     ColumnStatisticsOperation,
+    DefaultResultLayerName,
     InputLayerType,
+    input_layer_table,
     input_layer_type_feature_all,
     input_layer_type_point,
-    input_layer_type_polygon,
     input_layer_type_point_polygon,
-    input_layer_table,
-    DefaultResultLayerName,
+    input_layer_type_polygon,
 )
-from src.db.models.layer import LayerType
-from src.schemas.layer import FeatureGeometryType
-from src.db.models.layer import ToolType
-from src.schemas.colors import ColorRangeType
 
 
 class IJoin(BaseModel):
@@ -132,6 +132,11 @@ class IAggregationBase(BaseModel):
         None,
         title="Source Group By Field",
         description="The field in the source layer that is used to group the aggregated points.",
+    )
+    scenario_id: UUID | None = Field(
+        None,
+        title="Scenario ID",
+        description="The ID of the scenario that is to be applied on the input layer or base network.",
     )
 
     @validator("h3_resolution", pre=True, always=True)
@@ -260,6 +265,11 @@ class IBuffer(BaseModel):
         None,
         title="Polygon Difference",
         description="If true, the polygons returned will be the geometrical difference of the current step and the predecessor steps.",
+    )
+    scenario_id: UUID | None = Field(
+        None,
+        title="Scenario ID",
+        description="The ID of the scenario that is to be applied on the input layer or base network.",
     )
 
     # Make sure that the number of steps is smaller then then max distance

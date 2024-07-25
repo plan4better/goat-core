@@ -1,48 +1,53 @@
 import asyncio
+from uuid import UUID
+
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
+
 from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
 from src.core.tool import CRUDToolBase
 from src.jsoline import generate_jsolines
 from src.schemas.catchment_area import (
-    ICatchmentAreaActiveMobility,
-    ICatchmentAreaPT,
-    ICatchmentAreaCar,
     CatchmentAreaNearbyStationAccess,
-    CatchmentAreaTravelTimeCostActiveMobility,
     CatchmentAreaRoutingModeActiveMobility,
     CatchmentAreaRoutingModeCar,
+    CatchmentAreaTravelTimeCostActiveMobility,
     CatchmentAreaTravelTimeCostMotorizedMobility,
+    ICatchmentAreaActiveMobility,
+    ICatchmentAreaCar,
+    ICatchmentAreaPT,
 )
 from src.schemas.error import (
     OutOfGeofenceError,
-    R5EndpointError,
     R5CatchmentAreaComputeError,
+    R5EndpointError,
     RoutingEndpointError,
     SQLError,
 )
 from src.schemas.job import JobStatusType
 from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
 from src.schemas.toolbox_base import (
-    DefaultResultLayerName,
     CatchmentAreaGeometryTypeMapping,
+    DefaultResultLayerName,
 )
 from src.utils import decode_r5_grid
 
 
 async def call_routing_endpoint(
-        routing_mode: CatchmentAreaRoutingModeActiveMobility | CatchmentAreaRoutingModeCar,
-        request_payload: dict, http_client: AsyncClient,
+    routing_mode: CatchmentAreaRoutingModeActiveMobility | CatchmentAreaRoutingModeCar,
+    request_payload: dict,
+    http_client: AsyncClient,
 ):
     try:
         # Call GOAT Routing endpoint multiple times for upto 20 seconds / 10 retries
         for i in range(settings.CRUD_NUM_RETRIES):
             # Call GOAT Routing endpoint to compute catchment area
-            url = f"{settings.GOAT_ROUTING_URL}/active-mobility/catchment-area" \
-                if type(routing_mode) == CatchmentAreaRoutingModeActiveMobility else \
-                    f"{settings.GOAT_ROUTING_URL}/motorized-mobility/catchment-area"
+            url = (
+                f"{settings.GOAT_ROUTING_URL}/active-mobility/catchment-area"
+                if type(routing_mode) == CatchmentAreaRoutingModeActiveMobility
+                else f"{settings.GOAT_ROUTING_URL}/motorized-mobility/catchment-area"
+            )
             response = await http_client.post(
                 url=url,
                 json=request_payload,
@@ -187,10 +192,34 @@ class CRUDCatchmentAreaBase(CRUDToolBase):
             where_query = f"layer_id = '{layer_starting_points.id}'"
             table_name = self.table_starting_points
 
+        # Fetch features from input layer while applying a scenario if specified
+        scenario_id = (
+            "NULL" if params.scenario_id is None else f"'{str(params.scenario_id)}'"
+        )
+        layer_project_id = (
+            "NULL"
+            if params.starting_points.layer_project_id is None
+            else f"{params.starting_points.layer_project_id}"
+        )
         sql = f"""
             SELECT ST_X(geom) AS lon, ST_Y(geom) AS lat
-            FROM {table_name}
-            WHERE {where_query};
+            FROM (
+                WITH scenario_features AS (
+                    SELECT sf.feature_id AS id, sf.geom, sf.edit_type
+                    FROM customer.scenario_scenario_feature ssf
+                    INNER JOIN customer.scenario_feature sf ON sf.id = ssf.scenario_feature_id
+                    WHERE ssf.scenario_id = {scenario_id}
+                    AND sf.layer_project_id = {layer_project_id}
+                )
+                    SELECT original_features.id, original_features.geom
+                    FROM (SELECT * FROM {table_name} WHERE {where_query}) original_features
+                    LEFT JOIN scenario_features ON original_features.id = scenario_features.id
+                    WHERE scenario_features.id IS NULL
+                UNION ALL
+                    SELECT scenario_features.id, scenario_features.geom
+                    FROM scenario_features
+                    WHERE edit_type IN ('n', 'm')
+            ) input_features;
         """
         starting_points = (await self.async_session.execute(sql)).fetchall()
         starting_points = [dict(x) for x in starting_points]
@@ -280,7 +309,9 @@ class CRUDCatchmentAreaActiveMobility(CRUDCatchmentAreaBase):
             "layer_id": str(layer_id),
         }
 
-        await call_routing_endpoint(params.routing_type, request_payload, self.http_client)
+        await call_routing_endpoint(
+            params.routing_type, request_payload, self.http_client
+        )
 
         # Create layers only if result_params are not provided
         if not result_params:
@@ -575,10 +606,10 @@ class CRUDCatchmentAreaCar(CRUDCatchmentAreaBase):
         starting_points = await self.get_lats_lons(
             layer_name=(
                 DefaultResultLayerName.catchment_area_starting_points
-                if not result_params else
-                result_params["starting_points_layer_name"]
+                if not result_params
+                else result_params["starting_points_layer_name"]
             ),
-            params=params
+            params=params,
         )
         lats = starting_points["lats"]
         lons = starting_points["lons"]
@@ -612,7 +643,8 @@ class CRUDCatchmentAreaCar(CRUDCatchmentAreaBase):
                     "max_traveltime": params.travel_cost.max_traveltime,
                     "steps": params.travel_cost.steps,
                 }
-                if type(params.travel_cost) == CatchmentAreaTravelTimeCostMotorizedMobility
+                if type(params.travel_cost)
+                == CatchmentAreaTravelTimeCostMotorizedMobility
                 else {
                     "max_distance": params.travel_cost.max_distance,
                     "steps": params.travel_cost.steps,
@@ -626,7 +658,9 @@ class CRUDCatchmentAreaCar(CRUDCatchmentAreaBase):
             "layer_id": str(layer_id),
         }
 
-        await call_routing_endpoint(params.routing_type, request_payload, self.http_client)
+        await call_routing_endpoint(
+            params.routing_type, request_payload, self.http_client
+        )
 
         # Create layers only if result_params are not provided
         if not result_params:
