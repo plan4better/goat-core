@@ -1,4 +1,5 @@
 from typing import List
+from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from fastapi.responses import JSONResponse
@@ -667,7 +668,7 @@ async def read_scenario_features(
 
 
 @router.post(
-    "/{project_id}/scenario/{scenario_id}/features",
+    "/{project_id}/layer/{layer_project_id}/scenario/{scenario_id}/features",
     summary="Create scenario features",
     response_class=JSONResponse,
     status_code=201,
@@ -682,22 +683,13 @@ async def create_scenario_features(
     ),
 ):
     """Create scenario features."""
-    scenario_features = []
-    for feature in features:
-        scenario_feature = ScenarioFeature.from_orm(feature)
-        scenario_scenario_feature_link = ScenarioScenarioFeatureLink(
-            scenario=scenario, scenario_feature=scenario_feature
-        )
-        async_session.add(scenario_feature)
-        async_session.add(scenario_scenario_feature_link)
-        scenario_features.append(scenario_feature)
 
-    await async_session.commit()
-
-    for scenario_feature in scenario_features:
-        await async_session.refresh(scenario_feature)
-
-    fc = to_feature_collection(scenario_features)
+    fc = await crud_scenario.create_features(
+        async_session=async_session,
+        user_id=scenario.user_id,
+        scenario=scenario,
+        features=features,
+    )
 
     return fc
 
@@ -758,7 +750,7 @@ async def delete_scenario_features(
         example="1",
     ),
     scenario: Scenario = Depends(get_scenario),
-    feature_id: UUID4 | int = Path(
+    feature_id: UUID = Path(
         ...,
         description="Feature ID to delete",
     ),
