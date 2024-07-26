@@ -148,6 +148,9 @@ class CRUDScenario(CRUDBase[Scenario, IScenarioCreate, IScenarioUpdate]):
             await async_session.commit()
             return feature_db
 
+        if feature.h3_3 is None:
+            raise ValueError("h3_3 is required to modify a scenario from user table")
+
         # New modified feature. Create a new feature in the scenario_feature table
         origin_feature_obj = await self._get_origin_features(
             async_session, layer_project, feature.id, feature.h3_3
@@ -181,7 +184,7 @@ class CRUDScenario(CRUDBase[Scenario, IScenarioCreate, IScenarioUpdate]):
         layer_project: LayerProjectLink,
         scenario: Scenario,
         feature_id: UUID,
-        h3_3: int,
+        h3_3: int | None = None,
     ):
         """Delete a feature from a scenario."""
 
@@ -195,6 +198,11 @@ class CRUDScenario(CRUDBase[Scenario, IScenarioCreate, IScenarioUpdate]):
             )
 
         # New deleted feature. Create a new feature in the scenario_feature table
+        if h3_3 is None:
+            raise ValueError(
+                "h3_3 is required to delete a scenario feature which is derived from user table"
+            )
+
         origin_feature_obj = await self._get_origin_features(
             async_session, layer_project, feature_id, h3_3
         )

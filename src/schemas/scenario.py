@@ -31,7 +31,7 @@ class IScenarioFeatureUpdate(BaseModel):
     feature_id: UUID
     edit_type: ScenarioFeatureEditType
     layer_project_id: int
-    h3_3: int
+    h3_3: int | None
     geom: str
 
     class Config:
