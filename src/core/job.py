@@ -289,7 +289,12 @@ class CRUDFailedJob:
         # Get user_id
         user_id = self.user_id
 
-        for table in (UserDataTable.polygon, UserDataTable.line, UserDataTable.point, UserDataTable.no_geometry):
+        for table in (
+            UserDataTable.polygon,
+            UserDataTable.line,
+            UserDataTable.point,
+            UserDataTable.no_geometry,
+        ):
             table_name = f"{table.value}_{str(user_id).replace('-', '')}"
 
             # Build condition for layer filtering
@@ -339,7 +344,7 @@ class CRUDFailedJob:
         # Delete all tables
         for table in tables:
             await self.async_session.execute(
-                f"DROP TABLE IF EXISTS temporal.{table[0]}"
+                f"DROP TABLE IF EXISTS temporal.{table[0]} CASCADE;"
             )
         await self.async_session.commit()
 

@@ -1,8 +1,7 @@
-DROP FUNCTION IF EXISTS basic.create_heatmap_closest_average_opportunity_table; 
-CREATE OR REPLACE FUNCTION basic.create_heatmap_closest_average_opportunity_table(
-    input_layer_project_id int, input_table text, scenario_id text, max_traveltime int,
-    num_destinations int, where_filter text, result_table_name text, grid_resolution int,
-    append_existing boolean
+DROP FUNCTION IF EXISTS basic.create_heatmap_connectivity_reference_area_table; 
+CREATE OR REPLACE FUNCTION basic.create_heatmap_connectivity_reference_area_table(
+    input_layer_project_id int, input_table text, scenario_id text, where_filter text,
+    result_table_name text, grid_resolution int, append_existing boolean
 )
 RETURNS SETOF void
 LANGUAGE plpgsql
@@ -15,8 +14,6 @@ BEGIN
             CREATE TABLE %s (
                 id UUID,
                 h3_index h3index,
-                max_traveltime smallint,
-                num_destinations int,
                 h3_3 int
             );',
             result_table_name, result_table_name
@@ -33,8 +30,8 @@ BEGIN
     -- Produce h3 grid at specified resolution while applying a scenario if specified
     EXECUTE format(
         'INSERT INTO %s
-        SELECT id, h3_lat_lng_to_cell(geom::point, %s) AS h3_index, %s AS max_traveltime, %s AS num_destinations,
-            basic.to_short_h3_3(h3_lat_lng_to_cell(geom::point, 3)::bigint) AS h3_3
+        SELECT input_features.id, h3_index,
+            basic.to_short_h3_3(h3_lat_lng_to_cell(ST_Centroid(h3_boundary)::point, 3)::bigint) AS h3_3
         FROM (
             WITH scenario_features AS (
                 SELECT sf.feature_id AS id, sf.geom, sf.edit_type
@@ -51,9 +48,10 @@ BEGIN
                 SELECT scenario_features.id, scenario_features.geom
                 FROM scenario_features
                 WHERE edit_type IN (''n'', ''m'')
-        ) input_features;',
-        result_table_name, grid_resolution, max_traveltime, num_destinations,
-        scenario_id, input_layer_project_id, input_table, where_filter
+        ) input_features,
+        LATERAL basic.fill_polygon_h3_%s(input_features.geom);',
+        result_table_name, scenario_id, input_layer_project_id, input_table,
+        where_filter, grid_resolution
     );
 
     IF NOT append_existing THEN

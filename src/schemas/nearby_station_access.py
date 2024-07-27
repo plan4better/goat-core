@@ -1,17 +1,18 @@
 from typing import List
-from pydantic import BaseModel, Field
-from src.schemas.colors import ColorRangeType
+from uuid import UUID
+
+from pydantic import BaseModel, Field, validator
+
+from src.schemas.catchment_area import (
+    CatchmentAreaRoutingModeActiveMobility,
+    CatchmentAreaRoutingModePT,
+)
 from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import (
     CatchmentAreaStartingPointsBase,
     PTTimeWindow,
     check_starting_points,
     input_layer_type_point,
-    DefaultResultLayerName,
-)
-from src.schemas.catchment_area import (
-    CatchmentAreaRoutingModeActiveMobility,
-    CatchmentAreaRoutingModePT,
 )
 
 
@@ -58,6 +59,20 @@ class INearbyStationAccess(BaseModel):
         title="Time Window",
         description="The time window of the catchment area.",
     )
+    scenario_id: UUID | None = Field(
+        None,
+        title="Scenario ID",
+        description="The ID of the scenario that is to be applied on the input layer or base network.",
+    )
+
+    # Check that starting points are a layer if scenario ID is specified
+    @validator("scenario_id", pre=True, always=True)
+    def check_starting_points_is_layer(cls, v, values):
+        if v is not None and values["starting_points"].layer_project_id is None:
+            raise ValueError(
+                "Starting points must be a layer if a scenario ID is specified."
+            )
+        return v
 
     @property
     def tool_type(self):

@@ -36,7 +36,7 @@ async def test_heatmap_gravity(
     project_id = fixture_add_aggregate_point_layer_to_project["project_id"]
     layer_project_id = fixture_add_aggregate_point_layer_to_project["source_layer_project_id"]
 
-    # Produce heatmap request payload
+    # Produce request payload
     params = {
         "routing_type": routing_type.value,
         "impedance_function": impedance_function.value,

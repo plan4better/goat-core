@@ -754,6 +754,11 @@ async def delete_scenario_features(
         ...,
         description="Feature ID to delete",
     ),
+    h3_3: int | None = Query(
+        None,
+        description="H3 3 resolution",
+        example=5,
+    ),
 ):
 
     layer_project = await crud_layer_project.get(
@@ -771,6 +776,7 @@ async def delete_scenario_features(
         layer_project=layer_project,
         scenario=scenario,
         feature_id=feature_id,
+        h3_3=h3_3,
     )
 
     return None
