@@ -307,6 +307,7 @@ class CRUDCatchmentAreaActiveMobility(CRUDCatchmentAreaBase):
                 result_table if not result_params else result_params["result_table"]
             ),
             "layer_id": str(layer_id),
+            "scenario_id": params.scenario_id,
         }
 
         await call_routing_endpoint(
@@ -656,6 +657,7 @@ class CRUDCatchmentAreaCar(CRUDCatchmentAreaBase):
                 result_table if not result_params else result_params["result_table"]
             ),
             "layer_id": str(layer_id),
+            "scenario_id": params.scenario_id,
         }
 
         await call_routing_endpoint(
