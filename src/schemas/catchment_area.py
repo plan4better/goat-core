@@ -289,15 +289,6 @@ class ICatchmentAreaActiveMobility(BaseModel):
         description="If true, the polygons returned will be the geometrical difference of two following calculations.",
     )
 
-    # Check that starting points are a layer if scenario ID is specified
-    @validator("scenario_id", pre=True, always=True)
-    def check_starting_points_is_layer(cls, v, values):
-        if v is not None and values["starting_points"].layer_project_id is None:
-            raise ValueError(
-                "Starting points must be a layer if a scenario ID is specified."
-            )
-        return v
-
     # Check that polygon difference exists if catchment area type is polygon
     @validator("polygon_difference", pre=True, always=True)
     def check_polygon_difference(cls, v, values):
@@ -405,15 +396,6 @@ class ICatchmentAreaPT(BaseModel):
     percentiles: List[int] = [5]
     monte_carlo_draws: int = 200
 
-    # Check that starting points are a layer if scenario ID is specified
-    @validator("scenario_id", pre=True, always=True)
-    def check_starting_points_is_layer(cls, v, values):
-        if v is not None and values["starting_points"].layer_project_id is None:
-            raise ValueError(
-                "Starting points must be a layer if a scenario ID is specified."
-            )
-        return v
-
     # Check that polygon difference exists if catchment area type is polygon
     @validator("polygon_difference", pre=True, always=True)
     def check_polygon_difference(cls, v, values):
@@ -498,15 +480,6 @@ class ICatchmentAreaCar(BaseModel):
         title="Polygon Difference",
         description="If true, the polygons returned will be the geometrical difference of two following calculations.",
     )
-
-    # Check that starting points are a layer if scenario ID is specified
-    @validator("scenario_id", pre=True, always=True)
-    def check_starting_points_is_layer(cls, v, values):
-        if v is not None and values["starting_points"].layer_project_id is None:
-            raise ValueError(
-                "Starting points must be a layer if a scenario ID is specified."
-            )
-        return v
 
     # Check that polygon difference exists if catchment area type is polygon
     @validator("polygon_difference", pre=True, always=True)
@@ -594,15 +567,6 @@ class CatchmentAreaNearbyStationAccess(BaseModel):
         title="Polygon Difference",
         description="If true, the polygons returned will be the geometrical difference of two following calculations.",
     )
-
-    # Check that starting points are a layer if scenario ID is specified
-    @validator("scenario_id", pre=True, always=True)
-    def check_starting_points_is_layer(cls, v, values):
-        if v is not None and values["starting_points"].layer_project_id is None:
-            raise ValueError(
-                "Starting points must be a layer if a scenario ID is specified."
-            )
-        return v
 
     # Check that polygon difference exists if catchment area type is polygon
     @validator("polygon_difference", pre=True, always=True)
