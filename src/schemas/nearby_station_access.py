@@ -1,7 +1,7 @@
 from typing import List
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
 from src.schemas.catchment_area import (
     CatchmentAreaRoutingModeActiveMobility,
@@ -64,15 +64,6 @@ class INearbyStationAccess(BaseModel):
         title="Scenario ID",
         description="The ID of the scenario that is to be applied on the input layer or base network.",
     )
-
-    # Check that starting points are a layer if scenario ID is specified
-    @validator("scenario_id", pre=True, always=True)
-    def check_starting_points_is_layer(cls, v, values):
-        if v is not None and values["starting_points"].layer_project_id is None:
-            raise ValueError(
-                "Starting points must be a layer if a scenario ID is specified."
-            )
-        return v
 
     @property
     def tool_type(self):
