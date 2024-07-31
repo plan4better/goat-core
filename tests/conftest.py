@@ -13,24 +13,26 @@ from sqlalchemy import text
 from src.core.config import settings
 from src.endpoints.deps import get_db, session_manager
 from src.main import app
-from src.schemas.catchment_area import request_examples_catchment_area_active_mobility as active_mobility_request_examples
-from src.schemas.layer import LayerType
-from src.schemas.layer import request_examples as layer_request_examples
+from src.schemas.catchment_area import (
+    request_examples_catchment_area_active_mobility as active_mobility_request_examples,
+)
 from src.schemas.catchment_area import (
     request_examples_catchment_area_car,
     request_examples_catchment_area_pt,
 )
+from src.schemas.layer import LayerType
+from src.schemas.layer import request_examples as layer_request_examples
 from src.schemas.project import (
     request_examples as project_request_examples,
 )
 from tests.utils import (
     check_job_status,
+    check_user_data_deleted,
     generate_random_string,
     upload_file,
     upload_invalid_file,
     upload_valid_file,
     upload_valid_files,
-    check_user_data_deleted,
 )
 
 
@@ -257,6 +259,72 @@ async def fixture_create_layer_project(
     assert layer_order[1] == layer_project_ids[1]
 
     return {"layer_project": layer_project, "project_id": project_id}
+
+
+async def create_scenario(
+    client: AsyncClient,
+    project_id: str,
+):
+    # Create a scenario
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/scenario",
+        json={"name": "Test Scenario"},
+    )
+    assert response.status_code == 201
+
+    return response.json()
+
+
+@pytest.fixture
+async def fixture_create_project_scenario(
+    client: AsyncClient,
+    fixture_create_project,
+):
+    # Create a project
+    project_id = fixture_create_project["id"]
+
+    # Create a scenario
+    scenario = await create_scenario(client, project_id)
+
+    return {
+        "project_id": project_id,
+        "scenario_id": scenario["id"],
+    }
+
+
+@pytest.fixture
+async def fixture_create_project_scenario_features(
+    client: AsyncClient,
+    fixture_add_aggregate_point_layer_to_project,
+):
+    # Create a point layer associated with a project
+    project_id = fixture_add_aggregate_point_layer_to_project["project_id"]
+    layer_project_id = fixture_add_aggregate_point_layer_to_project[
+        "source_layer_project_id"
+    ]
+
+    # Create a scenario
+    scenario_id = (await create_scenario(client, project_id))["id"]
+
+    # Create scenario features
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer/{layer_project_id}/scenario/{scenario_id}/features",
+        json=[
+            {
+                "layer_project_id": layer_project_id,
+                "edit_type": "n",
+                "geom": "POINT (11.519519090652468 48.15706825475166)",
+            }
+        ],
+    )
+    assert response.status_code == 201
+
+    return {
+        "project_id": project_id,
+        "layer_project_id": layer_project_id,
+        "scenario_id": scenario_id,
+        "features": response.json()["features"],
+    }
 
 
 @pytest.fixture(autouse=True)
@@ -876,6 +944,7 @@ async def fixture_delete_internal_layers(
         layer=layer,
     )
 
+
 @pytest.fixture
 async def fixture_delete_external_layers(
     client: AsyncClient, fixture_create_external_layers
@@ -888,7 +957,10 @@ async def fixture_delete_external_layers(
     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}")
     assert response.status_code == 404  # Not Found
 
-async def create_multiple_layer(client: AsyncClient, fixture_create_user, fixture_get_home_folder, in_catalog: bool):
+
+async def create_multiple_layer(
+    client: AsyncClient, fixture_create_user, fixture_get_home_folder, in_catalog: bool
+):
     # Define layer metadata for the different layer types
     varying_attributes = [
         {
@@ -961,17 +1033,24 @@ async def create_multiple_layer(client: AsyncClient, fixture_create_user, fixtur
         cnt += 1
     return layers
 
+
 @pytest.fixture
 async def fixture_create_multiple_layers(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
-    return await create_multiple_layer(client, fixture_create_user, fixture_get_home_folder, False)
+    return await create_multiple_layer(
+        client, fixture_create_user, fixture_get_home_folder, False
+    )
+
 
 @pytest.fixture
 async def fixture_create_catalog_layers(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
-    return await create_multiple_layer(client, fixture_create_user, fixture_get_home_folder, True)
+    return await create_multiple_layer(
+        client, fixture_create_user, fixture_get_home_folder, True
+    )
+
 
 def get_payload_types(request_examples: dict) -> list:
     return request_examples
