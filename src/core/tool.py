@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
+from src.core.config import settings
 from src.core.job import CRUDFailedJob
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import layer as crud_layer
@@ -659,6 +660,7 @@ class CRUDToolBase(CRUDFailedJob):
                 '{layer_project.table_name}',
                 {layer_project.id},
                 '{arr_columns}',
+                '{settings.CUSTOMER_SCHEMA}',
                 {scenario_id},
                 '{where_query_polygon}',
                 30,
@@ -691,6 +693,7 @@ class CRUDToolBase(CRUDFailedJob):
                 '{layer_project.table_name}',
                 {layer_project.id},
                 '{arr_columns}',
+                '{settings.CUSTOMER_SCHEMA}',
                 {scenario_id},
                 '{where_query_line}',
                 '{temp_lines}'
@@ -722,6 +725,7 @@ class CRUDToolBase(CRUDFailedJob):
                 '{layer_project.table_name}',
                 {layer_project.id},
                 '{arr_columns}',
+                '{settings.CUSTOMER_SCHEMA}',
                 {scenario_id},
                 '{where_query_point}',
                 '{temp_points}'

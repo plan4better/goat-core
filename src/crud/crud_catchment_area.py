@@ -206,8 +206,8 @@ class CRUDCatchmentAreaBase(CRUDToolBase):
             FROM (
                 WITH scenario_features AS (
                     SELECT sf.feature_id AS id, sf.geom, sf.edit_type
-                    FROM customer.scenario_scenario_feature ssf
-                    INNER JOIN customer.scenario_feature sf ON sf.id = ssf.scenario_feature_id
+                    FROM {settings.CUSTOMER_SCHEMA}.scenario_scenario_feature ssf
+                    INNER JOIN {settings.CUSTOMER_SCHEMA}.scenario_feature sf ON sf.id = ssf.scenario_feature_id
                     WHERE ssf.scenario_id = {scenario_id}
                     AND sf.layer_project_id = {layer_project_id}
                 )
@@ -307,7 +307,7 @@ class CRUDCatchmentAreaActiveMobility(CRUDCatchmentAreaBase):
                 result_table if not result_params else result_params["result_table"]
             ),
             "layer_id": str(layer_id),
-            "scenario_id": params.scenario_id,
+            "scenario_id": str(params.scenario_id) if params.scenario_id else None,
         }
 
         await call_routing_endpoint(
@@ -657,7 +657,7 @@ class CRUDCatchmentAreaCar(CRUDCatchmentAreaBase):
                 result_table if not result_params else result_params["result_table"]
             ),
             "layer_id": str(layer_id),
-            "scenario_id": params.scenario_id,
+            "scenario_id": str(params.scenario_id) if params.scenario_id else None,
         }
 
         await call_routing_endpoint(

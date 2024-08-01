@@ -72,9 +72,10 @@ class CRUDTripCountStation(CRUDToolBase):
             (summarized ->> 'rail')::integer AS rail, (summarized ->> 'other')::integer AS other,
             (summarized ->> 'bus')::integer + (summarized ->> 'tram')::integer + (summarized ->> 'metro')::integer +
             (summarized ->> 'rail')::integer + (summarized ->> 'other')::integer AS total
-            FROM basic.count_public_transport_services_station(
+            FROM temporal.count_public_transport_services_station(
                 '{input_table}',
                 {layer_project.id},
+                '{settings.CUSTOMER_SCHEMA}',
                 {scenario_id},
                 :where_query,
                 '{str(timedelta(seconds=params.time_window.from_time))}',

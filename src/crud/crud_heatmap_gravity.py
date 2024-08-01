@@ -49,6 +49,7 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
                 f"""SELECT basic.create_heatmap_gravity_opportunity_table(
                     {layer["layer"].opportunity_layer_project_id},
                     '{layer["table_name"]}',
+                    '{settings.CUSTOMER_SCHEMA}',
                     {scenario_id},
                     {layer["layer"].max_traveltime},
                     {layer["layer"].sensitivity},

@@ -55,7 +55,7 @@ from tests.utils import check_job_status
             False,
         ),
         (
-            "point_layer",
+            "point_layer_scenario",
             CatchmentAreaRoutingModeActiveMobility.bicycle,
             {"max_distance": 4300, "steps": 6},
             CatchmentAreaTypeActiveMobility.network,
@@ -97,7 +97,7 @@ from tests.utils import check_job_status
             None,
         ),
         (
-            "point_layer",
+            "point_layer_scenario",
             CatchmentAreaRoutingModeActiveMobility.pedelec,
             {"max_distance": 2400, "steps": 3},
             CatchmentAreaTypeActiveMobility.polygon,
@@ -108,6 +108,7 @@ from tests.utils import check_job_status
 async def test_catchment_area_active_mobility(
     client: AsyncClient,
     fixture_create_project,
+    fixture_create_project_scenario_features,
     fixture_add_aggregate_point_layer_to_project,
     starting_points_type: str,
     routing_type: str,
@@ -116,6 +117,7 @@ async def test_catchment_area_active_mobility(
     polygon_difference: bool,
 ):
     # Generate sample layers for conducting the test
+    scenario_id = None
     if starting_points_type == "point_single":
         project_id = fixture_create_project["id"]
         starting_points = {"latitude": [48.138577], "longitude": [11.561173]}
@@ -125,12 +127,19 @@ async def test_catchment_area_active_mobility(
             "latitude": [48.800548, 48.802696, 48.786122],
             "longitude": [9.180397, 9.181044, 9.201984],
         }
-    else:
+    elif starting_points_type == "point_layer":
         project_id = fixture_add_aggregate_point_layer_to_project["project_id"]
         layer_project_id = fixture_add_aggregate_point_layer_to_project[
             "source_layer_project_id"
         ]
         starting_points = {"layer_project_id": layer_project_id}
+    elif starting_points_type == "point_layer_scenario":
+        project_id = fixture_create_project_scenario_features["project_id"]
+        layer_project_id = fixture_create_project_scenario_features["layer_project_id"]
+        starting_points = {"layer_project_id": layer_project_id}
+        scenario_id = fixture_create_project_scenario_features["scenario_id"]
+    else:
+        raise NotImplementedError("Invalid starting_points_type specified.")
 
     # Produce request payload
     params = {
@@ -138,6 +147,7 @@ async def test_catchment_area_active_mobility(
         "routing_type": routing_type,
         "travel_cost": travel_cost,
         "catchment_area_type": catchment_area_type,
+        "scenario_id": scenario_id,
     }
     if polygon_difference is not None:
         params["polygon_difference"] = polygon_difference

@@ -2,6 +2,7 @@ DROP FUNCTION IF EXISTS basic.count_public_transport_services_station;
 CREATE OR REPLACE FUNCTION basic.count_public_transport_services_station(
 	table_area TEXT,
 	area_layer_project_id INT,
+	customer_schema TEXT,
 	scenario_id TEXT,
 	where_filter TEXT,
 	start_time interval,
@@ -22,6 +23,7 @@ BEGIN
 		table_area,
 		area_layer_project_id,
 		'',
+		customer_schema,
 		scenario_id,
 		where_filter,
 		30, 

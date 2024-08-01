@@ -42,6 +42,7 @@ class CRUDHeatmapClosestAverage(CRUDHeatmapBase):
                 f"""SELECT basic.create_heatmap_closest_average_opportunity_table(
                     {layer["layer"].opportunity_layer_project_id},
                     '{layer["table_name"]}',
+                    '{settings.CUSTOMER_SCHEMA}',
                     {scenario_id},
                     {layer["layer"].max_traveltime},
                     {layer["layer"].number_of_destinations},

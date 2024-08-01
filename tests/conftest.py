@@ -314,7 +314,19 @@ async def fixture_create_project_scenario_features(
                 "layer_project_id": layer_project_id,
                 "edit_type": "n",
                 "geom": "POINT (11.519519090652468 48.15706825475166)",
-            }
+            },
+            {
+                "layer_project_id": layer_project_id,
+                "feature_id": "01910d8e-0bdd-7e9e-88d7-45b177eb0e04",
+                "edit_type": "m",
+                "geom": "POINT (11.596396565437317 48.11837666091377)",
+            },
+            {
+                "layer_project_id": layer_project_id,
+                "feature_id": "01910d8e-0bbf-78bd-903b-50c8c060aafb",
+                "edit_type": "d",
+                "geom": "POINT (11.566457578680202 48.14265042244961)",
+            },
         ],
     )
     assert response.status_code == 201

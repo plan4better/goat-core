@@ -41,6 +41,7 @@ class CRUDHeatmapConnectivity(CRUDToolBase):
             f"""SELECT basic.create_heatmap_connectivity_reference_area_table(
                 {layer_project.id},
                 '{layer_project.table_name}',
+                '{settings.CUSTOMER_SCHEMA}',
                 {scenario_id},
                 '{layer_project.where_query.replace("'", "''")}',
                 '{temp_points}',
