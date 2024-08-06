@@ -70,7 +70,7 @@ class MaxFeatureCnt(int, Enum):
     aggregate_polygon = 100000
     buffer = 10000
     trip_count_station = 10000
-    origin_destination = 10000
+    origin_destination = 12500
     heatmap_gravity_active_mobility = 1000000
     heatmap_gravity_motorized_mobility = 1000000
     heatmap_closest_average_active_mobility = 1000000
