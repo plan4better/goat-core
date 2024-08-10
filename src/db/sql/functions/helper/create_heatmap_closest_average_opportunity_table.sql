@@ -1,12 +1,14 @@
 DROP FUNCTION IF EXISTS basic.create_heatmap_closest_average_opportunity_table; 
 CREATE OR REPLACE FUNCTION basic.create_heatmap_closest_average_opportunity_table(
     input_layer_project_id int, input_table text, customer_schema text, scenario_id text,
-    max_traveltime int, num_destinations int, where_filter text, result_table_name text,
-    grid_resolution int, append_existing boolean
+    geofence_table text, geofence_where_filter text, max_traveltime int, num_destinations int,
+    where_filter text, result_table_name text, grid_resolution int, append_existing boolean
 )
 RETURNS SETOF void
 LANGUAGE plpgsql
 AS $function$
+DECLARE
+    base_query TEXT;
 BEGIN
     IF NOT append_existing THEN
         -- Create empty distributed table 
@@ -31,10 +33,10 @@ BEGIN
 	END IF;
 
     -- Produce h3 grid at specified resolution while applying a scenario if specified
-    EXECUTE format(
+    base_query := format(
         'INSERT INTO %s
-        SELECT id, h3_lat_lng_to_cell(geom::point, %s) AS h3_index, %s AS max_traveltime, %s AS num_destinations,
-            basic.to_short_h3_3(h3_lat_lng_to_cell(geom::point, 3)::bigint) AS h3_3
+        SELECT id, h3_lat_lng_to_cell(input_features.geom::point, %s) AS h3_index, %s AS max_traveltime, %s AS num_destinations,
+            basic.to_short_h3_3(h3_lat_lng_to_cell(input_features.geom::point, 3)::bigint) AS h3_3
         FROM (
             WITH scenario_features AS (
                 SELECT sf.feature_id AS id, sf.geom, sf.edit_type
@@ -51,11 +53,24 @@ BEGIN
                 SELECT scenario_features.id, scenario_features.geom
                 FROM scenario_features
                 WHERE edit_type IN (''n'', ''m'')
-        ) input_features;',
+        ) input_features',
         result_table_name, grid_resolution, max_traveltime, num_destinations,
         customer_schema, customer_schema, scenario_id, input_layer_project_id,
         input_table, where_filter
     );
+
+    -- Append geofence check if required
+    IF geofence_table IS NOT NULL THEN
+        base_query := base_query || format(
+            ', (SELECT geom FROM %s WHERE %s) geofence
+            WHERE input_features.geom && geofence.geom
+            AND ST_Intersects(input_features.geom, geofence.geom)',
+            geofence_table, geofence_where_filter
+        );
+    END IF;
+
+    -- Execute the final query
+    EXECUTE base_query;
 
     IF NOT append_existing THEN
         -- Add index 

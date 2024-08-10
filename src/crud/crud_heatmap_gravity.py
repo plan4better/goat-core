@@ -28,6 +28,7 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         routing_type: ActiveRoutingHeatmapType | MotorizedRoutingHeatmapType,
         layers: List[dict],
         scenario_id: UUID,
+        opportunity_geofence_layer,
     ):
         """Create distributed table for user-specified opportunities."""
 
@@ -36,6 +37,19 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
 
         # Create formatted scenario ID string for SQL query
         scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
+
+        # Create formatted opportunity geofence layer strings for SQL query
+        geofence_table = (
+            "NULL"
+            if opportunity_geofence_layer is None
+            else f"'{opportunity_geofence_layer.table_name}'"
+        )
+        geofence_where_filter = "NULL"
+        if opportunity_geofence_layer is not None:
+            geofence_where_filter = opportunity_geofence_layer.where_query.replace(
+                "'", "''"
+            )
+            geofence_where_filter = f"'{geofence_where_filter}'"
 
         append_to_existing = False
         for layer in layers:
@@ -51,6 +65,8 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
                     '{layer["table_name"]}',
                     '{settings.CUSTOMER_SCHEMA}',
                     {scenario_id},
+                    {geofence_table},
+                    {geofence_where_filter},
                     {layer["layer"].max_traveltime},
                     {layer["layer"].sensitivity},
                     {potential_column}::text,
@@ -129,11 +145,12 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         """Compute heatmap gravity."""
 
         # Fetch opportunity tables
-        layers = await self.fetch_opportunity_layers(params)
+        layers, opportunity_geofence_layer = await self.fetch_opportunity_layers(params)
         opportunity_table = await self.create_distributed_opportunity_table(
             params.routing_type,
             layers,
             params.scenario_id,
+            opportunity_geofence_layer,
         )
 
         # Initialize result table
