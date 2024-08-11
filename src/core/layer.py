@@ -8,6 +8,7 @@ import zipfile
 from typing import Union
 from uuid import UUID
 from enum import Enum
+from datetime import datetime
 
 # Third party imports
 import aiofiles
@@ -43,12 +44,14 @@ from src.schemas.layer import (
     OgrDriverType,
     OgrPostgresType,
     SupportedOgrGeomType,
+    UserDataTable,
 )
 from src.utils import (
     async_delete_dir,
     async_run_command,
     async_scandir,
     sanitize_error_message,
+    table_exists,
 )
 
 
@@ -70,6 +73,7 @@ def model_to_dict(model):
         return model_dict
     else:
         return model  # Return the model as is if it's not an instance of SQLModel or BaseModel
+
 
 def get_user_table(layer: Union[dict, SQLModel, BaseModel]):
     """Get the table with the user data based on the layer metadata."""
@@ -309,7 +313,6 @@ class OGRFileHandling:
             geometry_type = geometry_type.replace("Measured_", "")
             # Strip "Z", "M", "ZM" or "25D" from the end of the geometry type name
             geometry_type = re.sub(r"(Z|M|ZM|25D)$", "", geometry_type)
-
             if geometry_type not in SupportedOgrGeomType.__members__:
                 return {
                     "msg": "Geometry type not supported.",
@@ -621,7 +624,7 @@ class OGRFileHandling:
             to_crs_flag = ""
 
         # Build CMD command
-        cmd = f"""ogr2ogr -f "{OgrDriverType[file_type.value].value}" "{self.file_path}" PG:"host={settings.POSTGRES_SERVER} dbname={settings.POSTGRES_DB} user={settings.POSTGRES_USER} password={settings.POSTGRES_PASSWORD} port={settings.POSTGRES_PORT}" -sql "{sql_query}" {to_crs_flag} -progress"""
+        cmd = f"""ogr2ogr -f "{OgrDriverType[file_type.value].value}" "{self.file_path}" PG:"host={settings.POSTGRES_SERVER} dbname={settings.POSTGRES_DB} user={settings.POSTGRES_USER} password={settings.POSTGRES_PASSWORD} port={settings.POSTGRES_PORT}" -sql "{sql_query}" -nln "{layer.name}" {to_crs_flag} -progress"""
         try:
             # Run as async task
             task = asyncio.create_task(async_run_command(cmd))
