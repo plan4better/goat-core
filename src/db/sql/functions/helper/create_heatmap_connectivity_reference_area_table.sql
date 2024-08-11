@@ -1,7 +1,7 @@
 DROP FUNCTION IF EXISTS basic.create_heatmap_connectivity_reference_area_table; 
 CREATE OR REPLACE FUNCTION basic.create_heatmap_connectivity_reference_area_table(
-    input_layer_project_id int, input_table text, scenario_id text, where_filter text,
-    result_table_name text, grid_resolution int, append_existing boolean
+    input_layer_project_id int, input_table text, customer_schema text, scenario_id text,
+    where_filter text, result_table_name text, grid_resolution int, append_existing boolean
 )
 RETURNS SETOF void
 LANGUAGE plpgsql
@@ -35,8 +35,8 @@ BEGIN
         FROM (
             WITH scenario_features AS (
                 SELECT sf.feature_id AS id, sf.geom, sf.edit_type
-                FROM customer.scenario_scenario_feature ssf
-                INNER JOIN customer.scenario_feature sf ON sf.id = ssf.scenario_feature_id
+                FROM %s.scenario_scenario_feature ssf
+                INNER JOIN %s.scenario_feature sf ON sf.id = ssf.scenario_feature_id
                 WHERE ssf.scenario_id = %L
                 AND sf.layer_project_id = %s
             )
@@ -50,8 +50,8 @@ BEGIN
                 WHERE edit_type IN (''n'', ''m'')
         ) input_features,
         LATERAL basic.fill_polygon_h3_%s(input_features.geom);',
-        result_table_name, scenario_id, input_layer_project_id, input_table,
-        where_filter, grid_resolution
+        result_table_name, customer_schema, customer_schema, scenario_id,
+        input_layer_project_id, input_table, where_filter, grid_resolution
     );
 
     IF NOT append_existing THEN

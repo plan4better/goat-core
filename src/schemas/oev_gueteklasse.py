@@ -11,7 +11,7 @@ from src.schemas.toolbox_base import (
 )
 
 
-class CatchmentType(Enum):
+class CatchmentType(str, Enum):
     buffer = "buffer"
     network = "network"
 

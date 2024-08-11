@@ -56,6 +56,7 @@ class CRUDOevGueteklasse(CRUDToolBase):
                 FROM basic.count_public_transport_services_station (
                     '{input_table}',
                     {reference_layer_project.id},
+                    '{settings.CUSTOMER_SCHEMA}',
                     {scenario_id},
                     :where_query,
                     '{str(timedelta(seconds=params.time_window.from_time))}',

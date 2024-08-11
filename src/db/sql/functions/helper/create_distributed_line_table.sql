@@ -1,7 +1,7 @@
 DROP FUNCTION IF EXISTS basic.create_distributed_line_table; 
 CREATE OR REPLACE FUNCTION basic.create_distributed_line_table(
-    input_table text, input_layer_project_id int, relevant_columns text, scenario_id text,
-    where_filter text, result_table_name text
+    input_table text, input_layer_project_id int, relevant_columns text, customer_schema text,
+    scenario_id text, where_filter text, result_table_name text
 )
 RETURNS SETOF void
 LANGUAGE plpgsql
@@ -33,8 +33,8 @@ BEGIN
         FROM (
             WITH scenario_features AS (
                 SELECT sf.feature_id AS id, sf.geom, sf.edit_type %s
-                FROM customer.scenario_scenario_feature ssf
-                INNER JOIN customer.scenario_feature sf ON sf.id = ssf.scenario_feature_id
+                FROM %s.scenario_scenario_feature ssf
+                INNER JOIN %s.scenario_feature sf ON sf.id = ssf.scenario_feature_id
                 WHERE ssf.scenario_id = %L
                 AND sf.layer_project_id = %s
             )
@@ -49,9 +49,9 @@ BEGIN
         ) l, basic.h3_grid_resolution_3 h
         WHERE ST_Intersects(l.geom, h.geom)
         AND ST_WITHIN(l.geom, h.geom);',
-        result_table_name, relevant_columns, relevant_columns, scenario_id,
-        input_layer_project_id, relevant_columns, input_table, where_filter,
-        relevant_columns
+        result_table_name, relevant_columns, relevant_columns, customer_schema,
+        customer_schema, scenario_id, input_layer_project_id, relevant_columns,
+        input_table, where_filter, relevant_columns
    ); 
 
     -- Insert all where the lines intersect the border of the h3 grid and clip them using intersection.
@@ -61,8 +61,8 @@ BEGIN
         FROM (
             WITH scenario_features AS (
                 SELECT sf.feature_id AS id, sf.geom, sf.edit_type %s
-                FROM customer.scenario_scenario_feature ssf
-                INNER JOIN customer.scenario_feature sf ON sf.id = ssf.scenario_feature_id
+                FROM %s.scenario_scenario_feature ssf
+                INNER JOIN %s.scenario_feature sf ON sf.id = ssf.scenario_feature_id
                 WHERE ssf.scenario_id = %L
                 AND sf.layer_project_id = %s
             )
@@ -77,9 +77,9 @@ BEGIN
         ) l, basic.h3_grid_resolution_3 h
         WHERE ST_Intersects(l.geom, h.geom)
         AND ST_Intersects(l.geom, ST_ExteriorRing(h.geom));',
-        result_table_name, relevant_columns, relevant_columns, scenario_id,
-        input_layer_project_id, relevant_columns, input_table, where_filter,
-        relevant_columns
+        result_table_name, relevant_columns, relevant_columns, customer_schema,
+        customer_schema, scenario_id, input_layer_project_id, relevant_columns,
+        input_table, where_filter, relevant_columns
     ); 
 	
    -- Add indices
