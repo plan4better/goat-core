@@ -21,7 +21,6 @@ from src.db.models.layer import ContentBaseAttributes
 
 if TYPE_CHECKING:
     from _link_model import LayerProjectLink, UserProjectLink
-
     from .report import Report
     from .scenario import Scenario
 

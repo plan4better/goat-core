@@ -9,37 +9,12 @@ from src.schemas.layer import LayerType
 from src.db.models.project import Project
 from src.db.session import session_manager
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.db.models.system_task import SystemTask
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from src.crud.crud_user_project import user_project as crud_user_project
 from src.crud.crud_layer_project import layer_project as crud_layer_project
-
+from utils import fetch_last_run_timestamp, update_last_run_timestamp
 
 SYSTEM_TASK_ID = "thumbnail_update"
-
-
-async def fetch_last_run_timestamp(async_session: AsyncSession):
-    """Fetch the last run timestamp of the thumbnail update task."""
-
-    result = await CRUDBase(SystemTask).get(async_session, SYSTEM_TASK_ID)
-    return result, (
-        result.last_run if result is not None
-        else datetime.now(timezone.utc) - timedelta(minutes=5)
-    )
-
-
-async def update_last_run_timestamp(
-        async_session: AsyncSession,
-        system_task: SystemTask,
-        new_timestamp: datetime,
-):
-    """Update the last run timestamp of the thumbnail update task."""
-
-    await CRUDBase(SystemTask).update(
-        db=async_session,
-        db_obj=system_task,
-        obj_in={"last_run": new_timestamp},
-    )
 
 
 async def fetch_projects_to_update(async_session: AsyncSession, last_run: datetime):
@@ -79,39 +54,42 @@ async def process_projects(async_session: AsyncSession, last_run: datetime):
                     async_session=async_session, project_id=project.id
                 )
                 if user_project != [] and layers_project != []:
-                        print(f"Updating thumbnail for project: {project.id}")
+                    print(f"Updating thumbnail for project: {project.id}")
 
-                        old_thumbnail_url = project.thumbnail_url
+                    old_thumbnail_url = project.thumbnail_url
 
-                        # Create thumbnail
-                        print_map = PrintMap(async_session)
-                        thumbnail_url = await print_map.create_project_thumbnail(
-                            project=project,
-                            initial_view_state=user_project[0].initial_view_state,
-                            layers_project=layers_project,
-                            file_name=str(project.id)
-                            + project.updated_at.strftime("_%Y-%m-%d_%H-%M-%S-%f")
-                            + ".png",
-                        )
+                    # Create thumbnail
+                    print_map = PrintMap(async_session)
+                    thumbnail_url = await print_map.create_project_thumbnail(
+                        project=project,
+                        initial_view_state=user_project[0].initial_view_state,
+                        layers_project=layers_project,
+                        file_name=str(project.id)
+                        + project.updated_at.strftime("_%Y-%m-%d_%H-%M-%S-%f")
+                        + ".png",
+                    )
 
-                        # Update project with thumbnail url bypassing the model to avoid the table getting a new updated at
-                        await async_session.execute(
-                            text(
-                                """UPDATE customer.project
+                    # Update project with thumbnail url bypassing the model to avoid the table getting a new updated at
+                    await async_session.execute(
+                        text(
+                            """UPDATE customer.project
                                 SET thumbnail_url = :thumbnail_url WHERE id = :id""",
-                            ),
-                            {"thumbnail_url": thumbnail_url, "id": project.id},
-                        )
-                        await async_session.commit()
+                        ),
+                        {"thumbnail_url": thumbnail_url, "id": project.id},
+                    )
+                    await async_session.commit()
 
-                        # Delete old thumbnail from s3 if the thumbnail is not the default thumbnail
-                        if (old_thumbnail_url and settings.THUMBNAIL_DIR_PROJECT in old_thumbnail_url):
-                            settings.S3_CLIENT.delete_object(
-                                Bucket=settings.AWS_S3_ASSETS_BUCKET,
-                                Key=old_thumbnail_url.replace(
-                                    settings.ASSETS_URL + "/", ""
-                                ),
-                            )
+                    # Delete old thumbnail from s3 if the thumbnail is not the default thumbnail
+                    if (
+                        old_thumbnail_url
+                        and settings.THUMBNAIL_DIR_PROJECT in old_thumbnail_url
+                    ):
+                        settings.S3_CLIENT.delete_object(
+                            Bucket=settings.AWS_S3_ASSETS_BUCKET,
+                            Key=old_thumbnail_url.replace(
+                                settings.ASSETS_URL + "/", ""
+                            ),
+                        )
             except Exception as e:
                 print(f"Error updating project thumbnail: {e}")
 
@@ -125,34 +103,39 @@ async def process_layers(async_session: AsyncSession, last_run: datetime):
         for layer in layers:
             try:
                 layer = layer[0]
-                if (layer.type in (LayerType.feature, LayerType.table)):
-                        print(f"Updating thumbnail for layer: {layer.id}")
+                if layer.type in (LayerType.feature, LayerType.table):
+                    print(f"Updating thumbnail for layer: {layer.id}")
 
-                        old_thumbnail_url = layer.thumbnail_url
+                    old_thumbnail_url = layer.thumbnail_url
 
-                        # Create thumbnail
-                        print_map = PrintMap(async_session)
-                        thumbnail_url = await print_map.create_layer_thumbnail(
-                            layer=layer,
-                            file_name=str(layer.id) + "_" + str(uuid4()) + ".png",
-                        )
+                    # Create thumbnail
+                    print_map = PrintMap(async_session)
+                    thumbnail_url = await print_map.create_layer_thumbnail(
+                        layer=layer,
+                        file_name=str(layer.id) + "_" + str(uuid4()) + ".png",
+                    )
 
-                        # Update layer with thumbnail url bypassing the model to avoid the table getting a new updated at
-                        await async_session.execute(
-                            text(
-                                """UPDATE customer.layer
+                    # Update layer with thumbnail url bypassing the model to avoid the table getting a new updated at
+                    await async_session.execute(
+                        text(
+                            """UPDATE customer.layer
                                 SET thumbnail_url = :thumbnail_url WHERE id = :id""",
-                            ),
-                            {"thumbnail_url": thumbnail_url, "id": layer.id},
-                        )
-                        await async_session.commit()
+                        ),
+                        {"thumbnail_url": thumbnail_url, "id": layer.id},
+                    )
+                    await async_session.commit()
 
-                        # Delete old thumbnail from s3 if the thumbnail is not the default thumbnail
-                        if (old_thumbnail_url and settings.THUMBNAIL_DIR_LAYER in old_thumbnail_url):
-                            settings.S3_CLIENT.delete_object(
-                                Bucket=settings.AWS_S3_ASSETS_BUCKET,
-                                Key=old_thumbnail_url.replace(settings.ASSETS_URL + "/", ""),
-                            )
+                    # Delete old thumbnail from s3 if the thumbnail is not the default thumbnail
+                    if (
+                        old_thumbnail_url
+                        and settings.THUMBNAIL_DIR_LAYER in old_thumbnail_url
+                    ):
+                        settings.S3_CLIENT.delete_object(
+                            Bucket=settings.AWS_S3_ASSETS_BUCKET,
+                            Key=old_thumbnail_url.replace(
+                                settings.ASSETS_URL + "/", ""
+                            ),
+                        )
             except Exception as e:
                 print(f"Error updating layer thumbnail: {e}")
 
@@ -161,7 +144,9 @@ async def main():
     session_manager.init(settings.ASYNC_SQLALCHEMY_DATABASE_URI)
     async with session_manager.session() as async_session:
         # Get timestamp of last thumbnail update script run
-        system_task, last_run = await fetch_last_run_timestamp(async_session)
+        system_task, last_run = await fetch_last_run_timestamp(
+            async_session, SYSTEM_TASK_ID
+        )
         current_run = datetime.now(timezone.utc)
 
         # Update project thumbnails
