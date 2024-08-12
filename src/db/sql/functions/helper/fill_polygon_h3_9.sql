@@ -1,4 +1,3 @@
-/*This function returns the h3 indexes that are intersecting the borderpoints of a specified geometry*/
 DROP FUNCTION IF EXISTS basic.fill_polygon_h3_9;
 CREATE OR REPLACE FUNCTION basic.fill_polygon_h3_9(geom geometry)
 RETURNS TABLE (h3_index h3index, h3_short bigint, h3_boundary geometry(linestring, 4326), h3_geom geometry(polygon, 4326))
