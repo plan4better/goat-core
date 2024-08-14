@@ -5,6 +5,7 @@ from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
 from src.crud.crud_heatmap import CRUDHeatmapBase
 from src.schemas.heatmap import (
+    ROUTING_MODE_DEFAULT_SPEED,
     TRAVELTIME_MATRIX_RESOLUTION,
     TRAVELTIME_MATRIX_TABLE,
     ActiveRoutingHeatmapType,
@@ -51,6 +52,14 @@ class CRUDHeatmapClosestAverage(CRUDHeatmapBase):
 
         append_to_existing = False
         for layer in layers:
+            # Compute geofence buffer distance
+            geofence_buffer_dist = (
+                layer["layer"].max_traveltime
+                * ((ROUTING_MODE_DEFAULT_SPEED[routing_type] * 1000) / 60)
+                if opportunity_geofence_layer is not None
+                else "NULL"
+            )
+
             # Create distributed point table using sql
             await self.async_session.execute(
                 f"""SELECT basic.create_heatmap_closest_average_opportunity_table(
@@ -60,6 +69,7 @@ class CRUDHeatmapClosestAverage(CRUDHeatmapBase):
                     {scenario_id},
                     {geofence_table},
                     {geofence_where_filter},
+                    {geofence_buffer_dist},
                     {layer["layer"].max_traveltime},
                     {layer["layer"].number_of_destinations},
                     '{layer["where_query"].replace("'", "''")}',

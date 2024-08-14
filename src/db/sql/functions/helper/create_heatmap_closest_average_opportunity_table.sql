@@ -1,8 +1,9 @@
 DROP FUNCTION IF EXISTS basic.create_heatmap_closest_average_opportunity_table; 
 CREATE OR REPLACE FUNCTION basic.create_heatmap_closest_average_opportunity_table(
     input_layer_project_id int, input_table text, customer_schema text, scenario_id text,
-    geofence_table text, geofence_where_filter text, max_traveltime int, num_destinations int,
-    where_filter text, result_table_name text, grid_resolution int, append_existing boolean
+    geofence_table text, geofence_where_filter text, geofence_buffer_dist float,
+    max_traveltime int, num_destinations int, where_filter text, result_table_name text,
+    grid_resolution int, append_existing boolean
 )
 RETURNS SETOF void
 LANGUAGE plpgsql
@@ -62,10 +63,10 @@ BEGIN
     -- Append geofence check if required
     IF geofence_table IS NOT NULL THEN
         base_query := base_query || format(
-            ', (SELECT geom FROM %s WHERE %s) geofence
+            ', (SELECT ST_Buffer(ST_Union(geom)::geography, %s) AS geom FROM %s WHERE %s) geofence
             WHERE input_features.geom && geofence.geom
             AND ST_Intersects(input_features.geom, geofence.geom)',
-            geofence_table, geofence_where_filter
+            geofence_buffer_dist, geofence_table, geofence_where_filter
         );
     END IF;
 

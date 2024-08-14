@@ -46,6 +46,13 @@ TRAVELTIME_MATRIX_RESOLUTION = {
     MotorizedRoutingHeatmapType.car.value: 8,
 }
 
+ROUTING_MODE_DEFAULT_SPEED = {
+    ActiveRoutingHeatmapType.walking.value: 5,
+    ActiveRoutingHeatmapType.bicycle.value: 15,
+    ActiveRoutingHeatmapType.pedelec.value: 23,
+    MotorizedRoutingHeatmapType.car.value: 80,
+}
+
 
 class ImpedanceFunctionType(str, Enum):
     """Impedance function type schema."""
