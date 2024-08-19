@@ -1,7 +1,7 @@
 DROP FUNCTION IF EXISTS basic.create_distributed_polygon_table; 
 CREATE OR REPLACE FUNCTION basic.create_distributed_polygon_table(
-	input_table text, input_layer_project_id int, relevant_columns text, scenario_id text,
-	where_filter text, max_vertices_polygon integer, result_table_name text
+	input_table text, input_layer_project_id int, relevant_columns text, customer_schema text,
+	scenario_id text, where_filter text, max_vertices_polygon integer, result_table_name text
 )
 RETURNS SETOF void
 LANGUAGE plpgsql
@@ -15,8 +15,8 @@ BEGIN
 		FROM (
             WITH scenario_features AS (
                 SELECT sf.feature_id AS id, sf.geom, sf.edit_type %s
-                FROM customer.scenario_scenario_feature ssf
-                INNER JOIN customer.scenario_feature sf ON sf.id = ssf.scenario_feature_id
+                FROM %s.scenario_scenario_feature ssf
+                INNER JOIN %s.scenario_feature sf ON sf.id = ssf.scenario_feature_id
                 WHERE ssf.scenario_id = %L
                 AND sf.layer_project_id = %s
             )
@@ -29,8 +29,9 @@ BEGIN
                 FROM scenario_features
                 WHERE edit_type IN (''n'', ''m'')
         ) input_features;',
-		relevant_columns, relevant_columns, scenario_id, input_layer_project_id,
-		relevant_columns, input_table, where_filter, relevant_columns
+		relevant_columns, relevant_columns, customer_schema, customer_schema,
+		scenario_id, input_layer_project_id, relevant_columns, input_table,
+		where_filter, relevant_columns
 	);
 	
 	-- Create subdivided polygon table and add GIST index

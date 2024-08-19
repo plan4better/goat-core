@@ -1,22 +1,29 @@
 from src.core.tool import CRUDToolBase
+from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.schemas.heatmap import (
-    IHeatmapGravityActive,
-    IHeatmapGravityMotorized,
     IHeatmapClosestAverageActive,
     IHeatmapClosestAverageMotorized,
     IHeatmapConnectivityActive,
     IHeatmapConnectivityMotorized,
+    IHeatmapGravityActive,
+    IHeatmapGravityMotorized,
 )
-from src.crud.crud_layer_project import layer_project as crud_layer_project
 
 
 class CRUDHeatmapBase(CRUDToolBase):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
         super().__init__(job_id, background_tasks, async_session, user_id, project_id)
 
-    async def fetch_opportunity_layers(self, params: IHeatmapGravityActive | IHeatmapGravityMotorized |
-        IHeatmapClosestAverageActive | IHeatmapClosestAverageMotorized | IHeatmapConnectivityActive |
-        IHeatmapConnectivityMotorized,
+    async def fetch_opportunity_layers(
+        self,
+        params: (
+            IHeatmapGravityActive
+            | IHeatmapGravityMotorized
+            | IHeatmapClosestAverageActive
+            | IHeatmapClosestAverageMotorized
+            | IHeatmapConnectivityActive
+            | IHeatmapConnectivityMotorized
+        ),
     ):
         # Iterate over opportunity layers supplied by user
         opportunity_layers = []
@@ -41,10 +48,19 @@ class CRUDHeatmapBase(CRUDToolBase):
                 tool_type=params.tool_type,
             )
 
-            opportunity_layers.append({
-                "table_name": layer_project.table_name,
-                "where_query": layer_project.where_query,
-                "layer": layer,
-            })
+            opportunity_layers.append(
+                {
+                    "table_name": layer_project.table_name,
+                    "where_query": layer_project.where_query,
+                    "layer": layer,
+                }
+            )
 
-        return opportunity_layers
+        # Get opportunity geofence layer if specified
+        opportunity_geofence_layer = None
+        if params.opportunity_geofence_layer_project_id:
+            opportunity_geofence_layer = (await self.get_layers_project(params=params))[
+                "opportunity_geofence_layer_project_id"
+            ]
+
+        return opportunity_layers, opportunity_geofence_layer

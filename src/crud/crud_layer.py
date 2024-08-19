@@ -825,7 +825,7 @@ class CRUDLayerExport:
             f.write(f"Metadata for layer {layer.name}\n")
             f.write("############################################################\n")
             f.write(
-                f"Exported Coordinate Reference System: EPSG {layer.upload_reference_system}\n"
+                f"Exported Coordinate Reference System: {layer_in.crs}\n"
             )
             f.write(
                 f"Exported File Type: {OgrDriverType[layer_in.file_type.value].value}\n"

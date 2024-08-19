@@ -41,6 +41,7 @@ class CRUDHeatmapConnectivity(CRUDToolBase):
             f"""SELECT basic.create_heatmap_connectivity_reference_area_table(
                 {layer_project.id},
                 '{layer_project.table_name}',
+                '{settings.CUSTOMER_SCHEMA}',
                 {scenario_id},
                 '{layer_project.where_query.replace("'", "''")}',
                 '{temp_points}',
@@ -118,13 +119,11 @@ class CRUDHeatmapConnectivity(CRUDToolBase):
                 result_layer_id=str(layer_heatmap.id),
             )
         )
-
         # Register feature layer
         await self.create_feature_layer_tool(
             layer_in=layer_heatmap,
             params=params,
         )
-
         return {
             "status": JobStatusType.finished.value,
             "msg": "Heatmap connectivity was successfully computed.",

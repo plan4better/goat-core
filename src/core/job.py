@@ -1,15 +1,19 @@
 import asyncio
 import inspect
 import logging
+import datetime
+import uuid
 from functools import wraps
-
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 
 from src.core.config import settings
 from src.crud.crud_job import job as crud_job
 from src.schemas.error import ERROR_MAPPING, JobKilledError, TimeoutError, UnknownError
 from src.schemas.job import JobStatusType
 from src.schemas.layer import LayerType, UserDataTable
+from src.utils import table_exists
 
 # Create a logger object for background tasks
 background_logger = logging.getLogger("Background task")
@@ -20,6 +24,77 @@ formatter = logging.Formatter(
 )
 handler.setFormatter(formatter)
 background_logger.addHandler(handler)
+
+
+async def delete_orphan_data(
+    async_session: AsyncSession, user_id: UUID, last_run: datetime
+):
+    """Delete orphan data from user tables"""
+
+    for table in (
+        UserDataTable.polygon,
+        UserDataTable.line,
+        UserDataTable.point,
+        UserDataTable.no_geometry,
+    ):
+        table_name = f"{table.value}_{str(user_id).replace('-', '')}"
+
+        # Check if table exists
+        if not await table_exists(async_session, settings.USER_DATA_SCHEMA, table_name):
+            print(f"Table {table_name} for {user_id} does not exist.")
+            continue
+
+        # Build condition for layer filtering
+        if table == UserDataTable.no_geometry:
+            condition = f"type = '{LayerType.table.value}'"
+        else:
+            condition = f"feature_layer_geometry_type = '{table.value}'"
+
+
+        # Create temp table with layers owned by user
+        await async_session.execute(text("DROP TABLE IF EXISTS temp_layer;"))
+        temp_table_name = str(uuid.uuid4()).replace("-", "")
+        sql_temp_layer_table = f"""
+            CREATE TABLE temporal."{temp_table_name}" AS
+            SELECT id
+            FROM customer.layer
+            WHERE {condition}
+            AND user_id = '{str(user_id)}';
+        """
+        await async_session.execute(text(sql_temp_layer_table))
+        await async_session.execute(text(f"""ALTER TABLE temporal."{temp_table_name}" ADD PRIMARY KEY(id);"""))
+        await async_session.commit()
+
+        # Get layer_ids to delete from user data table
+        sql_layer_ids_to_delete = f"""
+            SELECT DISTINCT d.layer_id
+            FROM {settings.USER_DATA_SCHEMA}."{table_name}" d
+            LEFT JOIN temporal."{temp_table_name}" l
+            ON l.id = d.layer_id
+            WHERE l.id IS NULL
+            AND d.updated_at > '{last_run.isoformat()}';
+        """
+        layer_ids_to_delete = await async_session.execute(text(sql_layer_ids_to_delete))
+        layer_ids_to_delete = [row[0] for row in layer_ids_to_delete.fetchall()]
+
+        # Drop temp table
+        await async_session.execute(text(f"""DROP TABLE IF EXISTS temporal."{temp_table_name}";"""))
+        await async_session.commit()
+
+        # Delete orphan data
+        if len(layer_ids_to_delete) > 0:
+            print(f"Orphan data for {table_name} with the following layer-ids: {layer_ids_to_delete}")
+            for layer_id in layer_ids_to_delete:
+                # Delete orphan data
+                sql_delete_orphan_data = f"""
+                DELETE FROM {settings.USER_DATA_SCHEMA}."{table_name}"
+                WHERE layer_id = '{str(layer_id)}';
+                """
+                await async_session.execute(text(sql_delete_orphan_data))
+                await async_session.commit()
+        else:
+            print(f"No orphan data for {table_name}.")
+    return
 
 
 async def run_failure_func(instance, func, *args, **kwargs):
@@ -42,11 +117,11 @@ async def run_failure_func(instance, func, *args, **kwargs):
             print(f"Failure function {failure_func_name} failed with error: {e}")
     else:
         # Get the delete orphan, delete temp tables function from class
-        delete_orphan_func = getattr(instance, "delete_orphan_data", None)
         delete_temp_tables_func = getattr(instance, "delete_temp_tables", None)
         delete_created_layers = getattr(instance, "delete_created_layers", None)
-        # Run delete orphan function
-        await delete_orphan_func()
+        # Delete all orphan data that is older then 20 minutes
+        min_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=20)
+        await delete_orphan_data(async_session=instance.async_session, user_id=instance.user_id, last_run=min_time)
         # Run delete temp tables function
         await delete_temp_tables_func()
         # Delete all layers created by the job
@@ -286,50 +361,9 @@ class CRUDFailedJob:
     async def delete_orphan_data(self):
         """Delete orphan data from user tables"""
 
-        # Get user_id
-        user_id = self.user_id
-
-        for table in (
-            UserDataTable.polygon,
-            UserDataTable.line,
-            UserDataTable.point,
-            UserDataTable.no_geometry,
-        ):
-            table_name = f"{table.value}_{str(user_id).replace('-', '')}"
-
-            # Build condition for layer filtering
-            if table == UserDataTable.no_geometry:
-                condition = f"WHERE l.type = '{LayerType.table.value}'"
-            else:
-                condition = f"WHERE l.feature_layer_geometry_type = '{table.value}'"
-
-            # Delete orphan data that don't exists in layer table and check for data not older then 30 minuts
-            sql_delete_orphan_data = f"""
-            WITH layer_ids_to_check AS (
-                SELECT DISTINCT layer_id
-                FROM {settings.USER_DATA_SCHEMA}."{table_name}"
-                WHERE created_at > CURRENT_TIMESTAMP AT TIME ZONE 'UTC' - INTERVAL '30 minutes'
-            ),
-            to_delete AS (
-                SELECT x.layer_id
-                FROM layer_ids_to_check x
-                LEFT JOIN
-                (
-                    SELECT l.id
-                    FROM {settings.CUSTOMER_SCHEMA}.layer l
-                    {condition}
-                    AND l.user_id = '{str(user_id)}'
-                ) l
-                ON x.layer_id = l.id
-                WHERE l.id IS NULL
-            )
-            DELETE FROM {settings.USER_DATA_SCHEMA}."{table_name}" x
-            USING to_delete d
-            WHERE x.layer_id = d.layer_id;
-            """
-            await self.async_session.execute(text(sql_delete_orphan_data))
-            await self.async_session.commit()
-        return
+        await delete_orphan_data(
+            async_session=self.async_session, user_id=self.user_id, last_run=datetime.datetime.now(datetime.timezone.utc)
+        )
 
     async def delete_temp_tables(self):
         # Get all tables that end with the job id

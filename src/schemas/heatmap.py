@@ -134,6 +134,11 @@ class HeatmapGravityBase(BaseModel):
         title="Scenario ID",
         description="The ID of the scenario that is to be applied on the input layer or base network.",
     )
+    opportunity_geofence_layer_project_id: int | None = Field(
+        None,
+        title="Opportunity geofence layer project ID",
+        description="The layer project ID of a geofence to be used for limiting opportunities to a certain region.",
+    )
 
     def validate_max_traveltime(routing_type, values):
         max_traveltime = MaxTravelTimeTransportMode[routing_type].value
@@ -146,7 +151,10 @@ class HeatmapGravityBase(BaseModel):
 
     @property
     def input_layer_types(self):
-        return {"opportunity_layer_project_id": input_layer_type_point}
+        return {
+            "opportunity_layer_project_id": input_layer_type_point,
+            "opportunity_geofence_layer_project_id": input_layer_type_polygon,
+        }
 
 
 class HeatmapClosestAverageBase(BaseModel):
@@ -162,6 +170,11 @@ class HeatmapClosestAverageBase(BaseModel):
         title="Scenario ID",
         description="The ID of the scenario that is to be applied on the input layer or base network.",
     )
+    opportunity_geofence_layer_project_id: int | None = Field(
+        None,
+        title="Opportunity geofence layer project ID",
+        description="The layer project ID of a geofence to be used for limiting opportunities to a certain region.",
+    )
 
     def validate_max_traveltime(routing_type, values):
         max_traveltime = MaxTravelTimeTransportMode[routing_type].value
@@ -174,7 +187,10 @@ class HeatmapClosestAverageBase(BaseModel):
 
     @property
     def input_layer_types(self):
-        return {"opportunity_layer_project_id": input_layer_type_point}
+        return {
+            "opportunity_layer_project_id": input_layer_type_point,
+            "opportunity_geofence_layer_project_id": input_layer_type_polygon,
+        }
 
 
 class HeatmapConnectivityBase(BaseModel):
