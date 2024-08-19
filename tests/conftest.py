@@ -13,24 +13,26 @@ from sqlalchemy import text
 from src.core.config import settings
 from src.endpoints.deps import get_db, session_manager
 from src.main import app
-from src.schemas.catchment_area import request_examples_catchment_area_active_mobility as active_mobility_request_examples
-from src.schemas.layer import LayerType
-from src.schemas.layer import request_examples as layer_request_examples
+from src.schemas.catchment_area import (
+    request_examples_catchment_area_active_mobility as active_mobility_request_examples,
+)
 from src.schemas.catchment_area import (
     request_examples_catchment_area_car,
     request_examples_catchment_area_pt,
 )
+from src.schemas.layer import LayerType
+from src.schemas.layer import request_examples as layer_request_examples
 from src.schemas.project import (
     request_examples as project_request_examples,
 )
 from tests.utils import (
     check_job_status,
+    check_user_data_deleted,
     generate_random_string,
     upload_file,
     upload_invalid_file,
     upload_valid_file,
     upload_valid_files,
-    check_user_data_deleted,
 )
 
 
@@ -787,7 +789,7 @@ async def create_external_layer(client: AsyncClient, home_folder, layer_type):
     return response.json()
 
 
-external_layers = ["external_vector_tile", "external_imagery"]
+external_layers = ["external_vector", "external_imagery"]
 
 
 @pytest.fixture(params=external_layers)
@@ -802,7 +804,7 @@ async def fixture_create_external_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
     return await create_external_layer(
-        client, fixture_get_home_folder, "external_vector_tile"
+        client, fixture_get_home_folder, "external_vector"
     )
 
 
@@ -844,7 +846,7 @@ async def fixture_create_internal_and_external_layer(
         "feature_layer_standard",
     )
     external_layer = await create_external_layer(
-        client, fixture_get_home_folder, "external_vector_tile"
+        client, fixture_get_home_folder, "external_vector"
     )
     return internal_layer, external_layer
 
@@ -876,6 +878,7 @@ async def fixture_delete_internal_layers(
         layer=layer,
     )
 
+
 @pytest.fixture
 async def fixture_delete_external_layers(
     client: AsyncClient, fixture_create_external_layers
@@ -888,7 +891,10 @@ async def fixture_delete_external_layers(
     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}")
     assert response.status_code == 404  # Not Found
 
-async def create_multiple_layer(client: AsyncClient, fixture_create_user, fixture_get_home_folder, in_catalog: bool):
+
+async def create_multiple_layer(
+    client: AsyncClient, fixture_create_user, fixture_get_home_folder, in_catalog: bool
+):
     # Define layer metadata for the different layer types
     varying_attributes = [
         {
@@ -961,17 +967,24 @@ async def create_multiple_layer(client: AsyncClient, fixture_create_user, fixtur
         cnt += 1
     return layers
 
+
 @pytest.fixture
 async def fixture_create_multiple_layers(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
-    return await create_multiple_layer(client, fixture_create_user, fixture_get_home_folder, False)
+    return await create_multiple_layer(
+        client, fixture_create_user, fixture_get_home_folder, False
+    )
+
 
 @pytest.fixture
 async def fixture_create_catalog_layers(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
-    return await create_multiple_layer(client, fixture_create_user, fixture_get_home_folder, True)
+    return await create_multiple_layer(
+        client, fixture_create_user, fixture_get_home_folder, True
+    )
+
 
 def get_payload_types(request_examples: dict) -> list:
     return request_examples
