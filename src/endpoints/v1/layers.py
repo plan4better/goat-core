@@ -42,7 +42,7 @@ from src.endpoints.legacy import deps
 from src.resources import tms as custom_tms
 from src.resources.enums import MimeTypes
 from src.schemas.layer import (
-    ExternalVectorTile,
+    ExternalVector,
     TileMatrixSetList,
     VectorTileFunction,
     VectorTileTable,
@@ -94,7 +94,7 @@ def TileMatrixSetParams(
 def LayerParams(
     request: Request,
     layer: str = Path(..., description="Layer Name"),
-) -> ExternalVectorTile:
+) -> ExternalVector:
     """Return Layer Object."""
 
     if layer == "building":
@@ -122,7 +122,7 @@ class VectorTilerFactory:
     tms_dependency: Callable[..., TileMatrixSet] = TileMatrixSetParams
 
     # Table/Function dependency
-    layer_dependency: Callable[..., ExternalVectorTile] = LayerParams
+    layer_dependency: Callable[..., ExternalVector] = LayerParams
 
     with_tables_metadata: bool = False
     with_functions_metadata: bool = False

@@ -9,7 +9,7 @@ from src.db.models.layer import ContentBaseAttributes, internal_layer_table_name
 from src.schemas.common import CQLQuery
 from src.schemas.layer import (
     IExternalImageryRead,
-    IExternalVectorTileRead,
+    IExternalVectorRead,
     IFeatureStandardRead,
     IFeatureToolRead,
     ITableRead,
@@ -143,18 +143,22 @@ class IFeatureToolProjectRead(
 ):
     pass
 
+
 class IFeatureStreetNetworkProjectRead(
     LayerProjectIds, IFeatureStandardRead, IFeatureBaseProjectRead
 ):
     pass
 
+
 @optional
 class IFeatureStandardProjectUpdate(IFeatureBaseProject):
     pass
 
+
 @optional
 class IFeatureStreetNetworkProjectUpdate(IFeatureBaseProject):
     pass
+
 
 @optional
 class IFeatureToolProjectUpdate(IFeatureBaseProject):
@@ -188,7 +192,7 @@ class ITableProjectUpdate(CQLQuery):
     group: str | None = Field(None, description="Layer group name", max_length=255)
 
 
-class IExternalVectorTileProjectRead(LayerProjectIds, IExternalVectorTileRead):
+class IExternalVectorProjectRead(LayerProjectIds, IExternalVectorRead):
     group: str = Field(None, description="Layer group name", max_length=255)
     properties: dict = Field(
         ...,
@@ -197,7 +201,7 @@ class IExternalVectorTileProjectRead(LayerProjectIds, IExternalVectorTileRead):
 
 
 @optional
-class IExternalVectorTileProjectUpdate(BaseModel):
+class IExternalVectorProjectUpdate(BaseModel):
     name: str | None = Field(None, description="Layer name", max_length=255)
     group: str | None = Field(None, description="Layer group name", max_length=255)
     properties: dict | None = Field(
@@ -237,7 +241,7 @@ layer_type_mapping_read = {
     "feature_tool": IFeatureToolProjectRead,
     "feature_street_network": IFeatureStreetNetworkProjectRead,
     "table": ITableProjectRead,
-    "external_vector_tile": IExternalVectorTileProjectRead,
+    "external_vector": IExternalVectorProjectRead,
     "external_imagery": IExternalImageryProjectRead,
 }
 
@@ -246,7 +250,7 @@ layer_type_mapping_update = {
     "feature_tool": IFeatureToolProjectUpdate,
     "feature_street_network": IFeatureStreetNetworkProjectUpdate,
     "table": ITableProjectUpdate,
-    "external_vector_tile": IExternalVectorTileProjectUpdate,
+    "external_vector": IExternalVectorProjectUpdate,
     "external_imagery": IExternalImageryProjectUpdate,
 }
 
@@ -314,7 +318,7 @@ request_examples = {
                 "group": "Group 1",
             },
         },
-        "external_vector_tile": {
+        "external_vector": {
             "summary": "VectorVectorTile Layer",
             "value": {
                 "name": "VectorVectorTile Layer",

@@ -25,9 +25,10 @@ from src.core.config import settings
 from src.db.models._base_class import ContentBaseAttributes, DateTimeBase
 
 if TYPE_CHECKING:
+    from src.db.models.folder import Folder
+
     from ._link_model import LayerProjectLink
     from .data_store import DataStore
-    from src.db.models.folder import Folder
 
 
 class ToolType(str, Enum):
@@ -130,14 +131,15 @@ class LayerType(str, Enum):
 
     feature = "feature"
     external_imagery = "external_imagery"
-    external_vector_tile = "external_vector_tile"
+    external_vector = "external_vector"
     table = "table"
 
 
-class ExternalVectorTileDataType(str, Enum):
+class ExternalVectorDataType(str, Enum):
     """VectorTile layer data types."""
 
     mvt = "mvt"
+    wfs = "wfs"
 
 
 class FeatureGeometryType(str, Enum):
@@ -402,13 +404,13 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     )
     url: HttpUrl | None = Field(
         sa_column=Column(Text, nullable=True),
-        description="Layer URL for tile and imagery layers",
+        description="Layer URL for vector and imagery layers",
     )
-    data_type: Optional[
-        Union["ExternalImageryDataType", "ExternalVectorTileDataType"]
-    ] = Field(
-        sa_column=Column(Text, nullable=True),
-        description="Data type for imagery layers and tile layers",
+    data_type: Optional[Union["ExternalImageryDataType", "ExternalVectorDataType"]] = (
+        Field(
+            sa_column=Column(Text, nullable=True),
+            description="Data type for imagery layers and vector layers",
+        )
     )
     tool_type: Optional[ToolType] = Field(
         sa_column=Column(Text, nullable=True),
@@ -444,7 +446,9 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
 
     # Relationships
     data_store: "DataStore" = Relationship(back_populates="layers")
-    layer_projects: List["LayerProjectLink"] = Relationship(back_populates="layer", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    layer_projects: List["LayerProjectLink"] = Relationship(
+        back_populates="layer", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
     folder: "Folder" = Relationship(back_populates="layers")
 
     @validator("extent", pre=True)

@@ -867,7 +867,7 @@ async def create_external_layer(client: AsyncClient, home_folder, layer_type):
     return response.json()
 
 
-external_layers = ["external_vector_tile", "external_imagery"]
+external_layers = ["external_vector", "external_imagery"]
 
 
 @pytest.fixture(params=external_layers)
@@ -882,7 +882,7 @@ async def fixture_create_external_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
     return await create_external_layer(
-        client, fixture_get_home_folder, "external_vector_tile"
+        client, fixture_get_home_folder, "external_vector"
     )
 
 
@@ -924,7 +924,7 @@ async def fixture_create_internal_and_external_layer(
         "feature_layer_standard",
     )
     external_layer = await create_external_layer(
-        client, fixture_get_home_folder, "external_vector_tile"
+        client, fixture_get_home_folder, "external_vector"
     )
     return internal_layer, external_layer
 
