@@ -5,24 +5,24 @@ import os
 import re
 import time
 import zipfile
+from enum import Enum
 from typing import Union
 from uuid import UUID
-from enum import Enum
-from datetime import datetime
 
 # Third party imports
 import aiofiles
 import aiofiles.os as aos
 import pandas as pd
-from fastapi import UploadFile
+from fastapi import HTTPException, status
 from openpyxl import load_workbook
 from osgeo import ogr, osr
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from pyproj import CRS
 from shapely import wkb
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import select, text
 from sqlmodel import SQLModel
+from starlette.datastructures import UploadFile
 
 # Local application imports
 from src.core.config import settings
@@ -30,6 +30,7 @@ from src.core.job import job_log
 from src.crud.base import CRUDBase
 from src.db.models._link_model import LayerProjectLink
 from src.db.models.layer import (
+    FeatureDataType,
     FeatureLayerExportType,
     FeatureType,
     FileUploadType,
@@ -40,18 +41,18 @@ from src.db.models.layer import (
 from src.schemas.error import DataOutCRSBoundsError, Ogr2OgrError
 from src.schemas.job import JobStatusType, Msg, MsgType
 from src.schemas.layer import (
+    IFileUploadExternalService,
+    MaxFileSizeType,
     NumberColumnsPerType,
     OgrDriverType,
     OgrPostgresType,
     SupportedOgrGeomType,
-    UserDataTable,
 )
 from src.utils import (
     async_delete_dir,
     async_run_command,
     async_scandir,
     sanitize_error_message,
-    table_exists,
 )
 
 
@@ -162,19 +163,65 @@ class FileUpload:
         async_session: AsyncSession,
         user_id: UUID,
         dataset_id: UUID,
-        file: UploadFile,
+        source: UploadFile | IFileUploadExternalService,
     ):
         self.async_session = async_session
         self.user_id = user_id
-        self.file = file
+        self.source = source
         self.folder_path = os.path.join(
             settings.DATA_DIR, str(self.user_id), str(dataset_id)
         )
-        self.file_ending = os.path.splitext(file.filename)[-1][1:]
-        self.file_name = file.filename
-        self.file_path = os.path.join(self.folder_path, "file." + self.file_ending)
 
-    async def save_file(self, file: UploadFile):
+        if isinstance(source, UploadFile):
+            self.file_ending = os.path.splitext(source.filename)[-1][1:]
+            self.file_path = os.path.join(self.folder_path, "file." + self.file_ending)
+        else:
+            self.file_path = os.path.join(
+                self.folder_path, "file." + FileUploadType.gpkg.value
+            )
+
+    async def _fetch_and_write(self):
+        """Fetch data from external service if required, save file to disk."""
+
+        if isinstance(self.source, UploadFile):
+            # An existing file was uploaded, save file in chunks
+            async with aiofiles.open(self.file_path, "wb") as buffer:
+                while True:
+                    chunk = await self.source.read(65536)
+                    if not chunk:
+                        break
+                    await buffer.write(chunk)
+        else:
+            # Initialize OGR external service fetching
+            ogr_external_service_fetching = OGRExternalServiceFetching(
+                url=self.source.url, output_file=self.file_path
+            )
+
+            if self.source.data_type == FeatureDataType.wfs:
+                # Ensure a single WFS layer is specified
+                layers = self.source.other_properties.get("layers")
+                if not layers or len(layers) != 1:
+                    raise ValueError(
+                        "WFS: A single layer must be specified under the 'layers' key of other_properties."
+                    )
+
+                # Fetch the specified layer
+                ogr_external_service_fetching.fetch_wfs(layer_name=layers[0])
+
+                # Ensure the newly saved file does not exceed file size limits
+                if (
+                    os.path.getsize(self.file_path)
+                    > MaxFileSizeType[FileUploadType.gpkg.value].value
+                ):
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail=f"File size too large. Max file size is {round(MaxFileSizeType[FileUploadType.gpkg.value].value / 1048576, 2)} MB",
+                    )
+            elif self.data_type == FeatureDataType.mvt:
+                # TODO: Implement MVT fetching
+                pass
+
+    async def save_file(self):
         """Save file to disk for later operations."""
 
         # Clean all old folders that are older then two hours
@@ -186,18 +233,87 @@ class FileUpload:
             await aos.mkdir(os.path.join(settings.DATA_DIR, str(self.user_id)))
         await aos.mkdir(self.folder_path)
 
-        # Save file in chunks
-        async with aiofiles.open(self.file_path, "wb") as buffer:
-            while True:
-                chunk = await file.read(65536)
-                if not chunk:
-                    break
-                await buffer.write(chunk)
+        # Fetch and save file
+        await self._fetch_and_write()
+
         return self.file_path
 
     async def save_file_fail(self):
         """Delete folder if file upload fails."""
         await async_delete_dir(self.folder_path)
+
+
+class OGRExternalServiceFetching:
+    def __init__(self, url: HttpUrl, output_file: str):
+        self.url = url
+
+        # Initialize output GeoPackage data source
+        output_driver = ogr.GetDriverByName(OgrDriverType.gpkg.value)
+        if output_driver is None:
+            raise Exception(f"{OgrDriverType.gpkg.value} driver is not available.")
+
+        self.output_data_source = output_driver.CreateDataSource(output_file)
+        if self.output_data_source is None:
+            raise Exception(f"Could not create output data source at {output_file}")
+
+    def fetch_wfs(self, layer_name: str):
+        """Fetch data from WFS service and save to disk."""
+
+        ogr.UseExceptions()
+
+        # Initialize WFS data source
+        wfs_data_source = ogr.Open(str(self.url))
+        if wfs_data_source is None:
+            raise Exception(f"Could not open WFS service at {self.url}")
+
+        # Get the specified layer
+        input_layer = wfs_data_source.GetLayerByName(layer_name)
+        if input_layer is None:
+            raise Exception(f"Could not find layer {layer_name} in WFS service.")
+
+        # Get geometry column name and type
+        geom_column = input_layer.GetGeometryColumn()
+        if not geom_column:
+            raise Exception("Could not determine geometry column for WFS layer.")
+
+        geom_type = input_layer.GetGeomType()
+        if geom_type == ogr.wkbUnknown:
+            first_feature = input_layer.GetNextFeature()
+            if first_feature:
+                geom_type = first_feature.GetGeometryRef().GetGeometryType()
+            else:
+                raise Exception(
+                    "Could not determine geometry type for WFS layer, no features exist."
+                )
+
+        # Initialize output layer
+        output_layer = self.output_data_source.CreateLayer(
+            layer_name,
+            srs=input_layer.GetSpatialRef(),
+            geom_type=geom_type,
+            options=[f"GEOMETRY_NAME={geom_column}"],
+        )
+        if output_layer is None:
+            raise Exception(
+                f"Could not create layer {layer_name} in output data source."
+            )
+
+        # Create all remaining non-geometry columns
+        input_layer_defn = input_layer.GetLayerDefn()
+        for i in range(input_layer_defn.GetFieldCount()):
+            field_defn = input_layer_defn.GetFieldDefn(i)
+            output_layer.CreateField(field_defn)
+
+        # Copy features from input to output layer
+        for feature in input_layer:
+            output_layer.CreateFeature(feature)
+
+        ogr.DontUseExceptions()
+
+    async def fetch_mvt(self):
+        """Fetch data from MVT service and save to disk."""
+        # TODO: Implement MVT fetching
+        pass
 
 
 class OGRFileHandling:

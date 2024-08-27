@@ -15,7 +15,7 @@ from src.db.models.layer import (
     DataCategory,
     DataLicense,
     ExternalImageryDataType,
-    ExternalVectorDataType,
+    FeatureDataType,
     FeatureGeometryType,
     FeatureLayerExportType,
     FeatureType,
@@ -105,6 +105,17 @@ class IFileUploadMetadata(BaseModel):
     file_path: str = Field(..., description="File path", max_length=500)
     dataset_id: UUID = Field(..., description="Dataset ID")
     msg: Msg = Field(..., description="Response Message")
+
+
+class IFileUploadExternalService(BaseModel):
+    url: HttpUrl = (Field(..., description="URL of the external service"),)
+    data_type: FeatureDataType = (
+        Field(..., description="Type of interface provided by the external service"),
+    )
+    other_properties: dict = Field(
+        ...,
+        description="Additional properties required to fetch data from the external service",
+    )
 
 
 class ComputeBreakOperation(Enum):
@@ -380,7 +391,7 @@ class ExternalVectorAttributesBase(BaseModel):
     """Base model for additional attributes tile layer."""
 
     url: HttpUrl = Field(..., description="Layer URL")
-    data_type: ExternalVectorDataType = Field(..., description="Content data type")
+    data_type: FeatureDataType = Field(..., description="Content data type")
     properties: dict | None = Field(None, description="Layer properties.")
 
 

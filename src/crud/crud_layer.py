@@ -6,7 +6,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 # Third party imports
-from fastapi import HTTPException, UploadFile, status
+from fastapi import HTTPException, status
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from geoalchemy2.shape import WKTElement
@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
+from starlette.datastructures import UploadFile
 
 # Local application imports
 from src.core.config import settings
@@ -41,6 +42,7 @@ from src.schemas.layer import (
     FeatureType,
     ICatalogLayerGet,
     IFeatureStandardCreateAdditionalAttributes,
+    IFileUploadExternalService,
     IFileUploadMetadata,
     IInternalLayerCreate,
     IInternalLayerExport,
@@ -169,10 +171,10 @@ class CRUDLayer(CRUDLayerBase):
         self,
         async_session: AsyncSession,
         user_id: UUID,
+        source: UploadFile | IFileUploadExternalService,
         layer_type: LayerType,
-        file: UploadFile,
     ):
-        """Validate file using ogr2ogr."""
+        """Fetch data if required, then validate using ogr2ogr."""
 
         dataset_id = uuid4()
         # Initialize OGRFileUpload
@@ -180,18 +182,18 @@ class CRUDLayer(CRUDLayerBase):
             async_session=async_session,
             user_id=user_id,
             dataset_id=dataset_id,
-            file=file,
+            source=source,
         )
 
         # Save file
         timeout = 120
         try:
             file_path = await asyncio.wait_for(
-                file_upload.save_file(file=file),
+                file_upload.save_file(),
                 timeout,
             )
         except asyncio.TimeoutError:
-            # Handle the timeout here. For example, you can raise a custom exception or log it.
+            # Run failure function and perform cleanup
             await file_upload.save_file_fail()
             raise HTTPException(
                 status_code=status.HTTP_408_REQUEST_TIMEOUT,
@@ -240,16 +242,21 @@ class CRUDLayer(CRUDLayerBase):
             )
 
         # Get file size in bytes
-        original_position = file.file.tell()
-        file.file.seek(0, 2)
-        file_size = file.file.tell()
-        file.file.seek(original_position)
+        if isinstance(source, UploadFile):
+            original_position = source.file.tell()
+            source.file.seek(0, 2)
+            file_size = source.file.tell()
+            source.file.seek(original_position)
+        else:
+            file_size = os.path.getsize(file_path)
 
         # Define metadata object
         metadata = IFileUploadMetadata(
             **validation_result,
             dataset_id=dataset_id,
-            file_ending=os.path.splitext(file.filename)[-1][1:],
+            file_ending=os.path.splitext(
+                source.filename if isinstance(source, UploadFile) else file_path
+            )[-1][1:],
             file_size=file_size,
             layer_type=layer_type,
         )
@@ -824,9 +831,7 @@ class CRUDLayerExport:
             f.write("############################################################\n")
             f.write(f"Metadata for layer {layer.name}\n")
             f.write("############################################################\n")
-            f.write(
-                f"Exported Coordinate Reference System: {layer_in.crs}\n"
-            )
+            f.write(f"Exported Coordinate Reference System: {layer_in.crs}\n")
             f.write(
                 f"Exported File Type: {OgrDriverType[layer_in.file_type.value].value}\n"
             )

@@ -135,11 +135,12 @@ class LayerType(str, Enum):
     table = "table"
 
 
-class ExternalVectorDataType(str, Enum):
-    """VectorTile layer data types."""
+class FeatureDataType(str, Enum):
+    """Data types for feature layers."""
 
     mvt = "mvt"
     wfs = "wfs"
+    # NULL / None is used for feature layers not fetched from an external service
 
 
 class FeatureGeometryType(str, Enum):
@@ -406,11 +407,9 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         sa_column=Column(Text, nullable=True),
         description="Layer URL for vector and imagery layers",
     )
-    data_type: Optional[Union["ExternalImageryDataType", "ExternalVectorDataType"]] = (
-        Field(
-            sa_column=Column(Text, nullable=True),
-            description="Data type for imagery layers and vector layers",
-        )
+    data_type: Optional[Union["ExternalImageryDataType", "FeatureDataType"]] = Field(
+        sa_column=Column(Text, nullable=True),
+        description="Data type for imagery layers and vector layers",
     )
     tool_type: Optional[ToolType] = Field(
         sa_column=Column(Text, nullable=True),

@@ -49,6 +49,7 @@ from src.schemas.layer import (
     AreaStatisticsOperation,
     ComputeBreakOperation,
     ICatalogLayerGet,
+    IFileUploadExternalService,
     IFileUploadMetadata,
     IInternalLayerCreate,
     IInternalLayerExport,
@@ -108,9 +109,41 @@ async def file_upload(
     # Run the validation
     metadata = await crud_layer.upload_file(
         async_session=async_session,
-        layer_type=layer_type,
         user_id=user_id,
-        file=file,
+        source=file,
+        layer_type=layer_type,
+    )
+    return metadata
+
+
+@router.post(
+    "/file-upload-external-service",
+    summary="Fetch data from external service into a file, upload file to server and validate",
+    response_model=IFileUploadMetadata,
+    status_code=201,
+)
+async def file_upload_external_service(
+    *,
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_user_id),
+    external_service: IFileUploadExternalService = Body(
+        ...,
+        description="External service to fetch data from.",
+    ),
+):
+    """
+    Fetch data from external service into a file, upload file to server and validate.
+    """
+
+    # This endpoint only supports external services providing feature data
+    layer_type = LayerType.feature
+
+    # Run the validation
+    metadata = await crud_layer.upload_file(
+        async_session=async_session,
+        user_id=user_id,
+        source=external_service,
+        layer_type=layer_type,
     )
     return metadata
 
@@ -147,9 +180,9 @@ async def create_layer_internal(
 
     # Get metadata from file in folder
     metadata_path = None
-    for root, dirs, files in os.walk(folder_path):
-        if 'metadata.json' in files:
-            metadata_path = os.path.join(root, 'metadata.json')
+    for root, _dirs, files in os.walk(folder_path):
+        if "metadata.json" in files:
+            metadata_path = os.path.join(root, "metadata.json")
 
     if metadata_path is None:
         raise HTTPException(
