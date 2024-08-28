@@ -44,8 +44,8 @@ from src.schemas.layer import (
     IFeatureStandardCreateAdditionalAttributes,
     IFileUploadExternalService,
     IFileUploadMetadata,
-    IInternalLayerCreate,
-    IInternalLayerExport,
+    ILayerExport,
+    ILayerFromDatasetCreate,
     ILayerGet,
     IMetadataAggregate,
     IMetadataAggregateRead,
@@ -145,7 +145,7 @@ class CRUDLayer(CRUDLayerBase):
         if layer is None:
             raise LayerNotFoundError(f"{Layer.__name__} not found")
 
-        # Check if internal or external layer
+        # Delete data if internal layer
         if layer.type in [LayerType.table.value, LayerType.feature.value]:
             # Delete layer data
             await delete_layer_data(async_session=async_session, layer=layer)
@@ -677,7 +677,7 @@ class CRUDLayerImport(CRUDFailedJob):
     @job_log(job_step_name="internal_layer_create")
     async def create_internal(
         self,
-        layer_in: IInternalLayerCreate,
+        layer_in: ILayerFromDatasetCreate,
         file_metadata: dict,
         attribute_mapping: dict,
         project_id: UUID = None,
@@ -762,7 +762,7 @@ class CRUDLayerImport(CRUDFailedJob):
     async def import_file(
         self,
         file_metadata: dict,
-        layer_in: IInternalLayerCreate,
+        layer_in: ILayerFromDatasetCreate,
         project_id: UUID = None,
     ):
         """Import file using ogr2ogr."""
@@ -819,7 +819,7 @@ class CRUDLayerExport:
             settings.DATA_DIR, str(self.user_id), str(self.id)
         )
 
-    async def create_metadata_file(self, layer: Layer, layer_in: IInternalLayerExport):
+    async def create_metadata_file(self, layer: Layer, layer_in: ILayerExport):
         last_data_updated_at = await CRUDLayer(Layer).get_last_data_updated_at(
             async_session=self.async_session, id=self.id, query=layer_in.query
         )
@@ -864,7 +864,7 @@ class CRUDLayerExport:
 
     async def export_file(
         self,
-        layer_in: IInternalLayerExport,
+        layer_in: ILayerExport,
     ):
         """Export file using ogr2ogr."""
 
@@ -872,6 +872,12 @@ class CRUDLayerExport:
         layer = await CRUDLayer(Layer).get_internal(
             async_session=self.async_session, id=self.id
         )
+
+        # Only feature and table layers can be exported
+        if layer.type not in [LayerType.feature, LayerType.table]:
+            raise UnsupportedLayerTypeError(
+                "Layer is not a feature layer or table layer. Other layer types cannot be exported."
+            )
 
         # Make sure that feature layer have CRS set
         if layer.type == LayerType.feature:
@@ -943,7 +949,7 @@ class CRUDLayerExport:
 
         return result_dir
 
-    async def export_file_run(self, layer_in: IInternalLayerExport):
+    async def export_file_run(self, layer_in: ILayerExport):
         return await self.export_file(layer_in=layer_in)
 
 

@@ -1,6 +1,6 @@
 # Standard library imports
 from enum import Enum
-from typing import List
+from typing import List, Optional
 from uuid import UUID, uuid4
 
 # Third party imports
@@ -14,7 +14,6 @@ from src.db.models._base_class import DateTimeBase, content_base_example
 from src.db.models.layer import (
     DataCategory,
     DataLicense,
-    ExternalImageryDataType,
     FeatureDataType,
     FeatureGeometryType,
     FeatureLayerExportType,
@@ -22,6 +21,7 @@ from src.db.models.layer import (
     GeospatialAttributes,
     LayerBase,
     LayerType,
+    RasterDataType,
     TableLayerExportType,
     ToolType,
     layer_base_example,
@@ -97,27 +97,6 @@ class NumberColumnsPerType(int, Enum):
     boolean = 10
 
 
-class IFileUploadMetadata(BaseModel):
-    data_types: dict = Field(..., description="Data types of the columns")
-    layer_type: LayerType = Field(..., description="Layer type")
-    file_ending: str = Field(..., description="File ending", max_length=500)
-    file_size: int = Field(..., description="File size")
-    file_path: str = Field(..., description="File path", max_length=500)
-    dataset_id: UUID = Field(..., description="Dataset ID")
-    msg: Msg = Field(..., description="Response Message")
-
-
-class IFileUploadExternalService(BaseModel):
-    url: HttpUrl = (Field(..., description="URL of the external service"),)
-    data_type: FeatureDataType = (
-        Field(..., description="Type of interface provided by the external service"),
-    )
-    other_properties: dict = Field(
-        ...,
-        description="Additional properties required to fetch data from the external service",
-    )
-
-
 class ComputeBreakOperation(Enum):
     """Allowed operations on numeric columns."""
 
@@ -160,6 +139,59 @@ class LayerProperties(BaseModel):
 
 
 ################################################################################
+# External service DTOs
+################################################################################
+
+
+class ExternalServiceOtherProperties(BaseModel):
+    """Model for external service properties."""
+
+    layers: Optional[List[str]] = Field(
+        None, description="List of layers to be displayed"
+    )
+    width: Optional[int] = Field(None, description="Width of the WMS image")
+    height: Optional[int] = Field(None, description="Height of the WMS image")
+    srs: Optional[str] = Field(None, description="SRS of the WMS image", max_length=50)
+    legend_urls: Optional[List[HttpUrl]] = Field(None, description="Layer legend URLs")
+
+
+class ExternalServiceAttributesBase(BaseModel):
+    """Base model for attributes pertaining to an external service."""
+
+    url: Optional[HttpUrl] = Field(None, description="Layer URL")
+    data_type: Optional[FeatureDataType | RasterDataType] = Field(
+        None, description="Content data type"
+    )
+    properties: Optional[dict] = Field(None, description="Layer properties.")
+    other_properties: Optional[ExternalServiceOtherProperties] = Field(
+        None, description="Additional layer properties."
+    )
+
+
+################################################################################
+# File Upload DTOs
+################################################################################
+
+
+class IFileUploadExternalService(ExternalServiceAttributesBase):
+    """Model for external service attributes used to fetch feature data and save it as a file."""
+
+    pass
+
+
+class IFileUploadMetadata(BaseModel):
+    """Response model returned by file upload endpoints containing dataset metadata."""
+
+    data_types: dict = Field(..., description="Data types of the columns")
+    layer_type: LayerType = Field(..., description="Layer type")
+    file_ending: str = Field(..., description="File ending", max_length=500)
+    file_size: int = Field(..., description="File size")
+    file_path: str = Field(..., description="File path", max_length=500)
+    dataset_id: UUID = Field(..., description="Dataset ID")
+    msg: Msg = Field(..., description="Response Message")
+
+
+################################################################################
 # Feature Layer DTOs
 ################################################################################
 
@@ -199,7 +231,7 @@ feature_layer_update_base_example = {
 
 
 # Feature Layer Standard
-class IInternalLayerCreate(LayerBase):
+class ILayerFromDatasetCreate(LayerBase, ExternalServiceAttributesBase):
     id: UUID = Field(
         default_factory=uuid4, description="Content ID of the layer", alias="id"
     )
@@ -290,29 +322,14 @@ class IFeatureStreetNetworkUpdate(IFeatureStandardUpdate):
 
 
 ################################################################################
-# Imagery Layer DTOs
+# Raster DTOs
 ################################################################################
 
 
-class LayerOtherProperties(BaseModel):
-    """Model for external imagery layer properties."""
+class RasterAttributesBase(ExternalServiceAttributesBase):
+    """Base model for attributes pertaining to an external service providing a raster."""
 
-    layers: List[str] = Field(..., description="List of layers to be displayed")
-    width: int = Field(..., description="Width of the WMS image")
-    height: int = Field(..., description="Height of the WMS image")
-    srs: str = Field(..., description="SRS of the WMS image", max_length=50)
-    legend_urls: List[HttpUrl] | None = Field(None, description="Layer legend URLs")
-
-
-class ExternalImageryAttributesBase(BaseModel):
-    """Base model for additional attributes imagery layer."""
-
-    url: HttpUrl = Field(..., description="Layer URL")
-    data_type: ExternalImageryDataType = Field(..., description="Content data type")
-    properties: dict = Field(..., description="Layer properties.")
-    other_properties: LayerOtherProperties = Field(
-        ..., description="Additional layer properties."
-    )
+    pass
 
 
 imagery_layer_attributes_example = {
@@ -335,33 +352,31 @@ imagery_layer_attributes_example = {
 }
 
 
-class IExternalImageryCreate(
-    LayerBase, GeospatialAttributes, ExternalImageryAttributesBase
-):
-    """Model to create a imagery layer."""
+class IRasterCreate(LayerBase, GeospatialAttributes, RasterAttributesBase):
+    """Model to create a raster layer."""
 
     type: LayerType = Field(..., description="Layer type")
 
 
-class IExternalImageryRead(
+class IRasterRead(
     LayerReadBaseAttributes,
     LayerBase,
     GeospatialAttributes,
-    ExternalImageryAttributesBase,
+    RasterAttributesBase,
     DateTimeBase,
 ):
-    """Model to read a imagery layer."""
+    """Model to read a raster layer."""
 
     pass
 
 
 @optional
-class IExternalImageryUpdate(LayerBase, GeospatialAttributes):
-    """Model to update a imagery layer."""
+class IRasterUpdate(LayerBase, GeospatialAttributes):
+    """Model to update a raster layer."""
 
     url: HttpUrl | None = Field(None, description="Layer URL")
     properties: dict | None = Field(None, description="Layer properties.")
-    other_properties: LayerOtherProperties | None = Field(
+    other_properties: ExternalServiceOtherProperties | None = Field(
         None, description="Additional layer properties."
     )
 
@@ -379,64 +394,6 @@ imagery_layer_update_base_example = {
             "https://geodata.nationaalgeoregister.nl/luchtfoto/rgb/wms?request=GetLegendGraphic&service=WMS&layer=Actueel_ortho25&format=image/png&width=20&height=20",
             "https://geodata.nationaalgeoregister.nl/luchtfoto/rgb/wms?request=GetLegendGraphic&service=WMS&layer=Actueel_ortho25&format=image/png&width=20&height=20",
         ],
-    },
-}
-
-################################################################################
-# VectorTile Layer DTOs
-################################################################################
-
-
-class ExternalVectorAttributesBase(BaseModel):
-    """Base model for additional attributes tile layer."""
-
-    url: HttpUrl = Field(..., description="Layer URL")
-    data_type: FeatureDataType = Field(..., description="Content data type")
-    properties: dict | None = Field(None, description="Layer properties.")
-
-
-tile_layer_attributes_example = {
-    "url": "https://goat.plan4better.de/api/v1/layers/tiles/accidents_pedestrians/12/2179/1420.pbf",
-    "data_type": "mvt",
-    "properties": {
-        "type": "fill",
-        "paint": {"fill-color": "#00ffff"},
-    },
-}
-
-
-class IExternalVectorCreate(
-    LayerBase, GeospatialAttributes, ExternalVectorAttributesBase
-):
-    """Model to create a tile layer."""
-
-    type: LayerType = Field(..., description="Layer type")
-
-
-class IExternalVectorRead(
-    LayerReadBaseAttributes,
-    LayerBase,
-    GeospatialAttributes,
-    ExternalVectorAttributesBase,
-    DateTimeBase,
-):
-    """Model to read a tile layer."""
-
-    pass
-
-
-@optional
-class IExternalVectorUpdate(LayerBase, GeospatialAttributes):
-    """Model to update a tile layer."""
-
-    url: HttpUrl | None = Field(None, description="Layer URL")
-
-
-tile_layer_update_example = {
-    "url": "https://goat.plan4better.de/api/v1/layers/tiles/accidents_pedestrians/12/2179/1420.pbf",
-    "properties": {
-        "type": "fill",
-        "paint": {"fill-color": "#ff0000"},
     },
 }
 
@@ -495,34 +452,24 @@ def get_layer_class(class_type: str, layer_creator_class: dict, **kwargs):
 
 
 layer_creator_class = {
-    "internal": {
-        "table": ITableRead,
-        "feature": {
-            "standard": IFeatureStandardRead,
-            "tool": IFeatureToolRead,
-            "street_network": IFeatureStreetNetworkRead,
-        },
+    "feature": {
+        "standard": IFeatureStandardRead,
+        "tool": IFeatureToolRead,
+        "street_network": IFeatureStreetNetworkRead,
     },
-    "external": {
-        "external_imagery": IExternalImageryRead,
-        "external_vector": IExternalVectorRead,
-    },
+    "table": ITableRead,
+    "raster": IRasterRead,
 }
 
 
 layer_update_class = {
-    "internal": {
-        "table": ITableUpdate,
-        "feature": {
-            "standard": IFeatureStandardUpdate,
-            "tool": IFeatureToolUpdate,
-            "street_network": IFeatureStreetNetworkUpdate,
-        },
+    "feature": {
+        "standard": IFeatureStandardUpdate,
+        "tool": IFeatureToolUpdate,
+        "street_network": IFeatureStreetNetworkUpdate,
     },
-    "external": {
-        "external_imagery": IExternalImageryUpdate,
-        "external_vector": IExternalVectorUpdate,
-    },
+    "raster": IRasterUpdate,
+    "table": ITableUpdate,
 }
 
 
@@ -530,16 +477,13 @@ layer_update_class = {
 def get_layer_schema(
     class_mapping: dict, layer_type: LayerType, feature_layer_type: FeatureType = None
 ):
-    # Check if layer is external
-    if layer_type in class_mapping["external"]:
-        return class_mapping["external"][layer_type]
-    # Check if layer is internal
-    elif layer_type in class_mapping["internal"]:
+    # Check if layer type is valid
+    if layer_type in class_mapping:
         # Check if layer is feature
         if feature_layer_type:
-            return class_mapping["internal"][layer_type][feature_layer_type]
+            return class_mapping[layer_type][feature_layer_type]
         else:
-            return class_mapping["internal"][layer_type]
+            return class_mapping[layer_type]
     else:
         raise ValueError(f"Layer type ({layer_type}) is invalid")
 
@@ -556,7 +500,7 @@ class ILayerRead(BaseModel):
     def __new__(cls, *args, **kwargs):
         layer_read_class = get_layer_class(
             "read",
-            {**layer_creator_class["internal"], **layer_creator_class["external"]},
+            layer_creator_class,
             **kwargs,
         )
         return layer_read_class(**kwargs)
@@ -566,7 +510,7 @@ class ILayerUpdate(BaseModel):
     def __new__(cls, *args, **kwargs):
         layer_update_class = get_layer_class(
             "update",
-            {**layer_creator_class["internal"], **layer_creator_class["external"]},
+            layer_creator_class,
             **kwargs,
         )
         return layer_update_class(**kwargs)
@@ -585,7 +529,7 @@ class IValidateJobId(BaseModel):
     validate_job_id: UUID = Field(..., description="Upload job ID")
 
 
-class IInternalLayerExport(CQLQuery):
+class ILayerExport(CQLQuery):
     """Layer export input schema."""
 
     id: UUID = Field(..., description="Layer ID")
@@ -731,7 +675,25 @@ request_examples = {
             "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
         ],
     },
-    "create_internal": {
+    "create": {
+        "feature": {
+            "summary": "Layer Standard",
+            "value": {
+                "dataset_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
+                **content_base_example,
+                **layer_base_example,
+            },
+        },
+        "raster": {
+            "summary": "Raster Layer",
+            "value": {
+                **content_base_example,
+                **layer_base_example,
+                **imagery_layer_attributes_example,
+                "type": "raster",
+                "extent": "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)), ((2 2, 2 3, 3 3, 3 2, 2 2)))",
+            },
+        },
         "table": {
             "summary": "Table Layer",
             "value": {
@@ -740,16 +702,16 @@ request_examples = {
                 **layer_base_example,
             },
         },
-        "feature_layer_standard": {
+    },
+    "export": {
+        "feature": {
             "summary": "Layer Standard",
             "value": {
-                "dataset_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
-                **content_base_example,
-                **layer_base_example,
+                "id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
+                "file_type": "csv",
+                "file_name": "test",
             },
         },
-    },
-    "export_internal": {
         "table": {
             "summary": "Table Layer",
             "value": {
@@ -758,36 +720,6 @@ request_examples = {
                 "file_name": "test",
                 "crs": "EPSG:3857",
                 "query": {"op": "=", "args": [{"property": "category"}, "bus_stop"]},
-            },
-        },
-        "feature_layer_standard": {
-            "summary": "Layer Standard",
-            "value": {
-                "id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
-                "file_type": "csv",
-                "file_name": "test",
-            },
-        },
-    },
-    "create_external": {
-        "external_imagery": {
-            "summary": "Imagery Layer",
-            "value": {
-                **content_base_example,
-                **layer_base_example,
-                **imagery_layer_attributes_example,
-                "type": "external_imagery",
-                "extent": "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)), ((2 2, 2 3, 3 3, 3 2, 2 2)))",
-            },
-        },
-        "external_vector": {
-            "summary": "VectorTile Layer",
-            "value": {
-                **content_base_example,
-                **layer_base_example,
-                **tile_layer_attributes_example,
-                "type": "external_vector",
-                "extent": "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)), ((2 2, 2 3, 3 3, 3 2, 2 2)))",
             },
         },
     },

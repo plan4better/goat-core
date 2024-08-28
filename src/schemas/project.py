@@ -8,12 +8,11 @@ from src.db.models._base_class import DateTimeBase
 from src.db.models.layer import ContentBaseAttributes, internal_layer_table_name
 from src.schemas.common import CQLQuery
 from src.schemas.layer import (
-    IExternalImageryRead,
-    IExternalVectorRead,
+    ExternalServiceOtherProperties,
     IFeatureStandardRead,
     IFeatureToolRead,
+    IRasterRead,
     ITableRead,
-    LayerOtherProperties,
 )
 from src.utils import build_where, optional
 
@@ -192,45 +191,27 @@ class ITableProjectUpdate(CQLQuery):
     group: str | None = Field(None, description="Layer group name", max_length=255)
 
 
-class IExternalVectorProjectRead(LayerProjectIds, IExternalVectorRead):
+class IRasterProjectRead(LayerProjectIds, IRasterRead):
     group: str = Field(None, description="Layer group name", max_length=255)
     properties: dict = Field(
         ...,
         description="Layer properties",
     )
-
-
-@optional
-class IExternalVectorProjectUpdate(BaseModel):
-    name: str | None = Field(None, description="Layer name", max_length=255)
-    group: str | None = Field(None, description="Layer group name", max_length=255)
-    properties: dict | None = Field(
-        None,
-        description="Layer properties",
-    )
-
-
-class IExternalImageryProjectRead(LayerProjectIds, IExternalImageryRead):
-    group: str = Field(None, description="Layer group name", max_length=255)
-    properties: dict = Field(
-        ...,
-        description="Layer properties",
-    )
-    other_properties: LayerOtherProperties = Field(
+    other_properties: ExternalServiceOtherProperties = Field(
         ...,
         description="Other properties of the layer",
     )
 
 
 @optional
-class IExternalImageryProjectUpdate(BaseModel):
+class IRasterProjectUpdate(BaseModel):
     name: str | None = Field(None, description="Layer name", max_length=255)
     group: str | None = Field(None, description="Layer group name", max_length=255)
     properties: dict | None = Field(
         None,
         description="Layer properties",
     )
-    other_properties: LayerOtherProperties | None = Field(
+    other_properties: ExternalServiceOtherProperties | None = Field(
         None,
         description="Other properties of the layer",
     )
@@ -240,20 +221,19 @@ layer_type_mapping_read = {
     "feature_standard": IFeatureStandardProjectRead,
     "feature_tool": IFeatureToolProjectRead,
     "feature_street_network": IFeatureStreetNetworkProjectRead,
+    "raster": IRasterProjectRead,
     "table": ITableProjectRead,
-    "external_vector": IExternalVectorProjectRead,
-    "external_imagery": IExternalImageryProjectRead,
 }
 
 layer_type_mapping_update = {
     "feature_standard": IFeatureStandardProjectUpdate,
     "feature_tool": IFeatureToolProjectUpdate,
     "feature_street_network": IFeatureStreetNetworkProjectUpdate,
+    "raster": IRasterProjectUpdate,
     "table": ITableProjectUpdate,
-    "external_vector": IExternalVectorProjectUpdate,
-    "external_imagery": IExternalImageryProjectUpdate,
 }
 
+# TODO: Refactor
 request_examples = {
     "get": {
         "ids": [

@@ -6,6 +6,7 @@ import pytest
 from httpx import AsyncClient
 
 from src.core.config import settings
+from src.db.models.layer import LayerType
 from src.schemas.layer import (
     AreaStatisticsOperation,
     ComputeBreakOperation,
@@ -30,31 +31,29 @@ async def test_files_upload_invalid(client: AsyncClient, fixture_upload_file_inv
 
 
 @pytest.mark.asyncio
-async def test_create_internal_layer(
-    client: AsyncClient, fixture_create_internal_layers
-):
-    assert fixture_create_internal_layers is not None
+async def test_create_layers(client: AsyncClient, fixture_create_layers):
+    assert fixture_create_layers is not None
 
 
 @pytest.mark.asyncio
-async def test_create_internal_layer_in_project(
-    client: AsyncClient, fixture_create_internal_layer_in_project
+async def test_create_feature_layer_in_project(
+    client: AsyncClient, fixture_create_layer_in_project
 ):
-    assert fixture_create_internal_layer_in_project is not None
+    assert fixture_create_layer_in_project is not None
 
 
 @pytest.mark.asyncio
-async def test_export_internal_layer(
-    client: AsyncClient, fixture_create_internal_layers
-):
-    layer = fixture_create_internal_layers
+async def test_export_layers(client: AsyncClient, fixture_create_layers):
+    layer = fixture_create_layers
     layer_id = layer["id"]
 
     # Define export types based on layer type
-    if layer["type"] == "table":
+    if layer["type"] == LayerType.table:
         export_types = TableLayerExportType
-    else:
+    elif layer["type"] == LayerType.feature:
         export_types = FeatureLayerExportType
+    else:
+        return
 
     # Loop through all export types
     for export_type in export_types:
@@ -70,7 +69,7 @@ async def test_export_internal_layer(
 
         # Call export endpoint
         response = await client.post(
-            f"{settings.API_V2_STR}/layer/internal/{layer_id}/export",
+            f"{settings.API_V2_STR}/layer/{layer_id}/export",
             json=body,
         )
         assert response.status_code == 200
@@ -109,7 +108,7 @@ async def test_export_internal_layer(
 
 
 @pytest.mark.asyncio
-async def test_export_internal_layer_with_filter(
+async def test_export_feature_layer_with_filter(
     client: AsyncClient, fixture_create_polygon_layer
 ):
     layer = fixture_create_polygon_layer
@@ -126,7 +125,7 @@ async def test_export_internal_layer_with_filter(
 
     # Call export endpoint
     response = await client.post(
-        f"{settings.API_V2_STR}/layer/internal/{layer_id}/export",
+        f"{settings.API_V2_STR}/layer/{layer_id}/export",
         json=body,
     )
     assert response.status_code == 200
@@ -162,7 +161,7 @@ async def test_export_internal_layer_with_filter(
 
 # TODO: Add test that fails for export
 @pytest.mark.asyncio
-async def test_export_internal_layer_wrong_srid(
+async def test_export_feature_layer_wrong_srid(
     client: AsyncClient, fixture_create_polygon_layer
 ):
     layer = fixture_create_polygon_layer
@@ -178,7 +177,7 @@ async def test_export_internal_layer_wrong_srid(
 
     # Call export endpoint
     response = await client.post(
-        f"{settings.API_V2_STR}/layer/internal/{layer_id}/export",
+        f"{settings.API_V2_STR}/layer/{layer_id}/export",
         json=body,
     )
     assert response.status_code == 422
@@ -189,41 +188,22 @@ async def test_export_internal_layer_wrong_srid(
 
 
 @pytest.mark.asyncio
-async def test_create_external_layers(
-    client: AsyncClient, fixture_create_external_layers
-):
-    assert fixture_create_external_layers is not None
-
-
-@pytest.mark.asyncio
-async def test_get_internal_layer(
-    client: AsyncClient, fixture_create_internal_feature_layer
-):
-    layer_id = fixture_create_internal_feature_layer["id"]
+async def test_get_feature_layer(client: AsyncClient, fixture_create_feature_layer):
+    layer_id = fixture_create_feature_layer["id"]
     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}")
     assert response.status_code == 200
     assert response.json()["id"] == layer_id
 
 
 @pytest.mark.asyncio
-async def test_get_external_layer(client: AsyncClient, fixture_create_external_layer):
-    layer_id = fixture_create_external_layer["id"]
-    response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}")
-    assert response.status_code == 200
-    assert response.json()["id"] == layer_id
-
-
-@pytest.mark.asyncio
-async def test_get_layer_wrong_id(client: AsyncClient, fixture_create_external_layer):
+async def test_get_layer_wrong_id(client: AsyncClient, fixture_create_feature_layer):
     await get_with_wrong_id(client, "layer")
 
 
 @pytest.mark.asyncio
-async def test_update_internal_layer(
-    client: AsyncClient, fixture_create_internal_feature_layer
-):
-    layer_id = fixture_create_internal_feature_layer["id"]
-    layer_dict = fixture_create_internal_feature_layer
+async def test_update_feature_layer(client: AsyncClient, fixture_create_feature_layer):
+    layer_id = fixture_create_feature_layer["id"]
+    layer_dict = fixture_create_feature_layer
     layer_dict["name"] = "Updated name"
     layer_dict["description"] = "Updated description"
     layer_dict["tags"] = ["Update tag 1", "Update tag 2"]
@@ -240,24 +220,13 @@ async def test_update_internal_layer(
 
 
 @pytest.mark.asyncio
-async def test_delete_internal_layers(
-    client: AsyncClient, fixture_delete_internal_layers
-):
+async def test_delete_layers(client: AsyncClient, fixture_delete_layers):
     return
 
 
 @pytest.mark.asyncio
-async def test_delete_external_layers(
-    client: AsyncClient, fixture_delete_external_layers
-):
-    return
-
-
-@pytest.mark.asyncio
-async def test_get_feature_cnt(
-    client: AsyncClient, fixture_create_internal_feature_layer
-):
-    layer_id = fixture_create_internal_feature_layer["id"]
+async def test_get_feature_cnt(client: AsyncClient, fixture_create_feature_layer):
+    layer_id = fixture_create_feature_layer["id"]
     query = '{"op": "=", "args": [{"property": "category"}, "bus_stop"]}'
     response = await client.get(
         f"{settings.API_V2_STR}/layer/{layer_id}/feature-count?query={str(query)}"
@@ -269,9 +238,9 @@ async def test_get_feature_cnt(
 
 @pytest.mark.asyncio
 async def test_get_area_statistics(
-    client: AsyncClient, fixture_create_internal_feature_polygon_layer
+    client: AsyncClient, fixture_create_feature_polygon_layer
 ):
-    layer_id = fixture_create_internal_feature_polygon_layer["id"]
+    layer_id = fixture_create_feature_polygon_layer["id"]
     expected_result = {
         "sum": 978867237.0440512,
         "min": 239195114.2226817,
@@ -291,9 +260,9 @@ async def test_get_area_statistics(
 
 @pytest.mark.asyncio
 async def test_get_area_statistics_no_query(
-    client: AsyncClient, fixture_create_internal_feature_polygon_layer
+    client: AsyncClient, fixture_create_feature_polygon_layer
 ):
-    layer_id = fixture_create_internal_feature_polygon_layer["id"]
+    layer_id = fixture_create_feature_polygon_layer["id"]
 
     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}/area/sum")
     assert response.status_code == 200
@@ -302,9 +271,9 @@ async def test_get_area_statistics_no_query(
 
 @pytest.mark.asyncio
 async def test_get_wrong_area_statistics_wrong_geom_type(
-    client: AsyncClient, fixture_create_internal_feature_layer
+    client: AsyncClient, fixture_create_feature_layer
 ):
-    layer_id = fixture_create_internal_feature_layer["id"]
+    layer_id = fixture_create_feature_layer["id"]
     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}/area/sum")
     assert response.status_code == 422
     return
@@ -312,9 +281,9 @@ async def test_get_wrong_area_statistics_wrong_geom_type(
 
 @pytest.mark.asyncio
 async def test_get_unique_values_layer_pagination(
-    client: AsyncClient, fixture_create_internal_feature_layer
+    client: AsyncClient, fixture_create_feature_layer
 ):
-    layer_id = fixture_create_internal_feature_layer["id"]
+    layer_id = fixture_create_feature_layer["id"]
     column = "name"
 
     # Request the first 5 unique values
@@ -349,9 +318,9 @@ async def test_get_unique_values_layer_pagination(
 
 @pytest.mark.asyncio
 async def test_get_unique_values_layer_query(
-    client: AsyncClient, fixture_create_internal_feature_layer
+    client: AsyncClient, fixture_create_feature_layer
 ):
-    layer_id = fixture_create_internal_feature_layer["id"]
+    layer_id = fixture_create_feature_layer["id"]
     column = "name"
     query = '{"op": "=", "args": [{"property": "category"}, "bus_stop"]}'
 
@@ -368,7 +337,7 @@ async def test_get_unique_values_layer_query(
 
 @pytest.mark.asyncio
 async def test_get_unique_values_wrong_layer_id(
-    client: AsyncClient, fixture_create_internal_feature_layer
+    client: AsyncClient, fixture_create_feature_layer
 ):
     layer_id = uuid4()
     column = "name"
@@ -383,9 +352,9 @@ async def test_get_unique_values_wrong_layer_id(
 
 @pytest.mark.asyncio
 async def test_get_unique_values_wrong_layer_type(
-    client: AsyncClient, fixture_create_external_layer
+    client: AsyncClient, fixture_create_raster_layer
 ):
-    layer_id = fixture_create_external_layer["id"]
+    layer_id = fixture_create_raster_layer["id"]
     column = "name"
 
     # Request the first 5 unique values
@@ -398,9 +367,9 @@ async def test_get_unique_values_wrong_layer_type(
 
 @pytest.mark.asyncio
 async def test_get_unique_value_wrong_column_name(
-    client: AsyncClient, fixture_create_internal_feature_layer
+    client: AsyncClient, fixture_create_feature_layer
 ):
-    layer_id = fixture_create_internal_feature_layer["id"]
+    layer_id = fixture_create_feature_layer["id"]
     column = "wrong_column"
 
     # Request the first 5 unique values
@@ -412,10 +381,8 @@ async def test_get_unique_value_wrong_column_name(
 
 
 @pytest.mark.asyncio
-async def test_get_statistics_column(
-    client: AsyncClient, fixture_create_internal_table_layer
-):
-    layer_id = fixture_create_internal_table_layer["id"]
+async def test_get_statistics_column(client: AsyncClient, fixture_create_table_layer):
+    layer_id = fixture_create_table_layer["id"]
     column = "einwohnerzahl_ewz"
 
     base_results = {
@@ -479,7 +446,7 @@ async def test_get_statistics_column(
 
 @pytest.mark.asyncio
 async def test_get_statistics_column_wrong_layer_id(
-    client: AsyncClient, fixture_create_internal_table_layer
+    client: AsyncClient, fixture_create_table_layer
 ):
     layer_id = uuid4()
     column = "einwohnerzahl_ewz"
@@ -494,9 +461,9 @@ async def test_get_statistics_column_wrong_layer_id(
 # Get not existing column name
 @pytest.mark.asyncio
 async def test_get_statistics_column_wrong_column_name(
-    client: AsyncClient, fixture_create_internal_table_layer
+    client: AsyncClient, fixture_create_table_layer
 ):
-    layer_id = fixture_create_internal_table_layer["id"]
+    layer_id = fixture_create_table_layer["id"]
     column = "wrong_column"
 
     response = await client.get(
@@ -505,25 +472,20 @@ async def test_get_statistics_column_wrong_column_name(
     assert response.status_code == 404
     return
 
+
 # Get metadata aggregate for layers based on different filters
-async def test_get_layers(
-    client: AsyncClient, fixture_create_multiple_layers
-):
-    response = await client.post(
-        f"{settings.API_V2_STR}/layer"
-    )
+async def test_get_layers(client: AsyncClient, fixture_create_multiple_layers):
+    response = await client.post(f"{settings.API_V2_STR}/layer")
     assert response.status_code == 200
     assert len(response.json()["items"]) == 4
 
+
 # Get metadata aggregate for layers based on different filters
-async def test_get_catalog_layers(
-    client: AsyncClient, fixture_create_catalog_layers
-):
-    response = await client.post(
-        f"{settings.API_V2_STR}/layer/catalog"
-    )
+async def test_get_catalog_layers(client: AsyncClient, fixture_create_catalog_layers):
+    response = await client.post(f"{settings.API_V2_STR}/layer/catalog")
     assert response.status_code == 200
     assert len(response.json()["items"]) == 4
+
 
 # Get metadata aggregate for layers based on different filters
 async def test_get_layers_metadata_aggregate(

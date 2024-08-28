@@ -22,14 +22,13 @@ from src.endpoints.deps import get_db, get_scenario, get_user_id
 from src.schemas.common import ContentIdList, OrderEnum
 from src.schemas.error import HTTPErrorHandler
 from src.schemas.project import (
-    IExternalImageryProjectRead,
-    IExternalVectorProjectRead,
     IFeatureStandardProjectRead,
     IFeatureToolProjectRead,
     InitialViewState,
     IProjectBaseUpdate,
     IProjectCreate,
     IProjectRead,
+    IRasterProjectRead,
     ITableProjectRead,
 )
 from src.schemas.project import (
@@ -293,8 +292,7 @@ async def update_project_initial_view_state(
         IFeatureStandardProjectRead
         | IFeatureToolProjectRead
         | ITableProjectRead
-        | IExternalVectorProjectRead
-        | IExternalImageryProjectRead
+        | IRasterProjectRead
     ],
     response_model_exclude_none=True,
     status_code=200,
@@ -330,8 +328,7 @@ async def add_layers_to_project(
         IFeatureStandardProjectRead
         | IFeatureToolProjectRead
         | ITableProjectRead
-        | IExternalVectorProjectRead
-        | IExternalImageryProjectRead
+        | IRasterProjectRead
     ],
     response_model_exclude_none=True,
     status_code=200,
@@ -359,8 +356,7 @@ async def get_layers_from_project(
     response_model=IFeatureStandardProjectRead
     | IFeatureToolProjectRead
     | ITableProjectRead
-    | IExternalVectorProjectRead
-    | IExternalImageryProjectRead,
+    | IRasterProjectRead,
     response_model_exclude_none=True,
     status_code=200,
 )
@@ -388,8 +384,7 @@ async def get_layer_from_project(
     response_model=IFeatureStandardProjectRead
     | IFeatureToolProjectRead
     | ITableProjectRead
-    | IExternalVectorProjectRead
-    | IExternalImageryProjectRead,
+    | IRasterProjectRead,
     response_model_exclude_none=True,
     status_code=200,
 )

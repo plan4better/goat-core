@@ -11,6 +11,7 @@ from sqlalchemy import text
 
 # Local application imports
 from src.core.config import settings
+from src.db.models.layer import LayerType
 from src.endpoints.deps import get_db, session_manager
 from src.main import app
 from src.schemas.catchment_area import (
@@ -20,7 +21,6 @@ from src.schemas.catchment_area import (
     request_examples_catchment_area_car,
     request_examples_catchment_area_pt,
 )
-from src.schemas.layer import LayerType
 from src.schemas.layer import request_examples as layer_request_examples
 from src.schemas.project import (
     request_examples as project_request_examples,
@@ -231,15 +231,19 @@ async def fixture_create_projects(
 async def fixture_create_layer_project(
     client: AsyncClient,
     fixture_create_project,
-    fixture_create_internal_and_external_layer,
+    fixture_create_feature_and_raster_and_table_layer,
 ):
     project_id = fixture_create_project["id"]
-    internal_layer, external_layer = fixture_create_internal_and_external_layer
-    internal_layer_id = internal_layer["id"]
-    external_layer_id = external_layer["id"]
+    feature_layer, raster_layer, table_layer = (
+        fixture_create_feature_and_raster_and_table_layer
+    )
+    feature_layer_id = feature_layer["id"]
+    raster_layer_id = raster_layer["id"]
+    table_layer_id = table_layer["id"]
+
     # Add layers to project
     response = await client.post(
-        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={internal_layer_id}&layer_ids={external_layer_id}"
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={feature_layer_id}&layer_ids={raster_layer_id}&layer_ids={table_layer_id}"
     )
     assert response.status_code == 200
     layer_project = response.json()
@@ -379,7 +383,7 @@ async def fixture_upload_file_invalid(
     return await upload_invalid_file(client, request.param)
 
 
-async def create_internal_layer(
+async def create_layer_from_dataset(
     client: AsyncClient,
     dataset_id,
     fixture_get_home_folder,
@@ -389,16 +393,25 @@ async def create_internal_layer(
 ):
     # Get feature layer dict and add layer ID
     if layer_dict is None:
-        layer_dict = layer_request_examples["create_internal"][layer_type]["value"]
+        layer_dict = layer_request_examples["create"][layer_type]["value"]
     layer_dict["name"] = generate_random_string(12)
     layer_dict["dataset_id"] = dataset_id
     layer_dict["folder_id"] = fixture_get_home_folder["id"]
 
-    # Hit endpoint to create internal layer and add optional project_id
-    if project_id:
-        url = f"{settings.API_V2_STR}/layer/internal?project_id={project_id}"
+    # Identify correct endpoint
+    endpoint = None
+    if LayerType.feature.value in layer_type:
+        endpoint = "feature-standard"
+    elif LayerType.table.value in layer_type:
+        endpoint = "table"
     else:
-        url = f"{settings.API_V2_STR}/layer/internal"
+        raise ValueError("Layer type not recognized")
+
+    # Hit endpoint to create layer and add optional project_id
+    if project_id:
+        url = f"{settings.API_V2_STR}/layer/{endpoint}?project_id={project_id}"
+    else:
+        url = f"{settings.API_V2_STR}/layer/{endpoint}"
     response = await client.post(url, json=layer_dict)
     assert response.status_code == 201
 
@@ -416,12 +429,9 @@ async def create_internal_layer(
     return {**layer_dict, "job_id": job_id}
 
 
-internal_layers = ["feature_layer_standard", "table"]
-
-
 async def upload_and_create_layer(client, file_dir, home_folder, layer_type):
     dataset = await upload_file(client, file_dir)
-    layer = await create_internal_layer(
+    layer = await create_layer_from_dataset(
         client,
         dataset["dataset_id"],
         home_folder,
@@ -430,33 +440,42 @@ async def upload_and_create_layer(client, file_dir, home_folder, layer_type):
     return layer
 
 
-@pytest.fixture(params=internal_layers)
-async def fixture_create_internal_layers(
+layer_types = [
+    LayerType.feature,
+    LayerType.raster,
+    LayerType.table,
+]
+
+
+@pytest.fixture(params=layer_types)
+async def fixture_create_layers(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder, request
 ):
-    if request.param == "feature_layer_standard":
+    if request.param == LayerType.feature:
         metadata = await upload_valid_file(client, "point")
-        layer = await create_internal_layer(
+        layer = await create_layer_from_dataset(
             client, metadata["dataset_id"], fixture_get_home_folder, request.param
         )
-    elif request.param == "table":
+    elif request.param == LayerType.raster:
+        layer = await create_raster_layer(client, fixture_get_home_folder)
+    elif request.param == LayerType.table:
         metadata = await upload_valid_file(client, "no_geometry")
-        layer = await create_internal_layer(
+        layer = await create_layer_from_dataset(
             client, metadata["dataset_id"], fixture_get_home_folder, request.param
         )
     return layer
 
 
 @pytest.fixture
-async def fixture_create_internal_layer_in_project(
+async def fixture_create_layer_in_project(
     client: AsyncClient, fixture_create_project, fixture_get_home_folder
 ):
     metadata = await upload_valid_file(client, "point")
-    layer = await create_internal_layer(
+    layer = await create_layer_from_dataset(
         client,
         metadata["dataset_id"],
         fixture_get_home_folder,
-        "feature_layer_standard",
+        LayerType.feature,
         fixture_create_project["id"],
     )
     return layer
@@ -470,21 +489,36 @@ async def fixture_create_polygon_layer(
         settings.TEST_DATA_DIR, "layers", "tool", "zipcode_polygon.gpkg"
     )
     return await upload_and_create_layer(
-        client, dir_gpkg, fixture_get_home_folder, "feature_layer_standard"
+        client, dir_gpkg, fixture_get_home_folder, LayerType.feature
     )
 
 
-layers = ["flikster_de.geojson"]
-
-
-@pytest.fixture(params=layers)
-async def fixture_batch_create_internal_layers(
-    request, client: AsyncClient, fixture_create_user, fixture_get_home_folder
+@pytest.fixture
+async def fixture_create_feature_and_raster_and_table_layer(
+    client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
-    dir = os.path.join(settings.TEST_DATA_DIR, "layers", "batch", request.param)
-    return await upload_and_create_layer(
-        client, dir, fixture_get_home_folder, "feature_layer_standard"
+    metadata = await upload_valid_file(client, "point")
+    feature_layer = await create_layer_from_dataset(
+        client,
+        metadata["dataset_id"],
+        fixture_get_home_folder,
+        LayerType.feature,
     )
+
+    raster_layer = await create_raster_layer(
+        client,
+        fixture_get_home_folder,
+    )
+
+    metadata = await upload_valid_file(client, "no_geometry")
+    table_layer = await create_layer_from_dataset(
+        client,
+        metadata["dataset_id"],
+        fixture_get_home_folder,
+        LayerType.table,
+    )
+
+    return feature_layer, raster_layer, table_layer
 
 
 @pytest.fixture
@@ -515,7 +549,7 @@ async def fixture_create_large_polygon_layer(
         settings.TEST_DATA_DIR, "layers", "tool", "large_polygon.gpkg"
     )
     return await upload_and_create_layer(
-        client, dir_gpkg, fixture_get_home_folder, "feature_layer_standard"
+        client, dir_gpkg, fixture_get_home_folder, LayerType.feature
     )
 
 
@@ -546,10 +580,10 @@ async def fixture_create_join_layers(client: AsyncClient, fixture_get_home_folde
         settings.TEST_DATA_DIR, "layers", "tool", "zipcode_polygon.gpkg"
     )
     layer_csv = await upload_and_create_layer(
-        client, dir_csv, fixture_get_home_folder, "table"
+        client, dir_csv, fixture_get_home_folder, LayerType.table
     )
     layer_gpkg = await upload_and_create_layer(
-        client, dir_gpkg, fixture_get_home_folder, "feature_layer_standard"
+        client, dir_gpkg, fixture_get_home_folder, LayerType.feature
     )
     return {
         "home_folder": fixture_get_home_folder,
@@ -569,10 +603,10 @@ async def fixture_create_aggregate_point_layers(
         settings.TEST_DATA_DIR, "layers", "tool", "zipcode_polygon.gpkg"
     )
     layer_points = await upload_and_create_layer(
-        client, dir_points, fixture_get_home_folder, "feature_layer_standard"
+        client, dir_points, fixture_get_home_folder, LayerType.feature
     )
     layer_polygons = await upload_and_create_layer(
-        client, dir_polygons, fixture_get_home_folder, "feature_layer_standard"
+        client, dir_polygons, fixture_get_home_folder, LayerType.feature
     )
     return {
         "home_folder": fixture_get_home_folder,
@@ -589,7 +623,7 @@ async def fixture_create_aggregate_point_layer(
         settings.TEST_DATA_DIR, "layers", "tool", "points_with_category.gpkg"
     )
     layer_points = await upload_and_create_layer(
-        client, dir_points, fixture_get_home_folder, "feature_layer_standard"
+        client, dir_points, fixture_get_home_folder, LayerType.feature
     )
     return {"home_folder": fixture_get_home_folder, "layer_points": layer_points}
 
@@ -682,10 +716,10 @@ async def fixture_create_aggregate_polygon_layers(
         settings.TEST_DATA_DIR, "layers", "tool", "zipcode_polygon.gpkg"
     )
     layer_source = await upload_and_create_layer(
-        client, dir_source_layer, fixture_get_home_folder, "feature_layer_standard"
+        client, dir_source_layer, fixture_get_home_folder, LayerType.feature
     )
     layer_aggregation = await upload_and_create_layer(
-        client, dir_aggregation_layer, fixture_get_home_folder, "feature_layer_standard"
+        client, dir_aggregation_layer, fixture_get_home_folder, LayerType.feature
     )
     return {
         "home_folder": fixture_get_home_folder,
@@ -702,7 +736,7 @@ async def fixture_create_aggregate_polygon_layer(
         settings.TEST_DATA_DIR, "layers", "tool", "green_areas.gpkg"
     )
     layer_source = await upload_and_create_layer(
-        client, dir_source_layer, fixture_get_home_folder, "feature_layer_standard"
+        client, dir_source_layer, fixture_get_home_folder, LayerType.feature
     )
     return {
         "home_folder": fixture_get_home_folder,
@@ -761,10 +795,10 @@ async def fixture_add_aggregate_polygon_layer_to_project(
     }
 
 
-layer_types = ["point", "line", "polygon"]
+geometry_types = ["point", "line", "polygon"]
 
 
-@pytest.fixture(params=layer_types)
+@pytest.fixture(params=geometry_types)
 async def fixture_create_basic_layer(
     request, client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
@@ -773,7 +807,7 @@ async def fixture_create_basic_layer(
         settings.TEST_DATA_DIR, "layers", "valid", layer_type, "valid.gpkg"
     )
     layer = await upload_and_create_layer(
-        client, dir_gpkg, fixture_get_home_folder, "feature_layer_standard"
+        client, dir_gpkg, fixture_get_home_folder, LayerType.feature
     )
     return {
         "home_folder": fixture_get_home_folder,
@@ -824,7 +858,7 @@ async def fixture_add_origin_destination_layers_to_project(
         client, dir_origin_destination_matrix, fixture_get_home_folder, "table"
     )
     layer_geometry_layer = await upload_and_create_layer(
-        client, dir_geometry_layer, fixture_get_home_folder, "feature_layer_standard"
+        client, dir_geometry_layer, fixture_get_home_folder, LayerType.feature
     )
     project_id = fixture_create_project["id"]
 
@@ -852,98 +886,68 @@ async def fixture_add_origin_destination_layers_to_project(
     }
 
 
-async def create_external_layer(client: AsyncClient, home_folder, layer_type):
+async def create_raster_layer(client: AsyncClient, home_folder):
     # Get table layer dict and add layer ID
-    external_layer_dict = layer_request_examples["create_external"][layer_type]["value"]
-    external_layer_dict["folder_id"] = home_folder["id"]
+    layer_dict = layer_request_examples["create"][LayerType.raster.value]["value"]
+    layer_dict["folder_id"] = home_folder["id"]
 
     # Give layer a random name
-    external_layer_dict["name"] = generate_random_string(10)
-    # Hit endpoint to create external layer
-    response = await client.post(
-        f"{settings.API_V2_STR}/layer/external", json=external_layer_dict
-    )
+    layer_dict["name"] = generate_random_string(10)
+    # Hit endpoint to create raster layer
+    response = await client.post(f"{settings.API_V2_STR}/layer/raster", json=layer_dict)
     assert response.status_code == 201
     return response.json()
 
 
-external_layers = ["external_vector", "external_imagery"]
-
-
-@pytest.fixture(params=external_layers)
-async def fixture_create_external_layers(
-    client: AsyncClient, fixture_create_user, fixture_get_home_folder, request
-):
-    return await create_external_layer(client, fixture_get_home_folder, request.param)
-
-
 @pytest.fixture
-async def fixture_create_external_layer(
-    client: AsyncClient, fixture_create_user, fixture_get_home_folder
-):
-    return await create_external_layer(
-        client, fixture_get_home_folder, "external_vector"
-    )
-
-
-@pytest.fixture
-async def fixture_create_internal_feature_layer(
+async def fixture_create_feature_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
     metadata = await upload_valid_file(client, "point")
-    return await create_internal_layer(
+    return await create_layer_from_dataset(
         client,
         metadata["dataset_id"],
         fixture_get_home_folder,
-        "feature_layer_standard",
+        LayerType.feature,
     )
 
 
 @pytest.fixture
-async def fixture_create_internal_feature_polygon_layer(
+async def fixture_create_raster_layer(
+    client: AsyncClient, fixture_create_user, fixture_get_home_folder
+):
+    return await create_raster_layer(
+        client,
+        fixture_get_home_folder,
+    )
+
+
+@pytest.fixture
+async def fixture_create_feature_polygon_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
     metadata = await upload_valid_file(client, "polygon")
-    return await create_internal_layer(
+    return await create_layer_from_dataset(
         client,
         metadata["dataset_id"],
         fixture_get_home_folder,
-        "feature_layer_standard",
+        LayerType.feature,
     )
 
 
 @pytest.fixture
-async def fixture_create_internal_and_external_layer(
-    client: AsyncClient, fixture_create_user, fixture_get_home_folder
-):
-    metadata = await upload_valid_file(client, "point")
-    internal_layer = await create_internal_layer(
-        client,
-        metadata["dataset_id"],
-        fixture_get_home_folder,
-        "feature_layer_standard",
-    )
-    external_layer = await create_external_layer(
-        client, fixture_get_home_folder, "external_vector"
-    )
-    return internal_layer, external_layer
-
-
-@pytest.fixture
-async def fixture_create_internal_table_layer(
+async def fixture_create_table_layer(
     client: AsyncClient, fixture_create_user, fixture_get_home_folder
 ):
     metadata = await upload_valid_file(client, "no_geometry")
-    return await create_internal_layer(
-        client, metadata["dataset_id"], fixture_get_home_folder, "table"
+    return await create_layer_from_dataset(
+        client, metadata["dataset_id"], fixture_get_home_folder, LayerType.table
     )
 
 
 @pytest.fixture
-async def fixture_delete_internal_layers(
-    client: AsyncClient, fixture_create_internal_layers
-):
-    layer = fixture_create_internal_layers
+async def fixture_delete_layers(client: AsyncClient, fixture_create_layers):
+    layer = fixture_create_layers
     layer_id = layer["id"]
     response = await client.delete(f"{settings.API_V2_STR}/layer/{layer_id}")
     assert response.status_code == 204
@@ -952,22 +956,10 @@ async def fixture_delete_internal_layers(
     response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}")
     assert response.status_code == 404  # Not Found
 
-    await check_user_data_deleted(
-        layer=layer,
-    )
-
-
-@pytest.fixture
-async def fixture_delete_external_layers(
-    client: AsyncClient, fixture_create_external_layers
-):
-    layer = fixture_create_external_layers
-    layer_id = layer["id"]
-    response = await client.delete(f"{settings.API_V2_STR}/layer/{layer_id}")
-    assert response.status_code == 204
-
-    response = await client.get(f"{settings.API_V2_STR}/layer/{layer_id}")
-    assert response.status_code == 404  # Not Found
+    if layer["type"] in (LayerType.feature, LayerType.table):
+        await check_user_data_deleted(
+            layer=layer,
+        )
 
 
 async def create_multiple_layer(
@@ -1008,14 +1000,14 @@ async def create_multiple_layer(
             "in_catalog": in_catalog,
         },
     ]
-    layer_types = ["point", "line", "polygon", "point"]
+    layer_geometry_types = ["point", "line", "polygon", "point"]
     layers = []
     cnt = 0
-    for layer_type in layer_types:
+    for type in layer_geometry_types:
         # Get layer type specific metadata
         additional_metadata = varying_attributes[cnt]
         file_dir = os.path.join(
-            settings.TEST_DATA_DIR, "layers", "valid", layer_type, "valid.gpkg"
+            settings.TEST_DATA_DIR, "layers", "valid", type, "valid.gpkg"
         )
         layer_dict = {
             "description": "Layer description",
@@ -1033,11 +1025,11 @@ async def create_multiple_layer(
             **additional_metadata,
         }
         dataset = await upload_file(client, file_dir)
-        layer = await create_internal_layer(
+        layer = await create_layer_from_dataset(
             client,
             dataset["dataset_id"],
             fixture_get_home_folder,
-            layer_type,
+            LayerType.feature.value,
             project_id=None,
             layer_dict=layer_dict,
         )

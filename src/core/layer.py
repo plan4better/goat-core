@@ -199,7 +199,7 @@ class FileUpload:
 
             if self.source.data_type == FeatureDataType.wfs:
                 # Ensure a single WFS layer is specified
-                layers = self.source.other_properties.get("layers")
+                layers = self.source.other_properties.layers
                 if not layers or len(layers) != 1:
                     raise ValueError(
                         "WFS: A single layer must be specified under the 'layers' key of other_properties."

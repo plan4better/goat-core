@@ -51,13 +51,14 @@ from src.schemas.layer import (
     ICatalogLayerGet,
     IFileUploadExternalService,
     IFileUploadMetadata,
-    IInternalLayerCreate,
-    IInternalLayerExport,
-    ILayerExternalCreate,
+    ILayerExport,
+    ILayerFromDatasetCreate,
     ILayerGet,
     ILayerRead,
     IMetadataAggregate,
     IMetadataAggregateRead,
+    IRasterCreate,
+    IRasterRead,
     IUniqueValue,
     MaxFileSizeType,
 )
@@ -148,28 +149,23 @@ async def file_upload_external_service(
     return metadata
 
 
-@router.post(
-    "/internal",
-    summary="Create a new internal layer",
-    response_class=JSONResponse,
-    status_code=201,
-    description="Generate a new layer from a file that was previously uploaded using the file-upload endpoint.",
-)
-async def create_layer_internal(
+async def _create_layer_from_dataset(
     background_tasks: BackgroundTasks,
-    async_session: AsyncSession = Depends(get_db),
-    user_id: UUID = Depends(get_user_id),
+    async_session: AsyncSession,
+    user_id: UUID,
     project_id: Optional[UUID] = Query(
         None,
         description="The ID of the project to add the layer to",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
-    layer_in: IInternalLayerCreate = Body(
+    layer_in: ILayerFromDatasetCreate = Body(
         ...,
-        examples=layer_request_examples["create_internal"],
+        examples=layer_request_examples["create"],
         description="Layer to create",
     ),
 ):
+    """Create a feature standard or table layer from a dataset."""
+
     # Check if user owns folder by checking if it exists
     folder_path = os.path.join(settings.DATA_DIR, user_id, str(layer_in.dataset_id))
     if os.path.exists(folder_path) is False:
@@ -216,7 +212,96 @@ async def create_layer_internal(
 
 
 @router.post(
-    "/internal/{layer_id}/export",
+    "/feature-standard",
+    summary="Create a new feature standard layer",
+    response_class=JSONResponse,
+    status_code=201,
+    description="Generate a new layer from a file that was previously uploaded using the file-upload endpoint.",
+)
+async def create_layer_feature_standard(
+    background_tasks: BackgroundTasks,
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_user_id),
+    project_id: Optional[UUID] = Query(
+        None,
+        description="The ID of the project to add the layer to",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    layer_in: ILayerFromDatasetCreate = Body(
+        ...,
+        examples=layer_request_examples["create"][LayerType.feature],
+        description="Layer to create",
+    ),
+):
+    """Create a new feature standard layer from a previously uploaded dataset."""
+
+    return await _create_layer_from_dataset(
+        background_tasks=background_tasks,
+        async_session=async_session,
+        user_id=user_id,
+        project_id=project_id,
+        layer_in=layer_in,
+    )
+
+
+@router.post(
+    "/raster",
+    summary="Create a new raster layer",
+    response_model=IRasterRead,
+    status_code=201,
+    description="Generate a new layer based on a URL for a raster service hosted externally.",
+)
+async def create_layer_raster(
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+    layer_in: IRasterCreate = Body(
+        ...,
+        examples=layer_request_examples["create"][LayerType.raster],
+        description="Layer to create",
+    ),
+):
+    """Create a new raster layer from a service hosted externally."""
+
+    layer_in = Layer(**layer_in.dict(), user_id=user_id)
+    layer = await crud_layer.create(db=async_session, obj_in=layer_in)
+    return layer
+
+
+@router.post(
+    "/table",
+    summary="Create a new table layer",
+    response_class=JSONResponse,
+    status_code=201,
+    description="Generate a new layer from a file that was previously uploaded using the file-upload endpoint.",
+)
+async def create_layer_table(
+    background_tasks: BackgroundTasks,
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_user_id),
+    project_id: Optional[UUID] = Query(
+        None,
+        description="The ID of the project to add the layer to",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    layer_in: ILayerFromDatasetCreate = Body(
+        ...,
+        examples=layer_request_examples["create"][LayerType.table],
+        description="Layer to create",
+    ),
+):
+    """Create a new table layer from a previously uploaded dataset."""
+
+    return await _create_layer_from_dataset(
+        background_tasks=background_tasks,
+        async_session=async_session,
+        user_id=user_id,
+        project_id=project_id,
+        layer_in=layer_in,
+    )
+
+
+@router.post(
+    "/{layer_id}/export",
     summary="Export a layer to a file",
     response_class=FileResponse,
     status_code=201,
@@ -230,9 +315,9 @@ async def export_layer(
         description="The ID of the layer to export",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
-    layer_in: IInternalLayerExport = Body(
+    layer_in: ILayerExport = Body(
         ...,
-        examples=layer_request_examples["export_internal"],
+        examples=layer_request_examples["export"],
         description="Layer to export",
     ),
 ):
@@ -247,29 +332,6 @@ async def export_layer(
     # Return file
     file_name = os.path.basename(zip_file_path)
     return FileResponse(zip_file_path, media_type="application/zip", filename=file_name)
-
-
-@router.post(
-    "/external",
-    summary="Create a new external layer",
-    response_model=ILayerRead,
-    status_code=201,
-    description="Generate a new layer based on a URL that is stored on an external server.",
-)
-async def create_layer_external(
-    async_session: AsyncSession = Depends(get_db),
-    user_id: UUID4 = Depends(get_user_id),
-    layer_in: ILayerExternalCreate = Body(
-        ...,
-        examples=layer_request_examples["create_external"],
-        description="Layer to create",
-    ),
-):
-    """Create a new external layer."""
-
-    layer_in = Layer(**layer_in.dict(), user_id=user_id)
-    layer = await crud_layer.create(db=async_session, obj_in=layer_in)
-    return layer
 
 
 @router.get(

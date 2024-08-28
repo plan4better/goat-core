@@ -118,7 +118,7 @@ class FeatureServeType(str, Enum):
     binary = "binary"
 
 
-class ExternalImageryDataType(str, Enum):
+class RasterDataType(str, Enum):
     """Imagery layer data types."""
 
     wms = "wms"
@@ -130,8 +130,7 @@ class LayerType(str, Enum):
     """Layer types that are supported."""
 
     feature = "feature"
-    external_imagery = "external_imagery"
-    external_vector = "external_vector"
+    raster = "raster"
     table = "table"
 
 
@@ -407,9 +406,9 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         sa_column=Column(Text, nullable=True),
         description="Layer URL for vector and imagery layers",
     )
-    data_type: Optional[Union["ExternalImageryDataType", "FeatureDataType"]] = Field(
+    data_type: Optional[Union["RasterDataType", "FeatureDataType"]] = Field(
         sa_column=Column(Text, nullable=True),
-        description="Data type for imagery layers and vector layers",
+        description="Data type to store the source of the layer",
     )
     tool_type: Optional[ToolType] = Field(
         sa_column=Column(Text, nullable=True),

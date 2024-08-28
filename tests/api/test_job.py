@@ -6,15 +6,15 @@ from tests.utils import get_with_wrong_id, upload_valid_files
 
 
 @pytest.mark.asyncio
-async def test_get_job(client: AsyncClient, fixture_create_internal_feature_layer):
-    job_id = fixture_create_internal_feature_layer["job_id"]
+async def test_get_job(client: AsyncClient, fixture_create_feature_layer):
+    job_id = fixture_create_feature_layer["job_id"]
     response = await client.get(f"{settings.API_V2_STR}/job/{job_id}")
     assert response.status_code == 200
     assert response.json()["id"] == job_id
 
 
 @pytest.mark.asyncio
-async def test_get_job_wrong_id(client: AsyncClient, fixture_create_internal_feature_layer):
+async def test_get_job_wrong_id(client: AsyncClient, fixture_create_feature_layer):
     await get_with_wrong_id(client, "job")
 
 
@@ -27,9 +27,10 @@ async def test_get_jobs(client: AsyncClient, fixture_create_user):
 
 
 @pytest.mark.asyncio
-async def test_mark_jobs_as_read(client: AsyncClient, fixture_create_internal_feature_layer):
+async def test_mark_jobs_as_read(client: AsyncClient, fixture_create_feature_layer):
     response = await client.put(
-        f"{settings.API_V2_STR}/job/read", json=[fixture_create_internal_feature_layer["job_id"]]
+        f"{settings.API_V2_STR}/job/read",
+        json=[fixture_create_feature_layer["job_id"]],
     )
     assert response.status_code == 200
     assert response.json()[0]["read"] is True
