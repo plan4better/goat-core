@@ -15,7 +15,7 @@ from src.db.models.layer import (
     DataCategory,
     DataLicense,
     ExternalImageryDataType,
-    ExternalVectorTileDataType,
+    ExternalVectorDataType,
     FeatureGeometryType,
     FeatureLayerExportType,
     FeatureType,
@@ -258,6 +258,7 @@ class IFeatureToolRead(
 
     charts: dict | None = Field(None, description="Chart configuration")
 
+
 @optional
 class IFeatureToolUpdate(FeatureUpdateBase):
     """Model to update a feature layer tool."""
@@ -269,6 +270,7 @@ class IFeatureStreetNetworkRead(IFeatureStandardRead):
     """Model to read a street network feature layer."""
 
     pass
+
 
 class IFeatureStreetNetworkUpdate(IFeatureStandardUpdate):
     """Model to update a street network feature layer."""
@@ -374,11 +376,11 @@ imagery_layer_update_base_example = {
 ################################################################################
 
 
-class ExternalVectorTileAttributesBase(BaseModel):
+class ExternalVectorAttributesBase(BaseModel):
     """Base model for additional attributes tile layer."""
 
     url: HttpUrl = Field(..., description="Layer URL")
-    data_type: ExternalVectorTileDataType = Field(..., description="Content data type")
+    data_type: ExternalVectorDataType = Field(..., description="Content data type")
     properties: dict | None = Field(None, description="Layer properties.")
 
 
@@ -392,19 +394,19 @@ tile_layer_attributes_example = {
 }
 
 
-class IExternalVectorTileCreate(
-    LayerBase, GeospatialAttributes, ExternalVectorTileAttributesBase
+class IExternalVectorCreate(
+    LayerBase, GeospatialAttributes, ExternalVectorAttributesBase
 ):
     """Model to create a tile layer."""
 
     type: LayerType = Field(..., description="Layer type")
 
 
-class IExternalVectorTileRead(
+class IExternalVectorRead(
     LayerReadBaseAttributes,
     LayerBase,
     GeospatialAttributes,
-    ExternalVectorTileAttributesBase,
+    ExternalVectorAttributesBase,
     DateTimeBase,
 ):
     """Model to read a tile layer."""
@@ -413,7 +415,7 @@ class IExternalVectorTileRead(
 
 
 @optional
-class IExternalVectorTileUpdate(LayerBase, GeospatialAttributes):
+class IExternalVectorUpdate(LayerBase, GeospatialAttributes):
     """Model to update a tile layer."""
 
     url: HttpUrl | None = Field(None, description="Layer URL")
@@ -484,11 +486,15 @@ def get_layer_class(class_type: str, layer_creator_class: dict, **kwargs):
 layer_creator_class = {
     "internal": {
         "table": ITableRead,
-        "feature": {"standard": IFeatureStandardRead, "tool": IFeatureToolRead, "street_network": IFeatureStreetNetworkRead},
+        "feature": {
+            "standard": IFeatureStandardRead,
+            "tool": IFeatureToolRead,
+            "street_network": IFeatureStreetNetworkRead,
+        },
     },
     "external": {
         "external_imagery": IExternalImageryRead,
-        "external_vector_tile": IExternalVectorTileRead,
+        "external_vector": IExternalVectorRead,
     },
 }
 
@@ -496,11 +502,15 @@ layer_creator_class = {
 layer_update_class = {
     "internal": {
         "table": ITableUpdate,
-        "feature": {"standard": IFeatureStandardUpdate, "tool": IFeatureToolUpdate, "street_network": IFeatureStreetNetworkUpdate},
+        "feature": {
+            "standard": IFeatureStandardUpdate,
+            "tool": IFeatureToolUpdate,
+            "street_network": IFeatureStreetNetworkUpdate,
+        },
     },
     "external": {
         "external_imagery": IExternalImageryUpdate,
-        "external_vector_tile": IExternalVectorTileUpdate,
+        "external_vector": IExternalVectorUpdate,
     },
 }
 
@@ -759,13 +769,13 @@ request_examples = {
                 "extent": "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)), ((2 2, 2 3, 3 3, 3 2, 2 2)))",
             },
         },
-        "external_vector_tile": {
+        "external_vector": {
             "summary": "VectorTile Layer",
             "value": {
                 **content_base_example,
                 **layer_base_example,
                 **tile_layer_attributes_example,
-                "type": "external_vector_tile",
+                "type": "external_vector",
                 "extent": "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)), ((2 2, 2 3, 3 3, 3 2, 2 2)))",
             },
         },

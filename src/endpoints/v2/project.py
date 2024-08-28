@@ -23,7 +23,7 @@ from src.schemas.common import ContentIdList, OrderEnum
 from src.schemas.error import HTTPErrorHandler
 from src.schemas.project import (
     IExternalImageryProjectRead,
-    IExternalVectorTileProjectRead,
+    IExternalVectorProjectRead,
     IFeatureStandardProjectRead,
     IFeatureToolProjectRead,
     InitialViewState,
@@ -293,7 +293,7 @@ async def update_project_initial_view_state(
         IFeatureStandardProjectRead
         | IFeatureToolProjectRead
         | ITableProjectRead
-        | IExternalVectorTileProjectRead
+        | IExternalVectorProjectRead
         | IExternalImageryProjectRead
     ],
     response_model_exclude_none=True,
@@ -330,7 +330,7 @@ async def add_layers_to_project(
         IFeatureStandardProjectRead
         | IFeatureToolProjectRead
         | ITableProjectRead
-        | IExternalVectorTileProjectRead
+        | IExternalVectorProjectRead
         | IExternalImageryProjectRead
     ],
     response_model_exclude_none=True,
@@ -359,7 +359,7 @@ async def get_layers_from_project(
     response_model=IFeatureStandardProjectRead
     | IFeatureToolProjectRead
     | ITableProjectRead
-    | IExternalVectorTileProjectRead
+    | IExternalVectorProjectRead
     | IExternalImageryProjectRead,
     response_model_exclude_none=True,
     status_code=200,
@@ -388,7 +388,7 @@ async def get_layer_from_project(
     response_model=IFeatureStandardProjectRead
     | IFeatureToolProjectRead
     | ITableProjectRead
-    | IExternalVectorTileProjectRead
+    | IExternalVectorProjectRead
     | IExternalImageryProjectRead,
     response_model_exclude_none=True,
     status_code=200,
