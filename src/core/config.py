@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional
 
 import boto3
 from pydantic import BaseSettings, HttpUrl, PostgresDsn, validator
-
+from uuid import UUID
 
 class AsyncPostgresDsn(PostgresDsn):
     allowed_schemes = {"postgres+asyncpg", "postgresql+asyncpg"}
@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     USER_DATA_SCHEMA: Optional[str] = "user_data"
     CUSTOMER_SCHEMA: Optional[str] = "customer"
     REGION_MAPPING_PT_TABLE: Optional[str] = "basic.region_mapping_pt"
+    BASE_STREET_NETWORK: Optional[UUID] = "903ecdca-b717-48db-bbce-0219e41439cf"
 
     ASYNC_CLIENT_DEFAULT_TIMEOUT: Optional[float] = (
         10.0  # Default timeout for async http client
@@ -161,7 +162,7 @@ class Settings(BaseSettings):
 
     MARKER_DIR: Optional[str] = "icons/maki"
     MARKER_PREFIX: Optional[str] = "goat-marker-"
-
+    
     class Config:
         case_sensitive = True
 

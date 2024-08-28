@@ -18,6 +18,7 @@ from src.core.config import settings
 from src.db.models import Project
 from src.db.models.layer import Layer, LayerType
 from src.schemas.project import InitialViewState
+from src.schemas.layer import FeatureType
 from src.utils import async_get_with_retry
 
 
@@ -271,7 +272,7 @@ class PrintMap:
         # Check layer type
         if layer.type == LayerType.table:
             image = await self.create_table_thumbnail(layer)
-        elif layer.type == LayerType.feature:
+        elif layer.type == LayerType.feature and layer.feature_layer_type != FeatureType.street_network:
             image = await self.create_feature_layer_thumbnail(layer)
         else:
             raise ValueError("Invalid layer type.")
@@ -473,7 +474,7 @@ class PrintMap:
             )
 
         for layer in layers_project:
-            if layer.type == LayerType.table:
+            if layer.type == LayerType.table or layer.feature_layer_type == FeatureType.street_network:
                 continue
 
             if (

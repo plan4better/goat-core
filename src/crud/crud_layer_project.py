@@ -177,7 +177,6 @@ class CRUDLayerProject(CRUDLayerBase):
                     detail="Maximum number of layers in project reached",
                 )
 
-        # Get layer from catalog
         layers = await CRUDBase(Layer).get_multi(
             async_session,
             query=select(Layer).where(Layer.id.in_(layer_ids)),

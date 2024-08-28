@@ -3,6 +3,7 @@ from fastapi_pagination import Page, Params as PaginationParams
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.content import update_content_by_id
+from src.core.config import settings
 from src.db.models.project import Project
 from src.schemas.common import OrderEnum
 from src.schemas.project import (
@@ -12,6 +13,7 @@ from src.schemas.project import (
     InitialViewState,
 )
 from src.crud.crud_user_project import user_project as crud_user_project
+from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.crud.base import CRUDBase
 from src.db.models._link_model import UserProjectLink
 
@@ -41,7 +43,14 @@ class CRUDProject(CRUDBase):
                 initial_view_state=initial_view_state,
             ),
         )
-
+        # If not in testing environment add default layers to project
+        if not settings.TESTING:
+            # Add network layer to project
+            await crud_layer_project.create(
+                async_session=async_session,
+                project_id=project.id,
+                layer_ids=[settings.BASE_STREET_NETWORK]
+        )
         # Doing unneeded type conversion to make sure the relations of project are not loaded
         return IProjectRead(**project.dict())
 
