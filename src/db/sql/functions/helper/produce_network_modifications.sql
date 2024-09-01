@@ -2,13 +2,14 @@ DROP FUNCTION IF EXISTS basic.produce_network_modifications;
 CREATE OR REPLACE FUNCTION basic.produce_network_modifications(
 	scenario_id_input UUID,
 	edge_layer_project_id INTEGER,
-	node_layer_project_id INTEGER,
-	network_modifications_table TEXT
+	node_layer_project_id INTEGER
 )
-RETURNS void
+RETURNS TEXT
 LANGUAGE plpgsql
 AS $function$
 DECLARE
+	network_modifications_table TEXT;
+
 	edge_layer_id UUID := (SELECT layer_id FROM customer.layer_project WHERE id = edge_layer_project_id);
 	edge_network_table TEXT := 'user_data.street_network_line_' || REPLACE((
 		SELECT user_id FROM customer.layer WHERE id = edge_layer_id
@@ -29,8 +30,19 @@ BEGIN
 	---------------------------------------------------------------------------------------------------------------------
 	--Proceed only if the scenario contains features which apply to the specified edge layer
 	---------------------------------------------------------------------------------------------------------------------
+	
+	IF NOT EXISTS (
+		SELECT 1
+		FROM customer.scenario_scenario_feature ssf
+		INNER JOIN customer.scenario_feature sf ON sf.id = ssf.scenario_feature_id
+		WHERE ssf.scenario_id = scenario_id_input
+		AND sf.layer_project_id = edge_layer_project_id
+	) THEN
+		RETURN NULL;
+	END IF;
 
 	-- Create network modifications table
+	SELECT 'temporal.network_modifications_' || basic.uuid_generate_v7() INTO network_modifications_table;
 	EXECUTE FORMAT('
 		DROP TABLE IF EXISTS %I;
 		CREATE TABLE %I (
@@ -42,16 +54,6 @@ BEGIN
 			geom GEOMETRY(LINESTRING, 4326), h3_6 INTEGER, h3_3 INTEGER
 		);
 	', network_modifications_table, network_modifications_table);
-	
-	IF NOT EXISTS (
-		SELECT 1
-		FROM customer.scenario_scenario_feature ssf
-		INNER JOIN customer.scenario_feature sf ON sf.id = ssf.scenario_feature_id
-		WHERE ssf.scenario_id = scenario_id_input
-		AND sf.layer_project_id = edge_layer_project_id
-	) THEN
-		RETURN;
-	END IF;
 
 	---------------------------------------------------------------------------------------------------------------------
 	--Prepare Table
@@ -631,6 +633,8 @@ BEGIN
 		INSERT INTO %I
 		SELECT * FROM new_edges;
 	', network_modifications_table);
+
+	RETURN network_modifications_table;
 
 END
 $function$;
