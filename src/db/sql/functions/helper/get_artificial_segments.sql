@@ -35,6 +35,8 @@ DECLARE
 		SELECT user_id FROM customer.layer WHERE id = edge_layer_id
 	)::TEXT, '-', '');
 
+    combined_network_table TEXT;
+
     custom_cursor REFCURSOR;
 	origin_segment basic.origin_segment;
 	artificial_segment basic.artificial_segment;
@@ -52,6 +54,53 @@ DECLARE
     new_geom GEOMETRY;
 BEGIN
     
+    IF network_modifications_table IS NOT NULL THEN
+        SELECT REPLACE(
+            '"' || 'temporal.' || basic.uuid_generate_v7() || '"',
+            '-', '_'
+        ) INTO combined_network_table;
+
+        EXECUTE FORMAT(
+            'CREATE TABLE %s AS
+                WITH origin AS  (
+                    SELECT
+                        id, geom,
+                        ST_SETSRID(ST_Buffer(geom::geography, 100)::GEOMETRY, 4326) AS buffer_geom,
+                        basic.to_short_h3_3(h3_lat_lng_to_cell(ST_Centroid(geom)::point, 3)::bigint) AS h3_3
+                    FROM %I
+                    LIMIT %s::int
+                )
+                SELECT original_features.*
+                FROM (
+                    SELECT s.edge_id, s.class_, s.source, s.target, s.length_m, s.length_3857,
+                        s.coordinates_3857, s.impedance_slope, s.impedance_slope_reverse,
+                        s.impedance_surface, s.maxspeed_forward, s.maxspeed_backward, s.geom,
+                        s.h3_6, s.h3_3
+                    FROM %s s, origin o
+                    WHERE ST_Intersects(s.geom, o.buffer_geom)
+                ) original_features
+                LEFT JOIN %I scenario_features ON original_features.edge_id = scenario_features.id
+                WHERE scenario_features.id IS NULL
+                UNION ALL
+                SELECT s.id AS edge_id, class_, source, target, length_m, length_3857,
+                    coordinates_3857::json, impedance_slope, impedance_slope_reverse,
+                    impedance_surface, maxspeed_forward, maxspeed_backward, s.geom,
+                    h3_6, s.h3_3
+                FROM %I s, origin o
+                WHERE ST_Intersects(s.geom, o.buffer_geom)
+                AND edit_type = ''n'';',
+                combined_network_table, origin_points_table, num_origin_points, edge_network_table,
+                network_modifications_table, network_modifications_table
+        );
+
+        EXECUTE FORMAT(
+            'SELECT create_distributed_table(''%s'', ''h3_3'');',
+            combined_network_table
+        );
+    ELSE
+        combined_network_table := edge_network_table;
+    END IF;
+
 	OPEN custom_cursor FOR EXECUTE
 		FORMAT (
             'WITH origin AS  (
@@ -62,39 +111,17 @@ BEGIN
                 FROM %I
                 LIMIT %s::int
             ),
-            modified_network AS (
-                	SELECT original_features.*
-                    FROM (
-                        SELECT s.edge_id AS id, s.class_, s.source, s.target, s.length_m, s.length_3857,
-                            s.coordinates_3857, s.impedance_slope, s.impedance_slope_reverse,
-                            s.impedance_surface, s.maxspeed_forward, s.maxspeed_backward, s.geom,
-                            s.h3_6, s.h3_3
-                        FROM %s s,
-                            origin o
-                        WHERE s.class_ = ANY(string_to_array(''%s'', '',''))
-                        AND ST_Intersects(s.geom, o.buffer_geom)
-                    ) original_features
-                    LEFT JOIN %I scenario_features ON original_features.id = scenario_features.id
-                    WHERE scenario_features.id IS NULL
-                UNION ALL
-                    SELECT id, class_, source, target, length_m, length_3857,
-                        coordinates_3857::json, impedance_slope, impedance_slope_reverse,
-                        impedance_surface, maxspeed_forward, maxspeed_backward, geom,
-                        h3_6, h3_3
-                    FROM %I scenario_features
-                    WHERE edit_type = ''n''
-                    AND class_ = ANY(string_to_array(''%s'', '',''))
-            ),
             best_segment AS (
                 SELECT DISTINCT ON (o.id)
                     o.id AS point_id, o.geom AS point_geom, o.buffer_geom AS point_buffer,
-                    s.id, s.class_, s.impedance_slope, s.impedance_slope_reverse,
+                    s.edge_id AS id, s.class_, s.impedance_slope, s.impedance_slope_reverse,
                     s.impedance_surface, s.maxspeed_forward, s.maxspeed_backward,
                     s."source", s.target, s.geom, s.h3_3, s.h3_6,
                     ST_LineLocatePoint(s.geom, o.geom) AS fraction,
                     ST_ClosestPoint(s.geom, o.geom) AS fraction_geom
-                FROM modified_network s, origin o
-                WHERE ST_Intersects(s.geom, o.buffer_geom)
+                FROM %s s, origin o
+                WHERE class_ = ANY(string_to_array(''%s'', '',''))
+                AND ST_Intersects(s.geom, o.buffer_geom)
                 ORDER BY o.id, ST_ClosestPoint(s.geom, o.geom) <-> o.geom
             )
             SELECT
@@ -111,9 +138,7 @@ BEGIN
                 bs.id, bs.class_, bs.impedance_slope, bs.impedance_slope_reverse,
                 bs.impedance_surface, bs.maxspeed_forward, bs.maxspeed_backward,
                 bs."source", bs.target, bs.geom, bs.h3_3, bs.h3_6;'
-        , origin_points_table, num_origin_points, edge_network_table, classes,
-        network_modifications_table, network_modifications_table, classes);
-	
+        , origin_points_table, num_origin_points, combined_network_table, classes);
 	LOOP
 		FETCH custom_cursor INTO origin_segment;
 		EXIT WHEN NOT FOUND;
@@ -264,6 +289,13 @@ BEGIN
 	END LOOP;
 	
 	CLOSE custom_cursor;
+
+    IF network_modifications_table IS NOT NULL THEN
+        EXECUTE FORMAT(
+            'DROP TABLE IF EXISTS %s;',
+            combined_network_table
+        );
+    END IF;
 	
 END;
 $function$
