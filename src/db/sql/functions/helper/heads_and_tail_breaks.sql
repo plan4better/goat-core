@@ -1,4 +1,3 @@
-/*Inspired from https://github.com/CartoDB/cartodb-postgresql/blob/master/scripts-available/CDB_HeadsTailsBins.sql*/
 DROP FUNCTION IF EXISTS basic.heads_and_tails_breaks;
 CREATE OR REPLACE FUNCTION basic.heads_and_tails_breaks(table_name text, column_name text, where_filter TEXT, breaks INT)
 RETURNS JSONB AS $$
@@ -46,6 +45,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql
 PARALLEL SAFE;
+
+-- Inspired from https://github.com/CartoDB/cartodb-postgresql/blob/master/scripts-available/CDB_HeadsTailsBins.sql
+
 /*
 DROP TABLE temporal.test;
 CREATE TABLE temporal.test AS 

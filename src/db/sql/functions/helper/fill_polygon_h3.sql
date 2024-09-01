@@ -1,4 +1,3 @@
-/*This function is returning the h3 indices that are intersecting the borderpoints of */
 DROP FUNCTION IF EXISTS basic.fill_polygon_h3; 
 CREATE OR REPLACE FUNCTION basic.fill_polygon_h3(geom geometry, h3_resolution integer)
 RETURNS SETOF h3index

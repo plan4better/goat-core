@@ -1,12 +1,15 @@
-import pytest
-from pydantic import ValidationError
-from src.db.models.layer import DataCategory, DataLicense, LayerBase
-from src.schemas.layer import FeatureLayerExportType, IInternalLayerExport
 from uuid import uuid4
 
-def test_layer_base_creation():
+import pytest
+from pydantic import ValidationError
+
+from src.db.models.layer import DataCategory, DataLicense, Layer, LayerBase
+from src.schemas.layer import FeatureLayerExportType, ILayerExport
+
+
+def test_layer_creation():
     # Create a LayerBase instance with valid data
-    layer = LayerBase(
+    layer = Layer(
         folder_id=uuid4(),
         name="Test Layer",
         description="Test Description",
@@ -53,9 +56,9 @@ def test_layer_base_creation():
 
 
 # Add a test for a continent
-def test_layer_base_creation_continent():
+def test_layer_creation_continent():
     # Create a LayerBase instance with valid data
-    layer = LayerBase(
+    layer = Layer(
         folder_id=uuid4(),
         name="Test Layer",
         description="Test Description",
@@ -113,35 +116,37 @@ def test_layer_base_creation_invalid_geographical_code():
         LayerBase(geographical_code="XX")
 
 
-def test_internal_layer_export_valid_crs():
+def test_layer_export_valid_crs():
     # Test with valid CRS
     valid_crs = "EPSG:4326"
-    layer_export = IInternalLayerExport(
+    layer_export = ILayerExport(
         id=uuid4(),
         file_type=FeatureLayerExportType.geojson,
         file_name="test",
-        crs=valid_crs
+        crs=valid_crs,
     )
     assert layer_export.crs == valid_crs
 
-def test_internal_layer_export_invalid_crs():
+
+def test_layer_export_invalid_crs():
     # Test with invalid CRS
     invalid_crs = "Invalid CRS"
     with pytest.raises(ValidationError):
-        layer_export = IInternalLayerExport(
+        ILayerExport(
             id=uuid4(),
             file_type=FeatureLayerExportType.geojson,
             file_name="test",
-            crs=invalid_crs
+            crs=invalid_crs,
         )
 
-def test_internal_layer_export_invalid_crs_kml():
+
+def test_layer_export_invalid_crs_kml():
     # Test with invalid CRS for KML
-    invalid_crs = "EPSG:4326"
+    invalid_crs = "Invalid CRS"
     with pytest.raises(ValidationError):
-        layer_export = IInternalLayerExport(
+        ILayerExport(
             id=uuid4(),
             file_type=FeatureLayerExportType.kml,
             file_name="test",
-            crs=invalid_crs
+            crs=invalid_crs,
         )

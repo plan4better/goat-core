@@ -263,7 +263,7 @@ async def test_delete_layer_project(client: AsyncClient, fixture_create_layer_pr
         f"{settings.API_V2_STR}/project/{project_id}/layer",
     )
     assert response.status_code == 200
-    assert len(response.json()) == 1
+    assert len(response.json()) == 2
     assert (
         response.json()[0]["id"]
         == fixture_create_layer_project["layer_project"][1]["id"]

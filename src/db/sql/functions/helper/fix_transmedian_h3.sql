@@ -1,4 +1,3 @@
---This function is useful to fix h3 grids spanning accross the transmeridian. Without this the polygon would show as long bands.
 CREATE OR REPLACE FUNCTION basic.fix_transmeridian_h3(h3index h3index) RETURNS geometry AS $$
 DECLARE
     geom geometry;
@@ -10,6 +9,8 @@ DECLARE
     lat float;
     i int;
 BEGIN
+	--This function is useful to fix h3 grids spanning accross the transmeridian. Without this the polygon would show as long bands.
+
 	geom := h3_cell_to_boundary(h3index)::geometry;
     min_lon := ST_XMin(geom);
     max_lon := ST_XMax(geom);
