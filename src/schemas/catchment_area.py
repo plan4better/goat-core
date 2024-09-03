@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, validator
 
+from src.core.config import settings
 from src.schemas.colors import ColorRangeType
 from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import (
@@ -278,6 +279,16 @@ class ICatchmentAreaActiveMobility(BaseModel):
         title="Scenario ID",
         description="The ID of the scenario that is to be applied on the input layer or base network.",
     )
+    street_network_edge_layer_project_id: Optional[int] = Field(
+        default=settings.STREET_NETWORK_EDGE_DEFAULT_LAYER_PROJECT_ID,
+        title="Street Network Edge Layer Project ID",
+        description="The layer project ID of the street network edge layer.",
+    )
+    street_network_node_layer_project_id: Optional[int] = Field(
+        default=settings.STREET_NETWORK_NODE_DEFAULT_LAYER_PROJECT_ID,
+        title="Street Network Node Layer Project ID",
+        description="The layer project ID of the street network node layer.",
+    )
     catchment_area_type: CatchmentAreaTypeActiveMobility = Field(
         ...,
         title="Return Type",
@@ -469,6 +480,16 @@ class ICatchmentAreaCar(BaseModel):
         None,
         title="Scenario ID",
         description="The ID of the scenario that is to be applied on the input layer or base network.",
+    )
+    street_network_edge_layer_project_id: Optional[int] = Field(
+        default=settings.STREET_NETWORK_EDGE_DEFAULT_LAYER_PROJECT_ID,
+        title="Street Network Edge Layer Project ID",
+        description="The layer project ID of the street network edge layer.",
+    )
+    street_network_node_layer_project_id: Optional[int] = Field(
+        default=settings.STREET_NETWORK_NODE_DEFAULT_LAYER_PROJECT_ID,
+        title="Street Network Node Layer Project ID",
+        description="The layer project ID of the street network node layer.",
     )
     catchment_area_type: CatchmentAreaTypeCar = Field(
         ...,
