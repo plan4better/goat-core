@@ -30,7 +30,7 @@ from src.core.content import (
     read_contents_by_ids,
 )
 from src.crud.crud_job import job as crud_job
-from src.crud.crud_layer import CRUDLayerExport, CRUDLayerImport
+from src.crud.crud_layer import CRUDLayerDatasetUpdate, CRUDLayerExport, CRUDLayerImport
 from src.crud.crud_layer import layer as crud_layer
 from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.db.models.layer import (
@@ -149,25 +149,12 @@ async def file_upload_external_service(
     return metadata
 
 
-async def _create_layer_from_dataset(
-    background_tasks: BackgroundTasks,
-    async_session: AsyncSession,
+def _validate_and_fetch_metadata(
     user_id: UUID,
-    project_id: Optional[UUID] = Query(
-        None,
-        description="The ID of the project to add the layer to",
-        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    ),
-    layer_in: ILayerFromDatasetCreate = Body(
-        ...,
-        examples=layer_request_examples["create"],
-        description="Layer to create",
-    ),
+    dataset_id: UUID,
 ):
-    """Create a feature standard or table layer from a dataset."""
-
     # Check if user owns folder by checking if it exists
-    folder_path = os.path.join(settings.DATA_DIR, user_id, str(layer_in.dataset_id))
+    folder_path = os.path.join(settings.DATA_DIR, user_id, str(dataset_id))
     if os.path.exists(folder_path) is False:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -189,6 +176,32 @@ async def _create_layer_from_dataset(
     with open(os.path.join(metadata_path)) as f:
         file_metadata = json.loads(json.load(f))
 
+    return file_metadata
+
+
+async def _create_layer_from_dataset(
+    background_tasks: BackgroundTasks,
+    async_session: AsyncSession,
+    user_id: UUID,
+    project_id: Optional[UUID] = Query(
+        None,
+        description="The ID of the project to add the layer to",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    layer_in: ILayerFromDatasetCreate = Body(
+        ...,
+        examples=layer_request_examples["create"],
+        description="Layer to create",
+    ),
+):
+    """Create a feature standard or table layer from a dataset."""
+
+    # Validate and fetch dataset file metadata
+    file_metadata = _validate_and_fetch_metadata(
+        user_id=user_id,
+        dataset_id=layer_in.dataset_id,
+    )
+
     # Create job and check if user can create a new job
     job = await crud_job.check_and_create(
         async_session=async_session,
@@ -203,7 +216,7 @@ async def _create_layer_from_dataset(
         async_session=async_session,
         user_id=user_id,
         job_id=job.id,
-    ).import_file(
+    ).import_file_job(
         file_metadata=file_metadata,
         layer_in=layer_in,
         project_id=project_id,
@@ -487,6 +500,73 @@ async def update_layer(
             id=layer_id,
             layer_in=layer_in,
         )
+
+
+@router.put(
+    "/{layer_id}/dataset",
+    response_class=JSONResponse,
+    status_code=200,
+)
+async def update_layer_dataset(
+    background_tasks: BackgroundTasks,
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_user_id),
+    layer_id: UUID4 = Path(
+        ...,
+        description="The ID of the layer to get",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    dataset_id: UUID = Query(
+        ..., description="The ID of the dataset to update the layer with"
+    ),
+):
+    """Update the dataset of a layer."""
+
+    # Ensure updating the dataset of this layer is permitted
+    with HTTPErrorHandler():
+        existing_layer = await crud_layer.get_internal(
+            async_session=async_session,
+            id=layer_id,
+        )
+        if str(existing_layer.user_id) != str(user_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User does not have permission to update this layer.",
+            )
+
+        # Validate and fetch dataset file metadata
+        file_metadata = _validate_and_fetch_metadata(
+            user_id=user_id,
+            dataset_id=dataset_id,
+        )
+
+    # Create job and check if user can create a new job
+    job = await crud_job.check_and_create(
+        async_session=async_session,
+        user_id=user_id,
+        job_type=JobType.update_layer_dataset,
+    )
+
+    # Run the import
+    layer_in = ILayerFromDatasetCreate(
+        name=existing_layer.name,
+        description=existing_layer.description,
+        folder_id=existing_layer.folder_id,
+        properties=existing_layer.properties,
+        dataset_id=dataset_id,
+    )
+    await CRUDLayerDatasetUpdate(
+        background_tasks=background_tasks,
+        async_session=async_session,
+        user_id=user_id,
+        job_id=job.id,
+    ).update(
+        existing_layer_id=existing_layer.id,
+        file_metadata=file_metadata,
+        layer_in=layer_in,
+    )
+
+    return {"job_id": job.id}
 
 
 @router.delete(

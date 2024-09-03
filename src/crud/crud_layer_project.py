@@ -1,28 +1,29 @@
 # Standard library imports
-import re
+from typing import List, Union
 from uuid import UUID
 
 # Third party imports
 from fastapi import HTTPException, status
-from pydantic import ValidationError, parse_obj_as, BaseModel
-from sqlalchemy import select, text
+from pydantic import BaseModel, ValidationError, parse_obj_as
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
-from typing import Union, List
 
-# Local application imports
-from .base import CRUDBase
-from src.schemas.error import UnsupportedLayerTypeError, LayerNotFoundError
-from src.utils import build_where_clause
+from src.core.layer import CRUDLayerBase
 from src.db.models._link_model import LayerProjectLink
 from src.db.models.layer import Layer
 from src.db.models.project import Project
-from src.schemas.layer import LayerType, FeatureGeometryType
+from src.schemas.error import LayerNotFoundError, UnsupportedLayerTypeError
+from src.schemas.layer import FeatureGeometryType, LayerType
 from src.schemas.project import (
     layer_type_mapping_read,
     layer_type_mapping_update,
 )
-from src.core.layer import CRUDLayerBase
+from src.utils import build_where_clause
+
+# Local application imports
+from .base import CRUDBase
+
 
 class CRUDLayerProject(CRUDLayerBase):
     async def layer_projects_to_schemas(
@@ -143,7 +144,10 @@ class CRUDLayerProject(CRUDLayerBase):
         # Check if geometry type is correct
         if layer_project.type == LayerType.feature.value:
             if expected_geometry_types is not None:
-                if layer_project.feature_layer_geometry_type not in expected_geometry_types:
+                if (
+                    layer_project.feature_layer_geometry_type
+                    not in expected_geometry_types
+                ):
                     raise UnsupportedLayerTypeError(
                         f"Layer {layer_project.name} is not a {[geom_type.value for geom_type in expected_geometry_types]} layer"
                     )
@@ -351,5 +355,25 @@ class CRUDLayerProject(CRUDLayerBase):
                 detail=f"Operation not supported. The layer contains more than {max_feature_cnt} features. Please apply a filter to reduce the number of features.",
             )
         return feature_cnt
+
+    async def update_layer_id(
+        self,
+        async_session: AsyncSession,
+        layer_id: UUID,
+        new_layer_id: UUID,
+    ):
+        """Update layer id in layer project link."""
+
+        # Update all layers from project by id
+        query = (
+            update(LayerProjectLink)
+            .where(LayerProjectLink.layer_id == layer_id)
+            .values(layer_id=new_layer_id)
+        )
+
+        async with async_session.begin():
+            await async_session.execute(query)
+            await async_session.commit()
+
 
 layer_project = CRUDLayerProject(LayerProjectLink)

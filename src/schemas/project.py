@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, HttpUrl, validator
@@ -193,13 +194,9 @@ class ITableProjectUpdate(CQLQuery):
 
 class IRasterProjectRead(LayerProjectIds, IRasterRead):
     group: str = Field(None, description="Layer group name", max_length=255)
-    properties: dict = Field(
-        ...,
+    properties: Optional[dict] = Field(
+        None,
         description="Layer properties",
-    )
-    other_properties: ExternalServiceOtherProperties = Field(
-        ...,
-        description="Other properties of the layer",
     )
 
 

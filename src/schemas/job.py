@@ -28,6 +28,7 @@ class JobType(str, Enum):
     heatmap_connectivity_active_mobility = "heatmap_connectivity_active_mobility"
     heatmap_connectivity_motorized_mobility = "heatmap_connectivity_motorized_mobility"
     data_delete_multi = "data_delete_multi"
+    update_layer_dataset = "update_layer_dataset"
 
 
 class JobStatusType(str, Enum):
@@ -68,7 +69,6 @@ class JobStep(BaseModel):
 class JobStatusFileImport(BaseModel):
     upload: JobStep = {}
     migration: JobStep = {}
-    internal_layer_create: JobStep = {}
 
 
 class JobStatusJoin(BaseModel):
@@ -183,4 +183,5 @@ job_mapping = {
     JobType.heatmap_connectivity_active_mobility: JobStatusHeatmapConnectivityActiveMobility,
     JobType.heatmap_connectivity_motorized_mobility: JobStatusHeatmapConnectivityMotorizedMobility,
     JobType.data_delete_multi: JobStatusLayerDeleteMulti,
+    JobType.update_layer_dataset: JobStatusFileImport,
 }
