@@ -674,7 +674,6 @@ class CRUDLayerImport(CRUDFailedJob):
             f'{settings.USER_DATA_SCHEMA}."{str(self.job_id).replace("-", "")}"'
         )
 
-    @job_log(job_step_name="internal_layer_create")
     async def create_internal(
         self,
         layer_in: ILayerFromDatasetCreate,
@@ -695,9 +694,8 @@ class CRUDLayerImport(CRUDFailedJob):
             geom_type = SupportedOgrGeomType[
                 file_metadata["data_types"]["geometry"]["type"]
             ].value
-            additional_attributes["properties"] = get_base_style(
-                feature_geometry_type=geom_type
-            )
+            if not layer_in.properties:
+                layer_in.properties = get_base_style(feature_geometry_type=geom_type)
             additional_attributes["type"] = LayerType.feature
             additional_attributes["feature_layer_type"] = FeatureType.standard
             additional_attributes["feature_layer_geometry_type"] = geom_type
@@ -752,13 +750,8 @@ class CRUDLayerImport(CRUDFailedJob):
                 project_id=project_id,
             )
 
-        return {
-            "msg": "Layer successfully created.",
-            "status": JobStatusType.finished.value,
-        }
+        return layer.id
 
-    @run_background_or_immediately(settings)
-    @job_init()
     async def import_file(
         self,
         file_metadata: dict,
@@ -798,13 +791,30 @@ class CRUDLayerImport(CRUDFailedJob):
             job_id=self.job_id,
         )
         # Create layer metadata and thumbnail
-        result = await self.create_internal(
+        layer_id = await self.create_internal(
             layer_in=layer_in,
             file_metadata=file_metadata,
             attribute_mapping=attribute_mapping,
             project_id=project_id,
         )
 
+        return result, layer_id
+
+    @run_background_or_immediately(settings)
+    @job_init()
+    async def import_file_job(
+        self,
+        file_metadata: dict,
+        layer_in: ILayerFromDatasetCreate,
+        project_id: UUID = None,
+    ):
+        """Create a layer from a dataset file."""
+
+        result, _ = await self.import_file(
+            file_metadata=file_metadata,
+            layer_in=layer_in,
+            project_id=project_id,
+        )
         return result
 
 
@@ -980,3 +990,52 @@ class CRUDDataDelete(CRUDFailedJob):
         layers: list[Layer],
     ):
         return await self.delete_multi(async_session=async_session, layers=layers)
+
+
+class CRUDLayerDatasetUpdate(CRUDFailedJob):
+    """CRUD class for updating the dataset of an existing layer and updating all layer project references."""
+
+    def __init__(self, job_id, background_tasks, async_session, user_id):
+        super().__init__(job_id, background_tasks, async_session, user_id)
+
+    @run_background_or_immediately(settings)
+    @job_init()
+    async def update(
+        self,
+        existing_layer_id: UUID,
+        file_metadata: dict,
+        layer_in: ILayerFromDatasetCreate,
+    ):
+        """Update layer dataset."""
+
+        original_name = layer_in.name
+
+        # Create a new layer with the updated dataset while transferring existing layer properties
+        result, layer_id = await CRUDLayerImport(
+            background_tasks=self.background_tasks,
+            async_session=self.async_session,
+            user_id=self.user_id,
+            job_id=self.job_id,
+        ).import_file(
+            file_metadata=file_metadata,
+            layer_in=layer_in,
+        )
+
+        # Update all layer project references with the new layer id
+        await crud_layer_project.update_layer_id(
+            async_session=self.async_session,
+            layer_id=existing_layer_id,
+            new_layer_id=layer_id,
+        )
+
+        # Delete the old layer
+        await layer.delete(async_session=self.async_session, id=existing_layer_id)
+
+        # Rename the new layer
+        await layer.update(
+            async_session=self.async_session,
+            id=layer_id,
+            layer_in={"name": original_name},
+        )
+
+        return result
