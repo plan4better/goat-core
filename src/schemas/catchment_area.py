@@ -279,13 +279,13 @@ class ICatchmentAreaActiveMobility(BaseModel):
         title="Scenario ID",
         description="The ID of the scenario that is to be applied on the input layer or base network.",
     )
-    street_network_edge_layer_project_id: int = Field(
-        ...,
+    street_network_edge_layer_project_id: Optional[int] = Field(
+        default=settings.STREET_NETWORK_EDGE_DEFAULT_LAYER_PROJECT_ID,
         title="Street Network Edge Layer Project ID",
         description="The layer project ID of the street network edge layer.",
     )
-    street_network_node_layer_project_id: int = Field(
-        settings.STREET_NETWORK_NODE_DEFAULT_LAYER_PROJECT_ID,
+    street_network_node_layer_project_id: Optional[int] = Field(
+        default=settings.STREET_NETWORK_NODE_DEFAULT_LAYER_PROJECT_ID,
         title="Street Network Node Layer Project ID",
         description="The layer project ID of the street network node layer.",
     )
@@ -481,13 +481,13 @@ class ICatchmentAreaCar(BaseModel):
         title="Scenario ID",
         description="The ID of the scenario that is to be applied on the input layer or base network.",
     )
-    street_network_edge_layer_project_id: int = Field(
-        ...,
+    street_network_edge_layer_project_id: Optional[int] = Field(
+        default=settings.STREET_NETWORK_EDGE_DEFAULT_LAYER_PROJECT_ID,
         title="Street Network Edge Layer Project ID",
         description="The layer project ID of the street network edge layer.",
     )
-    street_network_node_layer_project_id: int = Field(
-        settings.STREET_NETWORK_NODE_DEFAULT_LAYER_PROJECT_ID,
+    street_network_node_layer_project_id: Optional[int] = Field(
+        default=settings.STREET_NETWORK_NODE_DEFAULT_LAYER_PROJECT_ID,
         title="Street Network Node Layer Project ID",
         description="The layer project ID of the street network node layer.",
     )
