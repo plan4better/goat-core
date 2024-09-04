@@ -3,7 +3,6 @@ from collections import namedtuple
 from pathlib import Path
 from psycopg2.errors import UndefinedFunction
 from sqlalchemy import text
-from src.utils import print_hashtags, print_info
 
 class FunctionManager:
     def __init__(self, engine, path: str, schema: str, schema_mapping: dict = None):
@@ -88,23 +87,23 @@ class FunctionManager:
             # Skip trigger functions as they should be dropped by drop_triggers()
             if "trigger" in function:
                 continue
-            print_info(f"Dropping {function}()")
+            print(f"Dropping {function}()")
             statement = f"DROP FUNCTION IF EXISTS {self.schema_mapping[self.schema]}.{function} CASCADE;"
             try:
                 self.engine.execute(text(statement))
             except UndefinedFunction as e:
                 print(e)
-        print_info(f"{len(functions)} functions dropped!")
+        print(f"{len(functions)} functions dropped!")
 
     def add_functions(self):
         sql_function_entities_ = self.sql_function_entities()
         for function in sql_function_entities_:
             self.engine.execute(text(function))
-            print_info("Adding Function.")
-        print_info(f"{len(sql_function_entities_)} functions added!")
+            print("Adding Function.")
+        print(f"{len(sql_function_entities_)} functions added!")
 
     def update_functions(self):
         # It will drop all functions and add them again
         self.drop_functions()
-        print_hashtags()
+        print("##################################################")
         self.add_functions()
