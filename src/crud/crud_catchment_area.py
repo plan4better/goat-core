@@ -308,8 +308,8 @@ class CRUDCatchmentAreaActiveMobility(CRUDCatchmentAreaBase):
             ),
             "layer_id": str(layer_id),
             "scenario_id": str(params.scenario_id) if params.scenario_id else None,
-            "street_network_edge_layer_project_id": params.street_network_edge_layer_project_id,
-            "street_network_node_layer_project_id": params.street_network_node_layer_project_id,
+            "street_network_edge_layer_project_id": params.layer_project_id_street_network_edge,
+            "street_network_node_layer_project_id": params.layer_project_id_street_network_node,
         }
 
         await call_routing_endpoint(
@@ -660,8 +660,8 @@ class CRUDCatchmentAreaCar(CRUDCatchmentAreaBase):
             ),
             "layer_id": str(layer_id),
             "scenario_id": str(params.scenario_id) if params.scenario_id else None,
-            "street_network_edge_layer_project_id": params.street_network_edge_layer_project_id,
-            "street_network_node_layer_project_id": params.street_network_node_layer_project_id,
+            "street_network_edge_layer_project_id": params.layer_project_id_street_network_edge,
+            "street_network_node_layer_project_id": params.layer_project_id_street_network_node,
         }
 
         await call_routing_endpoint(
