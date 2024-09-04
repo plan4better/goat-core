@@ -1,8 +1,9 @@
 from typing import Any, Dict, Optional
+from uuid import UUID
 
 import boto3
 from pydantic import BaseSettings, HttpUrl, PostgresDsn, validator
-from uuid import UUID
+
 
 class AsyncPostgresDsn(PostgresDsn):
     allowed_schemes = {"postgres+asyncpg", "postgresql+asyncpg"}
@@ -24,6 +25,8 @@ class Settings(BaseSettings):
     CUSTOMER_SCHEMA: Optional[str] = "customer"
     REGION_MAPPING_PT_TABLE: Optional[str] = "basic.region_mapping_pt"
     BASE_STREET_NETWORK: Optional[UUID] = "903ecdca-b717-48db-bbce-0219e41439cf"
+    STREET_NETWORK_EDGE_DEFAULT_LAYER_PROJECT_ID = 36126
+    STREET_NETWORK_NODE_DEFAULT_LAYER_PROJECT_ID = 37319
 
     ASYNC_CLIENT_DEFAULT_TIMEOUT: Optional[float] = (
         10.0  # Default timeout for async http client
@@ -31,8 +34,8 @@ class Settings(BaseSettings):
     ASYNC_CLIENT_READ_TIMEOUT: Optional[float] = (
         30.0  # Read timeout for async http client
     )
-    CRUD_NUM_RETRIES: Optional[int] = 20 # Number of times to retry calling an endpoint
-    CRUD_RETRY_INTERVAL: Optional[int] = 2 # Number of seconds to wait between retries
+    CRUD_NUM_RETRIES: Optional[int] = 20  # Number of times to retry calling an endpoint
+    CRUD_RETRY_INTERVAL: Optional[int] = 2  # Number of seconds to wait between retries
 
     HEATMAP_GRAVITY_MAX_SENSITIVITY: int = 1000000
 
@@ -138,9 +141,15 @@ class Settings(BaseSettings):
             region_name=values.get("AWS_REGION"),
         )
 
-    DEFAULT_PROJECT_THUMBNAIL: Optional[str] = "https://assets.plan4better.de/img/goat_new_project_artwork.png"
-    DEFAULT_LAYER_THUMBNAIL: Optional[str] = "https://assets.plan4better.de/img/goat_new_dataset_thumbnail.png"
-    DEFAULT_REPORT_THUMBNAIL: Optional[str] = "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png"
+    DEFAULT_PROJECT_THUMBNAIL: Optional[str] = (
+        "https://assets.plan4better.de/img/goat_new_project_artwork.png"
+    )
+    DEFAULT_LAYER_THUMBNAIL: Optional[str] = (
+        "https://assets.plan4better.de/img/goat_new_dataset_thumbnail.png"
+    )
+    DEFAULT_REPORT_THUMBNAIL: Optional[str] = (
+        "https://goat-app-assets.s3.eu-central-1.amazonaws.com/logos/goat_green.png"
+    )
     ASSETS_URL: Optional[str] = None
     THUMBNAIL_DIR_LAYER: Optional[str] = None
 
@@ -162,7 +171,7 @@ class Settings(BaseSettings):
 
     MARKER_DIR: Optional[str] = "icons/maki"
     MARKER_PREFIX: Optional[str] = "goat-marker-"
-    
+
     class Config:
         case_sensitive = True
 

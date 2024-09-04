@@ -162,7 +162,6 @@ class ExternalServiceAttributesBase(BaseModel):
     data_type: Optional[FeatureDataType | RasterDataType] = Field(
         None, description="Content data type"
     )
-    properties: Optional[dict] = Field(None, description="Layer properties.")
     other_properties: Optional[ExternalServiceOtherProperties] = Field(
         None, description="Additional layer properties."
     )
@@ -236,6 +235,7 @@ class ILayerFromDatasetCreate(LayerBase, ExternalServiceAttributesBase):
         default_factory=uuid4, description="Content ID of the layer", alias="id"
     )
     dataset_id: UUID = Field(..., description="Dataset ID")
+    properties: Optional[dict] = Field(None, description="Layer properties.")
 
 
 class IFeatureLayerToolCreate(BaseModel):
@@ -260,7 +260,6 @@ class IFeatureStandardCreateAdditionalAttributes(BaseModel):
     feature_layer_geometry_type: FeatureGeometryType = Field(
         ..., description="Feature layer geometry type"
     )
-    properties: dict = Field(..., description="Layer properties.")
     extent: str = Field(
         ..., description="Geographical Extent of the layer", max_length=500
     )

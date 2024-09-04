@@ -177,7 +177,7 @@ class FileUpload:
             self.file_path = os.path.join(self.folder_path, "file." + self.file_ending)
         else:
             self.file_path = os.path.join(
-                self.folder_path, "file." + FileUploadType.gpkg.value
+                self.folder_path, "file." + FileUploadType.geojson.value
             )
 
     async def _fetch_and_write(self):
@@ -247,10 +247,11 @@ class OGRExternalServiceFetching:
     def __init__(self, url: HttpUrl, output_file: str):
         self.url = url
 
-        # Initialize output GeoPackage data source
-        output_driver = ogr.GetDriverByName(OgrDriverType.gpkg.value)
+        # Initialize output GeoJSON data source
+        driver_type = OgrDriverType.geojson
+        output_driver = ogr.GetDriverByName(driver_type)
         if output_driver is None:
-            raise Exception(f"{OgrDriverType.gpkg.value} driver is not available.")
+            raise Exception(f"{driver_type} driver is not available.")
 
         self.output_data_source = output_driver.CreateDataSource(output_file)
         if self.output_data_source is None:
@@ -262,7 +263,7 @@ class OGRExternalServiceFetching:
         ogr.UseExceptions()
 
         # Initialize WFS data source
-        wfs_data_source = ogr.Open(str(self.url))
+        wfs_data_source = ogr.Open(f"WFS:{str(self.url)}")
         if wfs_data_source is None:
             raise Exception(f"Could not open WFS service at {self.url}")
 
@@ -270,11 +271,6 @@ class OGRExternalServiceFetching:
         input_layer = wfs_data_source.GetLayerByName(layer_name)
         if input_layer is None:
             raise Exception(f"Could not find layer {layer_name} in WFS service.")
-
-        # Get geometry column name and type
-        geom_column = input_layer.GetGeometryColumn()
-        if not geom_column:
-            raise Exception("Could not determine geometry column for WFS layer.")
 
         geom_type = input_layer.GetGeomType()
         if geom_type == ogr.wkbUnknown:
@@ -291,7 +287,6 @@ class OGRExternalServiceFetching:
             layer_name,
             srs=input_layer.GetSpatialRef(),
             geom_type=geom_type,
-            options=[f"GEOMETRY_NAME={geom_column}"],
         )
         if output_layer is None:
             raise Exception(
@@ -307,6 +302,10 @@ class OGRExternalServiceFetching:
         # Copy features from input to output layer
         for feature in input_layer:
             output_layer.CreateFeature(feature)
+
+        # Cleanup
+        self.output_data_source = None
+        wfs_data_source = None
 
         ogr.DontUseExceptions()
 

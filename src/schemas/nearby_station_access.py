@@ -1,8 +1,9 @@
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from src.core.config import settings
 from src.schemas.catchment_area import (
     CatchmentAreaRoutingModeActiveMobility,
     CatchmentAreaRoutingModePT,
@@ -63,6 +64,16 @@ class INearbyStationAccess(BaseModel):
         None,
         title="Scenario ID",
         description="The ID of the scenario that is to be applied on the input layer or base network.",
+    )
+    layer_project_id_street_network_edge: Optional[int] = Field(
+        default=settings.STREET_NETWORK_EDGE_DEFAULT_LAYER_PROJECT_ID,
+        title="Street Network Edge Layer Project ID",
+        description="The layer project ID of the street network edge layer.",
+    )
+    layer_project_id_street_network_node: Optional[int] = Field(
+        default=settings.STREET_NETWORK_NODE_DEFAULT_LAYER_PROJECT_ID,
+        title="Street Network Node Layer Project ID",
+        description="The layer project ID of the street network node layer.",
     )
 
     @property
