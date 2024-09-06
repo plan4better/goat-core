@@ -3,16 +3,17 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from src.core.config import settings
 from src.schemas.catchment_area import (
     CatchmentAreaRoutingModeActiveMobility,
     CatchmentAreaRoutingModePT,
+    CatchmentAreaStreetNetwork,
 )
 from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import (
     CatchmentAreaStartingPointsBase,
     PTTimeWindow,
     check_starting_points,
+    input_layer_type_line,
     input_layer_type_point,
 )
 
@@ -65,15 +66,10 @@ class INearbyStationAccess(BaseModel):
         title="Scenario ID",
         description="The ID of the scenario that is to be applied on the input layer or base network.",
     )
-    layer_project_id_street_network_edge: Optional[int] = Field(
-        default=settings.STREET_NETWORK_EDGE_DEFAULT_LAYER_PROJECT_ID,
-        title="Street Network Edge Layer Project ID",
-        description="The layer project ID of the street network edge layer.",
-    )
-    layer_project_id_street_network_node: Optional[int] = Field(
-        default=settings.STREET_NETWORK_NODE_DEFAULT_LAYER_PROJECT_ID,
-        title="Street Network Node Layer Project ID",
-        description="The layer project ID of the street network node layer.",
+    street_network: Optional[CatchmentAreaStreetNetwork] = Field(
+        None,
+        title="Street Network Layer Config",
+        description="The configuration of the street network layers to use.",
     )
 
     @property
@@ -82,7 +78,11 @@ class INearbyStationAccess(BaseModel):
 
     @property
     def input_layer_types(self):
-        return {"layer_project_id": input_layer_type_point}
+        return {
+            "layer_project_id": input_layer_type_point,
+            "edge_layer_project_id": input_layer_type_line,
+            "node_layer_project_id": input_layer_type_point,
+        }
 
     @property
     def geofence_table(self):

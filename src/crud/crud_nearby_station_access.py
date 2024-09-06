@@ -78,8 +78,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             catchment_area_type=CatchmentAreaTypeActiveMobility.polygon,
             polygon_difference=True,
             scenario_id=params.scenario_id,
-            layer_project_id_street_network_edge=params.layer_project_id_street_network_edge,
-            layer_project_id_street_network_node=params.layer_project_id_street_network_node,
+            street_network=params.street_network,
         )
 
         # Compute catchment area

@@ -17,6 +17,7 @@ from src.schemas.heatmap import (
 from src.schemas.job import JobStatusType
 from src.schemas.layer import FeatureGeometryType, IFeatureLayerToolCreate
 from src.schemas.toolbox_base import DefaultResultLayerName
+from src.utils import format_value_null_sql
 
 
 class CRUDHeatmapGravity(CRUDHeatmapBase):
@@ -35,9 +36,6 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
 
         # Create temp table name for points
         temp_points = await self.create_temp_table_name("points")
-
-        # Create formatted scenario ID string for SQL query
-        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
 
         # Create formatted opportunity geofence layer strings for SQL query
         geofence_table = (
@@ -73,7 +71,7 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
                     {layer["layer"].opportunity_layer_project_id},
                     '{layer["table_name"]}',
                     '{settings.CUSTOMER_SCHEMA}',
-                    {scenario_id},
+                    {format_value_null_sql(scenario_id)},
                     {geofence_table},
                     {geofence_where_filter},
                     {geofence_buffer_dist},

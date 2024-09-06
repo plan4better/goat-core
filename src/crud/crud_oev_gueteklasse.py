@@ -19,7 +19,7 @@ from src.schemas.job import JobStatusType
 from src.schemas.layer import IFeatureLayerToolCreate, UserDataGeomType
 from src.schemas.oev_gueteklasse import CatchmentType, IOevGueteklasse
 from src.schemas.toolbox_base import DefaultResultLayerName, MaxFeaturePolygonArea
-from src.utils import build_where_clause
+from src.utils import build_where_clause, format_value_null_sql
 
 
 class CRUDOevGueteklasse(CRUDToolBase):
@@ -46,9 +46,6 @@ class CRUDOevGueteklasse(CRUDToolBase):
 
         input_table = reference_layer_project.table_name
         where_query = build_where_clause([reference_layer_project.where_query])
-        scenario_id = (
-            "NULL" if params.scenario_id is None else f"'{str(params.scenario_id)}'"
-        )
         query = f"""
             INSERT INTO {self.table_stations}({', '.join(station_category_layer.attribute_mapping.keys())}, layer_id, geom)
             WITH child_stops AS (
@@ -57,7 +54,7 @@ class CRUDOevGueteklasse(CRUDToolBase):
                     '{input_table}',
                     {reference_layer_project.id},
                     '{settings.CUSTOMER_SCHEMA}',
-                    {scenario_id},
+                    {format_value_null_sql(params.scenario_id)},
                     :where_query,
                     '{str(timedelta(seconds=params.time_window.from_time))}',
                     '{str(timedelta(seconds=params.time_window.to_time))}',
