@@ -19,7 +19,7 @@ CREATE TYPE basic.artificial_segment AS (
 
 DROP FUNCTION IF EXISTS basic.get_artificial_segments;
 CREATE OR REPLACE FUNCTION basic.get_artificial_segments(
-    edge_layer_project_id INT,
+    street_network_edge_layer_id UUID,
     network_modifications_table TEXT,
     origin_points_table TEXT,
     num_origin_points INT,
@@ -30,9 +30,8 @@ RETURNS SETOF basic.artificial_segment
 LANGUAGE plpgsql
 AS $function$
 DECLARE
-    edge_layer_id UUID := (SELECT layer_id FROM customer.layer_project WHERE id = edge_layer_project_id);
 	edge_network_table TEXT := 'user_data.street_network_line_' || REPLACE((
-		SELECT user_id FROM customer.layer WHERE id = edge_layer_id
+		SELECT user_id FROM customer.layer WHERE id = street_network_edge_layer_id
 	)::TEXT, '-', '');
 
     combined_network_table TEXT;
