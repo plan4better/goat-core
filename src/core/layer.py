@@ -265,14 +265,24 @@ class OGRExternalServiceFetching:
         # Initialize WFS data source
         wfs_data_source = ogr.Open(f"WFS:{str(self.url)}")
         if wfs_data_source is None:
-            raise Exception(f"Could not open WFS service at {self.url}")
+            raise ValueError(f"Could not open WFS service at {self.url}")
 
         # Get the specified layer
         input_layer = wfs_data_source.GetLayerByName(layer_name)
         if input_layer is None:
-            raise Exception(f"Could not find layer {layer_name} in WFS service.")
+            raise ValueError(f"Could not find layer {layer_name} in WFS service.")
 
-        geom_type = input_layer.GetGeomType()
+        input_layer_defn = input_layer.GetLayerDefn()
+        if input_layer_defn is None:
+            raise ValueError(f"Could not get layer definition for {layer_name}.")
+
+        # Process geometry field
+        if input_layer_defn.GetGeomFieldCount() != 1:
+            raise ValueError(
+                f"Layer {layer_name} must contain exactly one geometry field."
+            )
+
+        geom_type = input_layer_defn.GetGeomFieldDefn(0).GetType()
         if geom_type == ogr.wkbUnknown:
             first_feature = input_layer.GetNextFeature()
             if first_feature:
@@ -294,7 +304,6 @@ class OGRExternalServiceFetching:
             )
 
         # Create all remaining non-geometry columns
-        input_layer_defn = input_layer.GetLayerDefn()
         for i in range(input_layer_defn.GetFieldCount()):
             field_defn = input_layer_defn.GetFieldDefn(i)
             output_layer.CreateField(field_defn)
