@@ -51,6 +51,10 @@ RUN apt install --fix-missing --no-install-recommends -y \
 # Install gdal binaries
 RUN apt-get update && apt-get install -y python3-dev gdal-bin libgdal-dev
 
+# Install qgis
+RUN wget -O /etc/apt/keyrings/qgis-archive-keyring.gpg https://download.qgis.org/downloads/qgis-archive-keyring.gpg
+RUN printf "Types: deb deb-src\nURIs: https://qgis.org/debian\nSuites: %s\nArchitectures: amd64\nComponents: main\nSigned-By: /etc/apt/keyrings/qgis-archive-keyring.gpg\n" "$(lsb_release -cs)" | tee /etc/apt/sources.list.d/qgis.sources
+RUN apt-get update && apt-get install -y qgis python3-qgis
 
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python && \
@@ -72,3 +76,5 @@ COPY . /app
 
 
 CMD bash -c "Xvfb ${DISPLAY} -screen 0 '1024x768x24' -ac +extension GLX +render -noreset -nolisten tcp & exec uvicorn src.main:app --host 0.0.0.0 --port ${UVICORN_PORT}"
+
+ENV PYTHONPATH "${PYTHONPATH}:/usr/lib/python3/dist-packages"
