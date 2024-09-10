@@ -198,9 +198,16 @@ class FileUpload:
                         break
                     await buffer.write(chunk)
         else:
+            # Ensure a URL is specified
+            url = self.source.other_properties.url
+            if not url:
+                raise ValueError(
+                    "A URL must be specified under the 'url' key of other_properties."
+                )
+
             # Initialize OGR external service fetching
             fetch_layer_external_service = FetchLayerExternalService(
-                url=self.source.url, output_file=self.file_path
+                url=url, output_file=self.file_path
             )
 
             if self.source.data_type == FeatureDataType.wfs:
