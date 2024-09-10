@@ -23,6 +23,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import select, text
 from sqlmodel import SQLModel
 from starlette.datastructures import UploadFile
+from qgis.core import (
+    QgsVectorLayer,
+    QgsVectorFileWriter,
+    QgsProject,
+)
 
 # Local application imports
 from src.core.config import settings
@@ -53,6 +58,7 @@ from src.utils import (
     async_run_command,
     async_scandir,
     sanitize_error_message,
+    print_warning,
 )
 
 
@@ -193,7 +199,7 @@ class FileUpload:
                     await buffer.write(chunk)
         else:
             # Initialize OGR external service fetching
-            ogr_external_service_fetching = OGRExternalServiceFetching(
+            fetch_layer_external_service = FetchLayerExternalService(
                 url=self.source.url, output_file=self.file_path
             )
 
@@ -206,7 +212,7 @@ class FileUpload:
                     )
 
                 # Fetch the specified layer
-                ogr_external_service_fetching.fetch_wfs(layer_name=layers[0])
+                fetch_layer_external_service.fetch_wfs(layer_name=layers[0])
 
                 # Ensure the newly saved file does not exceed file size limits
                 if (
@@ -243,24 +249,60 @@ class FileUpload:
         await async_delete_dir(self.folder_path)
 
 
-class OGRExternalServiceFetching:
+class FetchLayerExternalService:
     def __init__(self, url: HttpUrl, output_file: str):
         self.url = url
+        self.output_file = output_file
 
-        # Initialize output GeoJSON data source
-        driver_type = OgrDriverType.geojson
-        output_driver = ogr.GetDriverByName(driver_type)
-        if output_driver is None:
-            raise Exception(f"{driver_type} driver is not available.")
-
-        self.output_data_source = output_driver.CreateDataSource(output_file)
-        if self.output_data_source is None:
-            raise Exception(f"Could not create output data source at {output_file}")
+        # Output driver to be used
+        self.output_driver_type = OgrDriverType.geojson.value
 
     def fetch_wfs(self, layer_name: str):
         """Fetch data from WFS service and save to disk."""
 
+        # First, attempt to fetch data using QGIS
+        try:
+            # Create vector layer containing features from the WFS source
+            uri = f"typename='{layer_name}' url='{self.url}'"
+            layer = QgsVectorLayer(uri, layer_name, "WFS")
+
+            if not layer.isValid():
+                raise ValueError(f"Unable to open layer: {layer_name}")
+
+            # Add layer to project and write to GeoJSON file
+            QgsProject.instance().addMapLayer(layer)
+            options = QgsVectorFileWriter.SaveVectorOptions()
+            options.driverName = self.output_driver_type
+            error = QgsVectorFileWriter.writeAsVectorFormatV2(
+                layer,
+                self.output_file,
+                QgsProject.instance().transformContext(),
+                options
+            )
+            # Remove layer from project
+            QgsProject.instance().removeMapLayer(layer)
+
+            if error[0] != QgsVectorFileWriter.NoError:
+                raise Exception(f"Unable to write GeoJSON file: {error[1]}")
+
+            return
+        except Exception as e:
+            print_warning(f"QGIS failed to fetch WFS data, falling back to OGR.")
+            print_warning(f"QGIS error: {e}")
+
+
+        # Second, attempt to fetch data using OGR
         ogr.UseExceptions()
+
+        # Initialize output GeoJSON driver
+        output_driver = ogr.GetDriverByName(self.output_driver_type)
+        if output_driver is None:
+            raise Exception(f"{self.output_driver_type} driver is not available.")
+
+        # Create output data source
+        self.output_data_source = output_driver.CreateDataSource(self.output_file)
+        if self.output_data_source is None:
+            raise Exception(f"Could not create output data source at {self.output_file}")
 
         # Initialize WFS data source
         wfs_data_source = ogr.Open(f"WFS:{str(self.url)}")
@@ -272,6 +314,7 @@ class OGRExternalServiceFetching:
         if input_layer is None:
             raise ValueError(f"Could not find layer {layer_name} in WFS service.")
 
+        # Get the layer definition
         input_layer_defn = input_layer.GetLayerDefn()
         if input_layer_defn is None:
             raise ValueError(f"Could not get layer definition for {layer_name}.")
@@ -430,9 +473,20 @@ class OGRFileHandling:
 
         if layer_def.GetGeomFieldCount() == 1:
             # Get geometry type of layer to upload to specify target table
-            geometry_type = ogr.GeometryTypeToName(layer_def.GetGeomType()).replace(
+            if layer_def.GetGeomType() != ogr.wkbUnknown:
+                geometry_type = layer_def.GetGeomType()
+            else:
+                first_feature = layer.GetNextFeature()
+                if first_feature:
+                    geometry_type = first_feature.GetGeometryRef().GetGeometryType()
+                else:
+                    raise Exception(
+                        "Could not determine geometry type for layer, no features exist."
+                    )
+            geometry_type = ogr.GeometryTypeToName(geometry_type).replace(
                 " ", "_"
             )
+
             # Strip the "Measured " from beginning of the the geometry type name
             geometry_type = geometry_type.replace("Measured_", "")
             # Strip "Z", "M", "ZM" or "25D" from the end of the geometry type name
