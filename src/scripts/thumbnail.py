@@ -5,7 +5,7 @@ from src.core.print import PrintMap
 from sqlalchemy import select, text
 from src.core.config import settings
 from src.db.models.layer import Layer
-from src.schemas.layer import LayerType
+from src.schemas.layer import LayerType, FeatureType
 from src.db.models.project import Project
 from src.db.session import session_manager
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -104,6 +104,13 @@ async def process_layers(async_session: AsyncSession, last_run: datetime):
             try:
                 layer = layer[0]
                 if layer.type in (LayerType.feature, LayerType.table):
+                    # If there is a feature_layer_type and it is street_network then skip the layer
+                    if (
+                        layer.feature_layer_type
+                        and layer.feature_layer_type == FeatureType.street_network
+                    ):
+                        continue
+
                     print(f"Updating thumbnail for layer: {layer.id}")
 
                     old_thumbnail_url = layer.thumbnail_url
