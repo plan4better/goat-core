@@ -11,7 +11,7 @@ from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from geoalchemy2.shape import WKTElement
 from pydantic import BaseModel
-from sqlalchemy import and_, func, or_, select, text, exists
+from sqlalchemy import and_, exists, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, selectinload
 from sqlmodel import SQLModel
@@ -33,9 +33,9 @@ from src.db.models import (
     Layer,
     LayerOrganizationLink,
     LayerTeamLink,
+    Organization,
     Role,
     Team,
-    Organization,
 )
 from src.schemas.error import (
     ColumnNotFoundError,
@@ -681,8 +681,12 @@ class CRUDLayer(CRUDLayerBase):
             )
             query = (
                 select(Layer)
-                .outerjoin(LayerTeamLink, LayerTeamLink.layer_id == Layer.id)  # Left join to include layers without team links
-                .outerjoin(LayerOrganizationLink, LayerOrganizationLink.layer_id == Layer.id)  # Left join to include layers without org links
+                .outerjoin(
+                    LayerTeamLink, LayerTeamLink.layer_id == Layer.id
+                )  # Left join to include layers without team links
+                .outerjoin(
+                    LayerOrganizationLink, LayerOrganizationLink.layer_id == Layer.id
+                )  # Left join to include layers without org links
                 .where(
                     and_(
                         *filters,  # Apply your other filters here
@@ -690,7 +694,9 @@ class CRUDLayer(CRUDLayerBase):
                 )
                 .options(
                     selectinload(Layer.team_links).selectinload(LayerTeamLink.team),
-                    selectinload(Layer.organization_links).selectinload(LayerOrganizationLink.organization),
+                    selectinload(Layer.organization_links).selectinload(
+                        LayerOrganizationLink.organization
+                    ),
                 )
             )
 
@@ -724,9 +730,9 @@ class CRUDLayer(CRUDLayerBase):
                 shared_with[shared_with_key].append(
                     {
                         "role": layer[1],
-                        "team_id": layer[3],
-                        "team_name": layer[2],
-                        "team_avatar": layer[4],
+                        "id": layer[3],
+                        "name": layer[2],
+                        "avatar": layer[4],
                     }
                 )
                 layers_arr.append({"layer": layer[0], "shared_with": shared_with})
@@ -737,18 +743,18 @@ class CRUDLayer(CRUDLayerBase):
                     shared_with["teams"].append(
                         {
                             "role": role_mapping[team_link.role_id],
-                            "team_id": team_link.team.id,
-                            "team_name": team_link.team.name,
-                            "team_avatar": team_link.team.avatar,
+                            "id": team_link.team.id,
+                            "name": team_link.team.name,
+                            "avatar": team_link.team.avatar,
                         }
                     )
                 for organization_link in layer.organization_links:
                     shared_with["organizations"].append(
                         {
                             "role": role_mapping[organization_link.role_id],
-                            "organization_id": organization_link.organization.id,
-                            "organization_name": organization_link.organization.name,
-                            "organization_avatar": organization_link.organization.avatar,
+                            "id": organization_link.organization.id,
+                            "name": organization_link.organization.name,
+                            "avatar": organization_link.organization.avatar,
                         }
                     )
                 layers_arr.append({"layer": layer, "shared_with": shared_with})
