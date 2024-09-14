@@ -492,10 +492,10 @@ async def test_get_shared_organization_layers(client: AsyncClient, fixture_creat
     assert len(response.json()["items"]) == 5
 
 # Get metadata aggregate for layers based on different filters
-async def test_get_catalog_layers(client: AsyncClient, fixture_create_catalog_layers):
-    response = await client.post(f"{settings.API_V2_STR}/layer/catalog")
+async def test_get_layers_with_shared(client: AsyncClient, fixture_create_shared_team_layers, fixture_create_shared_organization_layers):
+    response = await client.post(f"{settings.API_V2_STR}/layer")
     assert response.status_code == 200
-    assert len(response.json()["items"]) == 4
+    assert len(response.json()["items"]) == 10
 
 
 # Get metadata aggregate for layers based on different filters

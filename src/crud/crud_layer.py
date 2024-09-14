@@ -11,9 +11,9 @@ from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from geoalchemy2.shape import WKTElement
 from pydantic import BaseModel
-from sqlalchemy import and_, func, or_, select, text, cast
+from sqlalchemy import and_, func, or_, select, text, exists
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only, contains_eager
+from sqlalchemy.orm import contains_eager, selectinload
 from sqlmodel import SQLModel
 from starlette.datastructures import UploadFile
 
@@ -609,7 +609,12 @@ class CRUDLayer(CRUDLayerBase):
         # Get base filter
         filters = await self.get_base_filter(user_id=user_id, params=params)
 
-        # If it has team_id then do a join with the LayerTeamLink table
+        # Get roles
+        roles = await CRUDBase(Role).get_all(
+            async_session,
+        )
+        role_mapping = {role.id: role.name for role in roles}
+
         if team_id:
             query = (
                 select(Layer, Role.name, Team.name, Team.id, Team.avatar)
@@ -648,7 +653,46 @@ class CRUDLayer(CRUDLayerBase):
                 .options(contains_eager(Layer.organization_links))
             )
         else:
-            query = select(Layer).where(and_(*filters))
+            query = (
+                select(Layer)
+                .where(
+                    or_(
+                        exists().where(
+                            and_(
+                                LayerTeamLink.layer_id == Layer.id,
+                                LayerTeamLink.team_id.isnot(None),
+                            )
+                        ),
+                        exists().where(
+                            and_(
+                                LayerOrganizationLink.layer_id == Layer.id,
+                                LayerOrganizationLink.organization_id.isnot(None),
+                            )
+                        ),
+                    ),
+                    *filters,
+                )
+                .options(
+                    selectinload(Layer.team_links).selectinload(LayerTeamLink.team),
+                    selectinload(Layer.organization_links).selectinload(
+                        LayerOrganizationLink.organization
+                    ),
+                )
+            )
+            query = (
+                select(Layer)
+                .outerjoin(LayerTeamLink, LayerTeamLink.layer_id == Layer.id)  # Left join to include layers without team links
+                .outerjoin(LayerOrganizationLink, LayerOrganizationLink.layer_id == Layer.id)  # Left join to include layers without org links
+                .where(
+                    and_(
+                        *filters,  # Apply your other filters here
+                    )
+                )
+                .options(
+                    selectinload(Layer.team_links).selectinload(LayerTeamLink.team),
+                    selectinload(Layer.organization_links).selectinload(LayerOrganizationLink.organization),
+                )
+            )
 
         # Build params
         params = {
@@ -677,23 +721,37 @@ class CRUDLayer(CRUDLayerBase):
             for layer in layers.items:
                 # Check if layer[1] is of type LayerTeamLink
                 shared_with = {shared_with_key: []}
-                layer_obj = layer[0]
-                role = layer[1]
-                name = layer[2]
-                team_id = layer[3]
-                avatar = layer[4]
-
                 shared_with[shared_with_key].append(
                     {
-                        "role": role,
-                        "team_id": team_id,
-                        "team_name": name,
-                        "team_avatar": avatar,
+                        "role": layer[1],
+                        "team_id": layer[3],
+                        "team_name": layer[2],
+                        "team_avatar": layer[4],
                     }
                 )
-                layers_arr.append({"layer": layer_obj, "shared_with": shared_with})
+                layers_arr.append({"layer": layer[0], "shared_with": shared_with})
         else:
-            layers_arr = [{"layer": layer} for layer in layers.items]
+            for layer in layers.items:
+                shared_with = {"teams": [], "organizations": []}
+                for team_link in layer.team_links:
+                    shared_with["teams"].append(
+                        {
+                            "role": role_mapping[team_link.role_id],
+                            "team_id": team_link.team.id,
+                            "team_name": team_link.team.name,
+                            "team_avatar": team_link.team.avatar,
+                        }
+                    )
+                for organization_link in layer.organization_links:
+                    shared_with["organizations"].append(
+                        {
+                            "role": role_mapping[organization_link.role_id],
+                            "organization_id": organization_link.organization.id,
+                            "organization_name": organization_link.organization.name,
+                            "organization_avatar": organization_link.organization.avatar,
+                        }
+                    )
+                layers_arr.append({"layer": layer, "shared_with": shared_with})
 
         layers.items = layers_arr
         return layers
