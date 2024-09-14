@@ -23,7 +23,6 @@ from src.utils import build_where, optional
 ################################################################################
 class ProjectContentType(str, Enum):
     layer = "layer"
-    report = "report"
 
 
 class InitialViewState(BaseModel):

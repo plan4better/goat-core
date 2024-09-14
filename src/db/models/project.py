@@ -20,8 +20,7 @@ from src.db.models._base_class import DateTimeBase
 from src.db.models.layer import ContentBaseAttributes
 
 if TYPE_CHECKING:
-    from _link_model import LayerProjectLink, UserProjectLink
-    from .report import Report
+    from _link_model import LayerProjectLink, UserProjectLink, ProjectTeamLink, ProjectOrganizationLink
     from .scenario import Scenario
 
 
@@ -74,10 +73,6 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         default=settings.DEFAULT_PROJECT_THUMBNAIL,
     )
     # Relationships
-    reports: List["Report"] = Relationship(
-        back_populates="project",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
     user_projects: List["UserProjectLink"] = Relationship(
         back_populates="project",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
@@ -90,6 +85,13 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         back_populates="project",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
-
+    team_links: List["ProjectTeamLink"] = Relationship(
+        back_populates="project",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+    organization_links: List["ProjectOrganizationLink"] = Relationship(
+        back_populates="project",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
 
 UniqueConstraint(Project.__table__.c.folder_id, Project.__table__.c.name)

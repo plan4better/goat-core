@@ -26,8 +26,7 @@ from src.db.models._base_class import ContentBaseAttributes, DateTimeBase
 
 if TYPE_CHECKING:
     from src.db.models.folder import Folder
-
-    from ._link_model import LayerProjectLink
+    from ._link_model import LayerProjectLink, LayerOrganizationLink, LayerTeamLink
     from .data_store import DataStore
 
 
@@ -448,6 +447,12 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         back_populates="layer", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
     folder: "Folder" = Relationship(back_populates="layers")
+    organization_links: List["LayerOrganizationLink"] = Relationship(
+        back_populates="layer", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    team_links: List["LayerTeamLink"] = Relationship(
+        back_populates="layer", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
     @validator("extent", pre=True)
     def wkt_to_geojson(cls, v):

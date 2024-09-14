@@ -15,6 +15,7 @@ class SyncPostgresDsn(PostgresDsn):
 
 
 class Settings(BaseSettings):
+    AUTH: Optional[bool] = False
     TEST_MODE: Optional[bool] = False
     ENVIRONMENT: Optional[str] = "dev"
     API_V2_STR: str = "/api/v2"
@@ -23,6 +24,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: Optional[str] = "GOAT Core API"
     USER_DATA_SCHEMA: Optional[str] = "user_data"
     CUSTOMER_SCHEMA: Optional[str] = "customer"
+    ACCOUNTS_SCHEMA: Optional[str] = "accounts"
     REGION_MAPPING_PT_TABLE: Optional[str] = "basic.region_mapping_pt"
     BASE_STREET_NETWORK: Optional[UUID] = "903ecdca-b717-48db-bbce-0219e41439cf"
     STREET_NETWORK_EDGE_DEFAULT_LAYER_PROJECT_ID = 36126
@@ -176,5 +178,4 @@ class Settings(BaseSettings):
         case_sensitive = True
 
 
-settings = Settings()
 settings = Settings()

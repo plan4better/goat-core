@@ -144,6 +144,7 @@ class ScenarioFeature(DateTimeBase, UserData, table=True):
     edit_type: ScenarioFeatureEditType = Field(
         sa_column=Column(Text, nullable=False), description="Type of the edit"
     )
+
     # Relationships
     layer_project: "LayerProjectLink" = Relationship(back_populates="scenario_features")
 

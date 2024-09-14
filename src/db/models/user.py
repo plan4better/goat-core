@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from .job import Job
     from .scenario import Scenario
     from .system_setting import SystemSetting
+    #from ._link_model import UserTeamLink
 
 
 class User(SQLModel, table=True):
@@ -36,3 +37,6 @@ class User(SQLModel, table=True):
     jobs: List["Job"] = Relationship(
         back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
+    # team_links: List["UserTeamLink"] = Relationship(
+    #     back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    # )

@@ -64,7 +64,7 @@ async def create_project(
         ..., example=project_request_examples["create"], description="Project to create"
     ),
 ):
-    """This will create an empty project with a default initial view state. The project does not contains layers or reports."""
+    """This will create an empty project with a default initial view state. The project does not contains layers."""
 
     # Create project
     return await crud_project.create(
@@ -138,37 +138,6 @@ async def read_projects(
     )
 
     return projects
-
-
-@router.post(
-    "/get-by-ids",
-    summary="Retrieve a list of projects by their IDs",
-    response_model=Page[IProjectRead],
-    response_model_exclude_none=True,
-    status_code=200,
-)
-async def read_projects_by_ids(
-    async_session: AsyncSession = Depends(get_db),
-    page_params: PaginationParams = Depends(),
-    user_id: UUID4 = Depends(get_user_id),
-    ids: ContentIdList = Body(
-        ...,
-        example=project_request_examples["get"],
-        description="List of project IDs to retrieve",
-    ),
-):
-    """Retrieve a list of projects by their IDs."""
-
-    # Get projects by ids
-    projects = await crud_project.get_projects(
-        async_session=async_session,
-        user_id=user_id,
-        page_params=page_params,
-        ids=ids.ids,
-    )
-
-    return projects
-
 
 @router.put(
     "/{project_id}",

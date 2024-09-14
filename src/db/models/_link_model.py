@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 from uuid import UUID
 
 from sqlalchemy.dialects.postgresql import JSONB
@@ -14,12 +14,18 @@ from sqlmodel import (
 )
 
 from src.db.models._base_class import DateTimeBase
-
+from src.core.config import settings
+from sqlmodel import SQLModel
+from src.db.models.organization import Organization
 if TYPE_CHECKING:
     from .layer import Layer
     from .project import Project
     from .scenario import Scenario
     from .scenario_feature import ScenarioFeature
+    from .user import User
+    from .team import Team
+    from .role import Role
+    from src.db.models.organization import Organization
 
 
 class LayerProjectLink(DateTimeBase, table=True):
@@ -136,3 +142,200 @@ class UserProjectLink(DateTimeBase, table=True):
 UniqueConstraint(
     UserProjectLink.project_id, UserProjectLink.user_id, name="unique_user_project"
 )
+
+
+# class UserTeamLink(SQLModel, table=True):
+#     """
+#     A table representing the relation between users and teams.
+
+#     Attributes:
+#         id (int): The unique identifier for the user team.
+#         team_id (str): The unique identifier for the team the user belongs to.
+#         user_id (str): The unique identifier for the user that belongs to the team.
+#     """
+
+#     __tablename__ = "user_team"
+#     __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+
+#     id: Optional[int] = Field(
+#         sa_column=Column(Integer, primary_key=True, autoincrement=True)
+#     )
+#     team_id: UUID = Field(
+#         sa_column=Column(
+#             UUID_PG(as_uuid=True),
+#             ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.team.id", ondelete="CASCADE"),
+#             nullable=False,
+#         )
+#     )
+#     user_id: UUID = Field(
+#         sa_column=Column(
+#             UUID_PG(as_uuid=True),
+#             ForeignKey(f"{settings.CUSTOMER_SCHEMA}.user.id", ondelete="CASCADE"),
+#             nullable=False,
+#         )
+#     )
+
+#     Relationships
+#     user: "User" = Relationship(back_populates="team_links")
+#     team: "Team" = Relationship(back_populates="user_links")
+
+
+class LayerOrganizationLink(SQLModel, table=True):
+    """
+    A table representing the relation between layers and organizations.
+
+    Attributes:
+        id (int): The unique identifier for the layer organization.
+        organization_id (str): The unique identifier for the organization the layer belongs to.
+        layer_id (str): The unique identifier for the layer that belongs to the organization.
+    """
+
+    __tablename__ = "layer_organization"
+    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+
+    id: Optional[int] = Field(
+        sa_column=Column(Integer, primary_key=True, autoincrement=True)
+    )
+    organization_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(
+                f"{settings.ACCOUNTS_SCHEMA}.organization.id", ondelete="CASCADE"
+            ),
+            nullable=False,
+        )
+    )
+    layer_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.layer.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    role_id: UUID = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.role.id"),
+            nullable=False,
+        )
+    )
+
+    # Relationships
+    layer: "Layer" = Relationship(back_populates="organization_links")
+    organization: "Organization" = Relationship(back_populates="layer_links")
+
+
+class LayerTeamLink(SQLModel, table=True):
+    """
+    A table representing the relation between layers and teams.
+
+    Attributes:
+        id (int): The unique identifier for the layer team.
+        team_id (str): The unique identifier for the team the layer belongs to.
+        layer_id (str): The unique identifier for the layer that belongs to the team.
+    """
+
+    __tablename__ = "layer_team"
+    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+
+    id: Optional[int] = Field(
+        sa_column=Column(Integer, primary_key=True, autoincrement=True)
+    )
+    team_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.team.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    layer_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.layer.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    role_id: UUID = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.role.id"),
+            nullable=False,
+        )
+    )
+
+    # Relationships
+    layer: "Layer" = Relationship(back_populates="team_links")
+    team: "Team" = Relationship(back_populates="layer_links")
+
+
+class ProjectTeamLink(SQLModel, table=True):
+    """
+    A table representing the relation between projects and teams.
+
+    Attributes:
+        id (int): The unique identifier for the project team.
+        team_id (str): The unique identifier for the team the project belongs to.
+        project_id (str): The unique identifier for the project that belongs to the team.
+    """
+
+    __tablename__ = "project_team"
+    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+
+    id: Optional[int] = Field(
+        sa_column=Column(Integer, primary_key=True, autoincrement=True)
+    )
+    team_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.team.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    project_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.project.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+
+    # Relationships
+    project: "Project" = Relationship(back_populates="team_links")
+    team: "Team" = Relationship(back_populates="project_links")
+
+class ProjectOrganizationLink(SQLModel, table=True):
+    """
+    A table representing the relation between projects and organizations.
+
+    Attributes:
+        id (int): The unique identifier for the project organization.
+        organization_id (str): The unique identifier for the organization the project belongs to.
+        project_id (str): The unique identifier for the project that belongs to the organization.
+    """
+
+    __tablename__ = "project_organization"
+    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+
+    id: Optional[int] = Field(
+        sa_column=Column(Integer, primary_key=True, autoincrement=True)
+    )
+    organization_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(
+                f"{settings.ACCOUNTS_SCHEMA}.organization.id", ondelete="CASCADE"
+            ),
+            nullable=False,
+        )
+    )
+    project_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.project.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+
+    # Relationships
+    project: "Project" = Relationship(back_populates="organization_links")
+    organization: "Organization" = Relationship(back_populates="project_links")

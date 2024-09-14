@@ -55,6 +55,7 @@ from src.schemas.layer import (
     ILayerFromDatasetCreate,
     ILayerGet,
     ILayerRead,
+    ILayerReadShared,
     IMetadataAggregate,
     IMetadataAggregateRead,
     IRasterCreate,
@@ -367,35 +368,9 @@ async def read_layer(
         async_session=async_session, id=layer_id, model=Layer, crud_content=crud_layer
     )
 
-
-@router.post(
-    "/get-by-ids",
-    summary="Retrieve a list of layers by their IDs",
-    response_model=Page[ILayerRead],
-    response_model_exclude_none=True,
-    status_code=200,
-)
-async def read_layers_by_ids(
-    async_session: AsyncSession = Depends(get_db),
-    page_params: PaginationParams = Depends(),
-    ids: ContentIdList = Body(
-        ...,
-        example=layer_request_examples["get"],
-        description="List of layer IDs to retrieve",
-    ),
-):
-    return await read_contents_by_ids(
-        async_session=async_session,
-        ids=ids,
-        model=Layer,
-        crud_content=crud_layer,
-        page_params=page_params,
-    )
-
-
 @router.post(
     "",
-    response_model=Page[ILayerRead],
+    response_model=Page[ILayerReadShared],
     response_model_exclude_none=True,
     status_code=200,
     summary="Retrieve a list of layers using different filters including a spatial filter. If not filter is specified, all layers will be returned.",
@@ -408,6 +383,16 @@ async def read_layers(
         None,
         examples={},
         description="Layer to get",
+    ),
+    team_id: UUID | None = Query(
+        None,
+        description="The ID of the team to get the layers from",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    organization_id: UUID | None = Query(
+        None,
+        description="The ID of the organization to get the layers from",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
     order_by: str = Query(
         None,
@@ -423,6 +408,10 @@ async def read_layers(
     """This endpoints returns a list of layers based one the specified filters."""
 
     with HTTPErrorHandler():
+        # Make sure that team_id and organization_id are not both set
+        if team_id is not None and organization_id is not None:
+            raise ValueError("Only one of team_id and organization_id can be set.")
+
         # Get layers from CRUD
         layers = await crud_layer.get_layers_with_filter(
             async_session=async_session,
@@ -431,6 +420,8 @@ async def read_layers(
             order_by=order_by,
             order=order,
             page_params=page_params,
+            team_id=team_id,
+            organization_id=organization_id,
         )
     return layers
 
