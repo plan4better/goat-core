@@ -635,6 +635,7 @@ class CRUDLayer(CRUDLayerBase):
         )
         role_mapping = {role.id: role.name for role in roles}
 
+        # Build query
         query = create_query_shared_content(
             Layer,
             LayerTeamLink,
@@ -663,8 +664,8 @@ class CRUDLayer(CRUDLayerBase):
             **params,
         )
         layers_arr = build_shared_with_object(
-            layers.items,
-            role_mapping,
+            items=layers.items,
+            role_mapping=role_mapping,
             team_key="team_links",
             org_key="organization_links",
             model_name="layer",

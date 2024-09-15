@@ -55,7 +55,6 @@ from src.schemas.layer import (
     ILayerFromDatasetCreate,
     ILayerGet,
     ILayerRead,
-    ILayerReadShared,
     IMetadataAggregate,
     IMetadataAggregateRead,
     IRasterCreate,

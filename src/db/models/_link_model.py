@@ -9,29 +9,29 @@ from sqlmodel import (
     ForeignKey,
     Integer,
     Relationship,
+    SQLModel,
     Text,
     UniqueConstraint,
 )
 
-from src.db.models._base_class import DateTimeBase
 from src.core.config import settings
-from sqlmodel import SQLModel
+from src.db.models._base_class import DateTimeBase
 from src.db.models.organization import Organization
 
 if TYPE_CHECKING:
+    from src.db.models.organization import Organization
+
     from .layer import Layer
     from .project import Project
     from .scenario import Scenario
     from .scenario_feature import ScenarioFeature
-    from .user import User
     from .team import Team
-    from .role import Role
-    from src.db.models.organization import Organization
+    from .user import User
 
 
 class LayerProjectLink(DateTimeBase, table=True):
     __tablename__ = "layer_project"
-    __table_args__ = {"schema": "customer"}
+    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
 
     id: int | None = Field(
         sa_column=Column(Integer, primary_key=True, autoincrement=True)
@@ -43,13 +43,15 @@ class LayerProjectLink(DateTimeBase, table=True):
     )
     layer_id: UUID = Field(
         sa_column=Column(
-            UUID_PG(as_uuid=True), ForeignKey("customer.layer.id", ondelete="CASCADE")
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.layer.id", ondelete="CASCADE"),
         ),
         description="Layer ID",
     )
     project_id: UUID = Field(
         sa_column=Column(
-            UUID_PG(as_uuid=True), ForeignKey("customer.project.id", ondelete="CASCADE")
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.project.id", ondelete="CASCADE"),
         ),
         description="Project ID",
     )
@@ -84,7 +86,7 @@ class LayerProjectLink(DateTimeBase, table=True):
 
 class ScenarioScenarioFeatureLink(DateTimeBase, table=True):
     __tablename__ = "scenario_scenario_feature"
-    __table_args__ = {"schema": "customer"}
+    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
 
     id: int | None = Field(
         sa_column=Column(Integer, primary_key=True, autoincrement=True)
@@ -92,7 +94,7 @@ class ScenarioScenarioFeatureLink(DateTimeBase, table=True):
     scenario_id: UUID | None = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey("customer.scenario.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.scenario.id", ondelete="CASCADE"),
             primary_key=True,
             nullable=False,
         ),
@@ -101,7 +103,9 @@ class ScenarioScenarioFeatureLink(DateTimeBase, table=True):
     scenario_feature_id: UUID | None = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey("customer.scenario_feature.id", ondelete="CASCADE"),
+            ForeignKey(
+                f"{settings.CUSTOMER_SCHEMA}.scenario_feature.id", ondelete="CASCADE"
+            ),
             primary_key=True,
             nullable=False,
         ),
@@ -114,20 +118,22 @@ class ScenarioScenarioFeatureLink(DateTimeBase, table=True):
 
 class UserProjectLink(DateTimeBase, table=True):
     __tablename__ = "user_project"
-    __table_args__ = {"schema": "customer"}
+    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
 
     id: int | None = Field(
         sa_column=Column(Integer, primary_key=True, autoincrement=True)
     )
     user_id: UUID = Field(
         sa_column=Column(
-            UUID_PG(as_uuid=True), ForeignKey("customer.user.id", ondelete="CASCADE")
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
         ),
         description="User ID",
     )
     project_id: UUID = Field(
         sa_column=Column(
-            UUID_PG(as_uuid=True), ForeignKey("customer.project.id", ondelete="CASCADE")
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.project.id", ondelete="CASCADE"),
         ),
         description="Project ID",
     )
@@ -171,7 +177,7 @@ class UserTeamLink(SQLModel, table=True):
     user_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
             nullable=False,
         )
     )

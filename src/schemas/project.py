@@ -72,6 +72,7 @@ class IProjectRead(ContentBaseAttributes, DateTimeBase):
     thumbnail_url: HttpUrl | None = Field(description="Project thumbnail URL")
     active_scenario_id: UUID | None = Field(None, description="Active scenario ID")
     shared_with: dict | None = Field(None, description="Shared with")
+    owned_by: dict | None = Field(None, description="Owned by")
 
 
 @optional

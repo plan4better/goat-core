@@ -132,6 +132,7 @@ class LayerReadBaseAttributes(BaseModel):
     shared_with: dict | None = Field(
         None, description="List of user IDs the layer is shared with"
     )
+    owned_by: dict | None = Field(None, description="User ID of the owner")
 
 
 class LayerProperties(BaseModel):
@@ -506,6 +507,7 @@ class ILayerRead(BaseModel):
             **kwargs,
         )
         return layer_read_class(**kwargs)
+
 
 class ILayerReadShared(BaseModel):
     def __new__(cls, *args, **kwargs):

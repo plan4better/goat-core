@@ -7,23 +7,29 @@ from sqlmodel import (
     Field,
     Relationship,
     SQLModel,
+    Text,
 )
+from src.core.config import settings
 
 if TYPE_CHECKING:
+    from ._link_model import UserTeamLink
     from .folder import Folder
     from .job import Job
     from .scenario import Scenario
     from .system_setting import SystemSetting
-    from ._link_model import UserTeamLink
 
 
 class User(SQLModel, table=True):
     __tablename__ = "user"
-    __table_args__ = {"schema": "customer"}
+    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
 
     id: UUID = Field(
         sa_column=Column(UUID_PG(as_uuid=True), primary_key=True, nullable=False)
     )
+    firstname: str = Field(sa_column=Column(Text, nullable=True))
+    lastname: str = Field(sa_column=Column(Text, nullable=True))
+    avatar: str = Field(sa_column=Column(Text, nullable=True))
+
     # Relationships
     scenarios: List["Scenario"] = Relationship(
         back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}

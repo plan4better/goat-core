@@ -8,10 +8,19 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy import text
+from jose import jwt
 
 # Local application imports
 from src.core.config import settings
-from src.db.models import LayerTeamLink, LayerOrganizationLink, Role, Team, Organization, ProjectTeamLink, ProjectOrganizationLink
+from src.db.models import (
+    LayerOrganizationLink,
+    LayerTeamLink,
+    Organization,
+    ProjectTeamLink,
+    Role,
+    Team,
+    User,
+)
 from src.db.models.layer import LayerType
 from src.endpoints.deps import get_db, session_manager
 from src.main import app
@@ -26,6 +35,7 @@ from src.schemas.layer import request_examples as layer_request_examples
 from src.schemas.project import (
     request_examples as project_request_examples,
 )
+from src.crud.base import CRUDBase
 from tests.utils import (
     check_job_status,
     check_user_data_deleted,
@@ -108,13 +118,29 @@ async def db_session():
 
 
 @pytest.fixture
-async def fixture_create_user(client: AsyncClient):
-    # Setup: Create the user
-    response = await client.post(f"{settings.API_V2_STR}/user")
-    user = response.json()
-    yield user
+async def fixture_create_user(client: AsyncClient, db_session):
+    # Get base user_id
+    scheme, _, token = settings.SAMPLE_AUTHORIZATION.partition(" ")
+    user_id = jwt.get_unverified_claims(token)["sub"]
+
+    # Create a user
+    user = User(
+        id=user_id,
+        firstname="Green",
+        lastname="GOAT",
+        avatar="https://assets.plan4better.de/img/goat_app_subscription_professional.jpg",
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    # Setup: Create user data schemas
+    result = await client.post(f"{settings.API_V2_STR}/user/data-schema")
+    assert result.status_code == 201
+    yield user.id
     # Teardown: Delete the user after the test
-    await client.delete(f"{settings.API_V2_STR}/user")
+    await CRUDBase(User).delete(db_session, id=user_id)
+    await client.delete(f"{settings.API_V2_STR}/user/data-schema")
 
 
 @pytest.fixture
@@ -1094,7 +1120,7 @@ async def fixture_create_shared_team_layers(
     team2 = Team(name="test_team2", avatar="https://www.plan4better.de/logo.png")
 
     # Create role
-    role = Role(name="team_member")
+    role = Role(name="team-member")
     db_session.add(role)
     await db_session.commit()
     await db_session.refresh(role)
@@ -1167,6 +1193,7 @@ async def fixture_create_shared_organization_layers(
 
     return {"organizations": [organization1, organization2], "layers": layers}
 
+
 @pytest.fixture
 async def fixture_create_shared_team_projects(
     client: AsyncClient, fixture_create_folder, fixture_create_projects, db_session
@@ -1180,7 +1207,7 @@ async def fixture_create_shared_team_projects(
     team2 = Team(name="test_team2", avatar="https://www.plan4better.de/logo.png")
 
     # Create role
-    role = Role(name="team_member")
+    role = Role(name="team-member")
     db_session.add(role)
     await db_session.commit()
     await db_session.refresh(role)

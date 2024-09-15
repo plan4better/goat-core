@@ -23,8 +23,8 @@ from sqlmodel import (
     Text,
     text,
 )
-
 from ._base_class import DateTimeBase
+from src.core.config import settings
 
 if TYPE_CHECKING:
     from ._link_model import LayerProjectLink, ScenarioScenarioFeatureLink
@@ -108,7 +108,7 @@ class ScenarioFeature(DateTimeBase, UserData, table=True):
     """Layer model."""
 
     __tablename__ = "scenario_feature"
-    __table_args__ = {"schema": "customer"}
+    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
 
     id: UUID | None = Field(
         sa_column=Column(
@@ -125,7 +125,9 @@ class ScenarioFeature(DateTimeBase, UserData, table=True):
     layer_project_id: int | None = Field(
         sa_column=Column(
             Integer,
-            ForeignKey("customer.layer_project.id", ondelete="CASCADE"),
+            ForeignKey(
+                f"{settings.CUSTOMER_SCHEMA}.layer_project.id", ondelete="CASCADE"
+            ),
             nullable=False,
         ),
         description="Project layer ID",

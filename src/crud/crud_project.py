@@ -92,7 +92,7 @@ class CRUDProject(CRUDBase):
     ) -> Page[IProjectRead]:
         """Get projects for a user and folder"""
 
-        # If ids are provided apply filter by ids, otherwise apply filter by folder_id and user_id
+        # Build query and filters
         if team_id or organization_id:
             filters = []
         elif folder_id:
@@ -134,8 +134,8 @@ class CRUDProject(CRUDBase):
             order=order,
         )
         projects.items = build_shared_with_object(
-            projects.items,
-            role_mapping,
+            items=projects.items,
+            role_mapping=role_mapping,
             team_key="team_links",
             org_key="organization_links",
             model_name="project",
