@@ -31,8 +31,6 @@ class Role(DateTimeBase, table=True):
     Attributes:
         id (str): The unique identifier for the role.
         name (str): The name of the role.
-        permissions (List[Permission]): A list of permission objects associated with the role. This is a relation to the permission table.
-        users (List[User]): A list of user objects associated with the role. This is a relation to the
     """
 
     __tablename__ = "role"
