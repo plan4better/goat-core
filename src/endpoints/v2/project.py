@@ -113,6 +113,16 @@ async def read_projects(
     page_params: PaginationParams = Depends(),
     folder_id: UUID4 | None = Query(None, description="Folder ID"),
     user_id: UUID4 = Depends(get_user_id),
+    team_id: UUID | None = Query(
+        None,
+        description="The ID of the team to get the layers from",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    organization_id: UUID | None = Query(
+        None,
+        description="The ID of the organization to get the layers from",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
     search: str = Query(None, description="Searches the name of the project"),
     order_by: str = Query(
         None,
@@ -135,6 +145,8 @@ async def read_projects(
         search=search,
         order_by=order_by,
         order=order,
+        team_id=team_id,
+        organization_id=organization_id,
     )
 
     return projects

@@ -11,7 +11,7 @@ from sqlalchemy import text
 
 # Local application imports
 from src.core.config import settings
-from src.db.models import LayerTeamLink, LayerOrganizationLink, Role, Team, Organization
+from src.db.models import LayerTeamLink, LayerOrganizationLink, Role, Team, Organization, ProjectTeamLink, ProjectOrganizationLink
 from src.db.models.layer import LayerType
 from src.endpoints.deps import get_db, session_manager
 from src.main import app
@@ -1166,6 +1166,45 @@ async def fixture_create_shared_organization_layers(
     await db_session.commit()
 
     return {"organizations": [organization1, organization2], "layers": layers}
+
+@pytest.fixture
+async def fixture_create_shared_team_projects(
+    client: AsyncClient, fixture_create_folder, fixture_create_projects, db_session
+):
+
+    # Create projects
+    projects = fixture_create_projects
+
+    # Create a team
+    team1 = Team(name="test_team", avatar="https://www.plan4better.de/logo.png")
+    team2 = Team(name="test_team2", avatar="https://www.plan4better.de/logo.png")
+
+    # Create role
+    role = Role(name="team_member")
+    db_session.add(role)
+    await db_session.commit()
+    await db_session.refresh(role)
+
+    # Create layer team links
+    project_teams1 = []
+    project_teams2 = []
+    for project in projects:
+        project_team1 = ProjectTeamLink(
+            project_id=project["id"], team_id=team1.id, role_id=role.id
+        )
+        project_team2 = ProjectTeamLink(
+            project_id=project["id"], team_id=team2.id, role_id=role.id
+        )
+        project_teams1.append(project_team1)
+        project_teams2.append(project_team2)
+
+    team1.project_links = project_teams1
+    team2.project_links = project_teams2
+    db_session.add(team1)
+    db_session.add(team2)
+    await db_session.commit()
+
+    return {"teams": [team1, team2], "projects": projects}
 
 
 fixture_catchment_area_active_mobility = create_generic_toolbox_fixture(

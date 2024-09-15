@@ -17,6 +17,7 @@ from src.db.models._base_class import DateTimeBase
 from src.core.config import settings
 from sqlmodel import SQLModel
 from src.db.models.organization import Organization
+
 if TYPE_CHECKING:
     from .layer import Layer
     from .project import Project
@@ -144,40 +145,40 @@ UniqueConstraint(
 )
 
 
-# class UserTeamLink(SQLModel, table=True):
-#     """
-#     A table representing the relation between users and teams.
+class UserTeamLink(SQLModel, table=True):
+    """
+    A table representing the relation between users and teams.
 
-#     Attributes:
-#         id (int): The unique identifier for the user team.
-#         team_id (str): The unique identifier for the team the user belongs to.
-#         user_id (str): The unique identifier for the user that belongs to the team.
-#     """
+    Attributes:
+        id (int): The unique identifier for the user team.
+        team_id (str): The unique identifier for the team the user belongs to.
+        user_id (str): The unique identifier for the user that belongs to the team.
+    """
 
-#     __tablename__ = "user_team"
-#     __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __tablename__ = "user_team"
+    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
 
-#     id: Optional[int] = Field(
-#         sa_column=Column(Integer, primary_key=True, autoincrement=True)
-#     )
-#     team_id: UUID = Field(
-#         sa_column=Column(
-#             UUID_PG(as_uuid=True),
-#             ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.team.id", ondelete="CASCADE"),
-#             nullable=False,
-#         )
-#     )
-#     user_id: UUID = Field(
-#         sa_column=Column(
-#             UUID_PG(as_uuid=True),
-#             ForeignKey(f"{settings.CUSTOMER_SCHEMA}.user.id", ondelete="CASCADE"),
-#             nullable=False,
-#         )
-#     )
+    id: Optional[int] = Field(
+        sa_column=Column(Integer, primary_key=True, autoincrement=True)
+    )
+    team_id: UUID = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.team.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    user_id: UUID = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.user.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
 
-#     Relationships
-#     user: "User" = Relationship(back_populates="team_links")
-#     team: "Team" = Relationship(back_populates="user_links")
+    # Relationships
+    user: "User" = Relationship(back_populates="team_links")
+    team: "Team" = Relationship(back_populates="user_links")
 
 
 class LayerOrganizationLink(SQLModel, table=True):
@@ -298,10 +299,18 @@ class ProjectTeamLink(SQLModel, table=True):
             nullable=False,
         )
     )
+    role_id: UUID = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.role.id"),
+            nullable=False,
+        )
+    )
 
     # Relationships
     project: "Project" = Relationship(back_populates="team_links")
     team: "Team" = Relationship(back_populates="project_links")
+
 
 class ProjectOrganizationLink(SQLModel, table=True):
     """
@@ -332,6 +341,13 @@ class ProjectOrganizationLink(SQLModel, table=True):
         sa_column=Column(
             UUID_PG(as_uuid=True),
             ForeignKey(f"{settings.CUSTOMER_SCHEMA}.project.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    role_id: UUID = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.role.id"),
             nullable=False,
         )
     )

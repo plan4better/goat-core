@@ -71,6 +71,7 @@ class IProjectRead(ContentBaseAttributes, DateTimeBase):
     layer_order: list[int] | None = Field(None, description="Layer order in project")
     thumbnail_url: HttpUrl | None = Field(description="Project thumbnail URL")
     active_scenario_id: UUID | None = Field(None, description="Active scenario ID")
+    shared_with: dict | None = Field(None, description="Shared with")
 
 
 @optional

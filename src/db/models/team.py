@@ -7,7 +7,7 @@ from uuid import UUID
 from src.core.config import settings
 
 if TYPE_CHECKING:
-    from ._link_model import LayerTeamLink, ProjectTeamLink
+    from ._link_model import LayerTeamLink, ProjectTeamLink, UserTeamLink
 
 class Team(DateTimeBase, table=True):
     """
@@ -34,5 +34,8 @@ class Team(DateTimeBase, table=True):
         back_populates="team", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
     project_links: List["ProjectTeamLink"] = Relationship(
+        back_populates="team", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    user_links: List["UserTeamLink"] = Relationship(
         back_populates="team", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )

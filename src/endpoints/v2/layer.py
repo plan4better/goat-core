@@ -370,7 +370,7 @@ async def read_layer(
 
 @router.post(
     "",
-    response_model=Page[ILayerReadShared],
+    response_model=Page[ILayerRead],
     response_model_exclude_none=True,
     status_code=200,
     summary="Retrieve a list of layers using different filters including a spatial filter. If not filter is specified, all layers will be returned.",
