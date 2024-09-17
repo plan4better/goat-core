@@ -1,10 +1,23 @@
 from typing import List
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status, BackgroundTasks
+
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    status,
+)
 from pydantic import UUID4
-from sqlalchemy import select, func
+from sqlalchemy import func, select
+
+from src.core.config import settings
 from src.crud.crud_folder import folder as crud_folder
 from src.db.models.folder import Folder
 from src.db.session import AsyncSession
+from src.deps.auth import auth_z
 from src.endpoints.deps import get_db, get_user_id
 from src.schemas.common import OrderEnum
 from src.schemas.folder import (
@@ -15,7 +28,6 @@ from src.schemas.folder import (
 from src.schemas.folder import (
     request_examples as folder_request_examples,
 )
-from src.core.config import settings
 
 router = APIRouter()
 
@@ -26,6 +38,7 @@ router = APIRouter()
     summary="Create a new folder",
     response_model=FolderRead,
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def create_folder(
     *,
@@ -57,6 +70,7 @@ async def create_folder(
     summary="Retrieve a folder by its ID",
     response_model=FolderRead,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def read_folder(
     *,
@@ -87,6 +101,7 @@ async def read_folder(
     response_model=List[FolderRead],
     response_model_exclude_none=True,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def read_folders(
     *,
@@ -123,6 +138,7 @@ async def read_folders(
     summary="Update a folder with new data",
     response_model=FolderUpdate,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def update_folder(
     *,
@@ -154,6 +170,7 @@ async def update_folder(
     summary="Delete a folder and all its contents",
     response_model=None,
     status_code=204,
+    dependencies=[Depends(auth_z)],
 )
 async def delete_folder(
     *,
@@ -168,5 +185,7 @@ async def delete_folder(
 ):
     """Delete a folder and all its contents"""
 
-    await crud_folder.delete(async_session, background_tasks=background_tasks, id=folder_id, user_id=user_id)
+    await crud_folder.delete(
+        async_session, background_tasks=background_tasks, id=folder_id, user_id=user_id
+    )
     return

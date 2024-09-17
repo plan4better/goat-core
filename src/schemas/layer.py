@@ -129,6 +129,10 @@ class LayerReadBaseAttributes(BaseModel):
     id: UUID = Field(..., description="Content ID of the layer", alias="id")
     user_id: UUID = Field(..., description="User ID of the owner")
     type: LayerType = Field(..., description="Layer type")
+    shared_with: dict | None = Field(
+        None, description="List of user IDs the layer is shared with"
+    )
+    owned_by: dict | None = Field(None, description="User ID of the owner")
 
 
 class LayerProperties(BaseModel):
@@ -503,6 +507,18 @@ class ILayerRead(BaseModel):
             **kwargs,
         )
         return layer_read_class(**kwargs)
+
+
+class ILayerReadShared(BaseModel):
+    def __new__(cls, *args, **kwargs):
+        layer = kwargs["layer"]
+        shared_with = kwargs.get("shared_with", None)
+        layer_read_class = get_layer_class(
+            "read",
+            layer_creator_class,
+            **layer,
+        )
+        return layer_read_class(**layer, shared_with=shared_with)
 
 
 class ILayerUpdate(BaseModel):

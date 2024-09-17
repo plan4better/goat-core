@@ -10,8 +10,8 @@ from sqlmodel import (
     Text,
     text,
 )
-
 from ._base_class import DateTimeBase
+from src.core.config import settings
 
 if TYPE_CHECKING:
     from ._link_model import ScenarioScenarioFeatureLink
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 class Scenario(DateTimeBase, table=True):
     __tablename__ = "scenario"
-    __table_args__ = {"schema": "customer"}
+    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
 
     id: UUID | None = Field(
         sa_column=Column(
@@ -35,7 +35,7 @@ class Scenario(DateTimeBase, table=True):
     project_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey("customer.project.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.project.id", ondelete="CASCADE"),
             nullable=False,
         ),
     )
@@ -43,7 +43,7 @@ class Scenario(DateTimeBase, table=True):
         default=None,
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey("customer.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
             nullable=False,
         ),
     )
