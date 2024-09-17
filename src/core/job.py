@@ -186,9 +186,8 @@ def job_init():
                 job = await crud_job.update(
                     db=async_session,
                     db_obj=job,
-                    obj_in={"status_simple": JobStatusType.finished.value},
+                    obj_in={"status_simple": JobStatusType.finished.value, "payload": kwargs["params"].dict(exclude_none=True)},
                 )
-
                 try:
                     # Get the delete temp tables function from class
                     delete_temp_tables_func = getattr(self, "delete_temp_tables", None)

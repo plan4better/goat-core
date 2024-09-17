@@ -58,6 +58,9 @@ class Job(DateTimeBase, table=True):
         sa_column=Column(Boolean, nullable=False, server_default="False"),
         description="Whether the user has marked the job as read",
     )
+    payload: dict | None = Field(
+        sa_column=Column(JSONB, nullable=True), description="Payload of the job"
+    )
 
     # Relationships
     user: "User" = Relationship(back_populates="jobs")
