@@ -183,10 +183,15 @@ def job_init():
                 JobStatusType.timeout.value,
                 JobStatusType.failed.value,
             ]:
+                if kwargs.get("params"):
+                    payload = {"status_simple": JobStatusType.finished.value, "payload": kwargs["params"].dict(exclude_none=True)}
+                else:
+                    payload = {"status_simple": JobStatusType.finished.value}
+
                 job = await crud_job.update(
                     db=async_session,
                     db_obj=job,
-                    obj_in={"status_simple": JobStatusType.finished.value, "payload": kwargs["params"].dict(exclude_none=True)},
+                    obj_in=payload,
                 )
                 try:
                     # Get the delete temp tables function from class
