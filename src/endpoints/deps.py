@@ -5,6 +5,7 @@ from httpx import AsyncClient, Timeout
 from jose import jwt
 from pydantic import UUID4
 from sqlalchemy.ext.asyncio import AsyncSession
+from qgis.core import QgsApplication
 
 from src.core.config import settings
 from src.crud.crud_scenario import scenario as crud_scenario
@@ -87,3 +88,19 @@ async def close_http_client():
     if http_client is not None:
         await http_client.aclose()
         http_client = None
+
+
+def initialize_qgis_application():
+    """Initialize QGIS session and resources."""
+    
+    QgsApplication.setPrefixPath("/usr", True)
+    application = QgsApplication([], False)
+    application.initQgis()
+    return application
+
+
+def close_qgis_application(application: QgsApplication):
+    """Terminate QGIS session and clean-up resources."""
+
+    application.exitQgis()
+    QgsApplication.exit()

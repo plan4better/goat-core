@@ -16,6 +16,7 @@ from src.schemas.heatmap import (
 from src.schemas.job import JobStatusType
 from src.schemas.layer import FeatureGeometryType, IFeatureLayerToolCreate
 from src.schemas.toolbox_base import DefaultResultLayerName
+from src.utils import format_value_null_sql
 
 
 class CRUDHeatmapConnectivity(CRUDToolBase):
@@ -33,16 +34,13 @@ class CRUDHeatmapConnectivity(CRUDToolBase):
         # Create temp table name for points
         temp_points = await self.create_temp_table_name("points")
 
-        # Create formatted scenario ID string for SQL query
-        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
-
         # Create distributed point table using sql
         await self.async_session.execute(
             f"""SELECT basic.create_heatmap_connectivity_reference_area_table(
                 {layer_project.id},
                 '{layer_project.table_name}',
                 '{settings.CUSTOMER_SCHEMA}',
-                {scenario_id},
+                {format_value_null_sql(scenario_id)},
                 '{layer_project.where_query.replace("'", "''")}',
                 '{temp_points}',
                 {TRAVELTIME_MATRIX_RESOLUTION[routing_type]},

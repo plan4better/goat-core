@@ -56,6 +56,7 @@ class DefaultResultLayerName(str, Enum):
     heatmap_connectivity_active_mobility = "Heatmap - Connectivity"
     heatmap_connectivity_motorized_mobility = "Heatmap - Connectivity"
 
+
 class MaxFeatureCnt(int, Enum):
     """Max feature count schema."""
 
@@ -77,6 +78,7 @@ class MaxFeatureCnt(int, Enum):
     heatmap_closest_average_motorized_mobility = 1000000
     heatmap_connectivity_active_mobility = 1000000
     heatmap_connectivity_motorized_mobility = 1000000
+
 
 class ToolsWithReferenceAreaCheck(str, Enum):
     """Tools with reference area check schema."""
@@ -175,6 +177,7 @@ class CatchmentAreaStartingPointsBase(BaseModel):
 
         return values
 
+
 def check_starting_points(max_count):
     @root_validator(pre=True, allow_reuse=True)
     def _validator(cls, values):
@@ -183,11 +186,17 @@ def check_starting_points(max_count):
 
         if lat and long:
             if len(lat) > max_count:
-                raise ValueError(f"The maximum number of starting points is {max_count}.")
+                raise ValueError(
+                    f"The maximum number of starting points is {max_count}."
+                )
             if len(long) > max_count:
-                raise ValueError(f"The maximum number of starting points is {max_count}.")
+                raise ValueError(
+                    f"The maximum number of starting points is {max_count}."
+                )
         return values
+
     return _validator
+
 
 class PTSupportedDay(str, Enum):
     """PT supported days schema."""
@@ -298,10 +307,17 @@ class InputLayerType(BaseModel):
 
         return values
 
+
 input_layer_type_point = InputLayerType(
     layer_types=[LayerType.feature],
     feature_layer_geometry_types=[
         FeatureGeometryType.point,
+    ],
+)
+input_layer_type_line = InputLayerType(
+    layer_types=[LayerType.feature],
+    feature_layer_geometry_types=[
+        FeatureGeometryType.line,
     ],
 )
 input_layer_type_polygon = InputLayerType(

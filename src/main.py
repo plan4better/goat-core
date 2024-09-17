@@ -12,7 +12,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from src.core.config import settings
 from src.db.session import session_manager
-from src.endpoints.deps import close_http_client
+from src.endpoints.deps import close_http_client, initialize_qgis_application, close_qgis_application
 from src.endpoints.v2.api import router as api_router_v2
 
 if settings.SENTRY_DSN and settings.ENVIRONMENT:
@@ -31,10 +31,12 @@ async def lifespan(app: FastAPI):
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     logger.addHandler(handler)
+    qgis_application = initialize_qgis_application()
     yield
     print("Shutting down...")
     await session_manager.close()
     await close_http_client()
+    close_qgis_application(qgis_application)
 
 
 app = FastAPI(

@@ -150,6 +150,7 @@ class LayerProperties(BaseModel):
 class ExternalServiceOtherProperties(BaseModel):
     """Model for external service properties."""
 
+    url: Optional[HttpUrl] = Field(None, description="Layer URL")
     layers: Optional[List[str]] = Field(
         None, description="List of layers to be displayed"
     )

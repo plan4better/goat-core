@@ -545,13 +545,15 @@ async def delete_orphans(
     link_table_name = (
         f"{link_table_model.__table_args__['schema']}.{link_table_model.__tablename__}"
     )
-    sql = text(f"""
+    sql = text(
+        f"""
     DELETE FROM {child_table_name}
     WHERE {column_name} NOT IN (
         SELECT {link_column_name}
         FROM {link_table_name}
     )
-    """)
+    """
+    )
     await db.execute(sql)
 
 
@@ -595,3 +597,10 @@ def to_feature_collection(
             )
         )
     return FeatureCollection(features)
+
+
+def format_value_null_sql(value) -> str:
+    if value is None:
+        return "NULL"
+    else:
+        return f"'{value}'"

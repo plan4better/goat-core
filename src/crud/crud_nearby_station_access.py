@@ -78,8 +78,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             catchment_area_type=CatchmentAreaTypeActiveMobility.polygon,
             polygon_difference=True,
             scenario_id=params.scenario_id,
-            layer_project_id_street_network_edge=params.layer_project_id_street_network_edge,
-            layer_project_id_street_network_node=params.layer_project_id_street_network_node,
+            street_network=params.street_network,
         )
 
         # Compute catchment area
@@ -105,6 +104,10 @@ class CRUDNearbyStationAccess(CRUDToolBase):
             for inner_key in inner_dict:
                 flat_mode_mapping[str(inner_key)] = outer_key
 
+        modes_sql_array = (
+            "{" + ",".join(f'"{mode.value}"' for mode in params.mode) + "}"
+        )
+
         # Run query to find nearby stations, compute route frequencies and insert into result table
         sql_compute_nearby_station_access = f"""
             WITH stop AS (
@@ -119,16 +122,18 @@ class CRUDNearbyStationAccess(CRUDToolBase):
                 LATERAL jsonb_each(route_ids) unpacked
             ),
             service AS (
-                SELECT sr.stop_id, sr.stop_name, sr.access_time, sr.geom, sr.route_id, sr.route_type, count(sr.route_id) AS trip_cnt
+                SELECT sr.stop_id, sr.stop_name, sr.access_time, sr.geom, sr.route_id, sr.route_type, sr.mode, count(sr.route_id) AS trip_cnt
                 FROM (
-                    SELECT stop_id, stop_name, access_time, geom, route_type, jsonb_array_elements_text(routes) as route_id
+                    SELECT stop_id, stop_name, access_time, geom, route_type, jsonb_array_elements_text(routes) as route_id,
+                        ('{json.dumps(flat_mode_mapping)}'::JSONB ->> route_type) AS mode
                     FROM stop
                 ) sr
-                GROUP BY sr.stop_id, sr.stop_name, sr.access_time, sr.geom, sr.route_id, sr.route_type
+                WHERE sr.mode = ANY('{modes_sql_array}'::text[])
+                GROUP BY sr.stop_id, sr.stop_name, sr.access_time, sr.geom, sr.route_id, sr.route_type, sr.mode
             ),
             frequency AS (
                 SELECT s.stop_id, s.stop_name, s.access_time, s.geom, r.route_short_name,
-                    s.route_type, trip_cnt, ROUND({params.time_window.duration_minutes} / trip_cnt) AS frequency
+                    s.route_type, s.mode, trip_cnt, ROUND({params.time_window.duration_minutes} / trip_cnt) AS frequency
                 FROM service s
                 INNER JOIN basic.routes r ON r.route_id = s.route_id
             )
@@ -140,7 +145,7 @@ class CRUDNearbyStationAccess(CRUDToolBase):
                 FROM (
                     SELECT geom, stop_name, access_time, ROUND(120 / sum(trip_cnt)) AS agg_frequency,
                     array_agg(DISTINCT route_type) AS route_types,
-                    jsonb_agg(jsonb_build_object('route_name', route_short_name, 'mode', '{json.dumps(flat_mode_mapping)}'::JSONB ->> route_type, 'frequency', frequency)) AS routes
+                    jsonb_agg(jsonb_build_object('route_name', route_short_name, 'mode', mode, 'frequency', frequency)) AS routes
                     FROM frequency
                     GROUP BY stop_id, stop_name, access_time, geom
                 ) sub,

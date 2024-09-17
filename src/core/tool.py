@@ -48,7 +48,12 @@ from src.schemas.toolbox_base import (
     MaxFeatureCnt,
     MaxFeaturePolygonArea,
 )
-from src.utils import build_where_clause, get_random_string, search_value
+from src.utils import (
+    build_where_clause,
+    format_value_null_sql,
+    get_random_string,
+    search_value,
+)
 
 
 def assign_attribute(mapped_column, attribute_mapping, attribute_value):
@@ -653,7 +658,6 @@ class CRUDToolBase(CRUDFailedJob):
             if layer_project.attribute_mapping
             else ""
         )
-        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
 
         await self.async_session.execute(
             f"""SELECT basic.create_distributed_polygon_table(
@@ -661,7 +665,7 @@ class CRUDToolBase(CRUDFailedJob):
                 {layer_project.id},
                 '{arr_columns}',
                 '{settings.CUSTOMER_SCHEMA}',
-                {scenario_id},
+                {format_value_null_sql(scenario_id)},
                 '{where_query_polygon}',
                 30,
                 '{temp_polygons}'
@@ -686,7 +690,6 @@ class CRUDToolBase(CRUDFailedJob):
             if layer_project.attribute_mapping
             else ""
         )
-        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
 
         await self.async_session.execute(
             f"""SELECT basic.create_distributed_line_table(
@@ -694,7 +697,7 @@ class CRUDToolBase(CRUDFailedJob):
                 {layer_project.id},
                 '{arr_columns}',
                 '{settings.CUSTOMER_SCHEMA}',
-                {scenario_id},
+                {format_value_null_sql(scenario_id)},
                 '{where_query_line}',
                 '{temp_lines}'
             )"""
@@ -718,7 +721,6 @@ class CRUDToolBase(CRUDFailedJob):
             if layer_project.attribute_mapping
             else ""
         )
-        scenario_id = "NULL" if scenario_id is None else f"'{str(scenario_id)}'"
 
         await self.async_session.execute(
             f"""SELECT basic.create_distributed_point_table(
@@ -726,7 +728,7 @@ class CRUDToolBase(CRUDFailedJob):
                 {layer_project.id},
                 '{arr_columns}',
                 '{settings.CUSTOMER_SCHEMA}',
-                {scenario_id},
+                {format_value_null_sql(scenario_id)},
                 '{where_query_point}',
                 '{temp_points}'
             )"""

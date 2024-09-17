@@ -31,7 +31,7 @@ from src.schemas.toolbox_base import (
     CatchmentAreaGeometryTypeMapping,
     DefaultResultLayerName,
 )
-from src.utils import decode_r5_grid
+from src.utils import decode_r5_grid, format_value_null_sql
 
 
 async def call_routing_endpoint(
@@ -193,9 +193,6 @@ class CRUDCatchmentAreaBase(CRUDToolBase):
             table_name = self.table_starting_points
 
         # Fetch features from input layer while applying a scenario if specified
-        scenario_id = (
-            "NULL" if params.scenario_id is None else f"'{str(params.scenario_id)}'"
-        )
         layer_project_id = (
             "NULL"
             if params.starting_points.layer_project_id is None
@@ -208,7 +205,7 @@ class CRUDCatchmentAreaBase(CRUDToolBase):
                     SELECT sf.feature_id AS id, sf.geom, sf.edit_type
                     FROM {settings.CUSTOMER_SCHEMA}.scenario_scenario_feature ssf
                     INNER JOIN {settings.CUSTOMER_SCHEMA}.scenario_feature sf ON sf.id = ssf.scenario_feature_id
-                    WHERE ssf.scenario_id = {scenario_id}
+                    WHERE ssf.scenario_id = {format_value_null_sql(params.scenario_id)}
                     AND sf.layer_project_id = {layer_project_id}
                 )
                     SELECT original_features.id, original_features.geom
@@ -307,10 +304,18 @@ class CRUDCatchmentAreaActiveMobility(CRUDCatchmentAreaBase):
                 result_table if not result_params else result_params["result_table"]
             ),
             "layer_id": str(layer_id),
-            "scenario_id": str(params.scenario_id) if params.scenario_id else None,
-            "street_network_edge_layer_project_id": params.layer_project_id_street_network_edge,
-            "street_network_node_layer_project_id": params.layer_project_id_street_network_node,
         }
+
+        # Append scenario ID if specified
+        if params.scenario_id:
+            request_payload["scenario_id"] = str(params.scenario_id)
+
+        # Append street network config if specified
+        if params.street_network:
+            request_payload["street_network"] = {
+                "edge_layer_project_id": params.street_network.edge_layer_project_id,
+                "node_layer_project_id": params.street_network.node_layer_project_id,
+            }
 
         await call_routing_endpoint(
             params.routing_type, request_payload, self.http_client
@@ -659,10 +664,18 @@ class CRUDCatchmentAreaCar(CRUDCatchmentAreaBase):
                 result_table if not result_params else result_params["result_table"]
             ),
             "layer_id": str(layer_id),
-            "scenario_id": str(params.scenario_id) if params.scenario_id else None,
-            "street_network_edge_layer_project_id": params.layer_project_id_street_network_edge,
-            "street_network_node_layer_project_id": params.layer_project_id_street_network_node,
         }
+
+        # Append scenario ID if specified
+        if params.scenario_id:
+            request_payload["scenario_id"] = str(params.scenario_id)
+
+        # Append street network config if specified
+        if params.street_network:
+            request_payload["street_network"] = {
+                "edge_layer_project_id": params.street_network.edge_layer_project_id,
+                "node_layer_project_id": params.street_network.node_layer_project_id,
+            }
 
         await call_routing_endpoint(
             params.routing_type, request_payload, self.http_client
