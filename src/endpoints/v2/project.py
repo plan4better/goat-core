@@ -18,8 +18,9 @@ from src.db.models.project import Project
 from src.db.models.scenario import Scenario
 from src.db.models.scenario_feature import ScenarioFeature
 from src.db.session import AsyncSession
+from src.deps.auth import auth_z
 from src.endpoints.deps import get_db, get_scenario, get_user_id
-from src.schemas.common import ContentIdList, OrderEnum
+from src.schemas.common import OrderEnum
 from src.schemas.error import HTTPErrorHandler
 from src.schemas.project import (
     IFeatureStandardProjectRead,
@@ -55,6 +56,7 @@ router = APIRouter()
     response_model=IProjectRead,
     response_model_exclude_none=True,
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def create_project(
     async_session: AsyncSession = Depends(get_db),
@@ -80,6 +82,7 @@ async def create_project(
     response_model=IProjectRead,
     response_model_exclude_none=True,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def read_project(
     async_session: AsyncSession = Depends(get_db),
@@ -107,6 +110,7 @@ async def read_project(
     response_model=Page[IProjectRead],
     response_model_exclude_none=True,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def read_projects(
     async_session: AsyncSession = Depends(get_db),
@@ -151,11 +155,13 @@ async def read_projects(
 
     return projects
 
+
 @router.put(
     "/{project_id}",
     response_model=IProjectRead,
     response_model_exclude_none=True,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def update_project(
     async_session: AsyncSession = Depends(get_db),
@@ -183,6 +189,7 @@ async def update_project(
     "/{project_id}",
     response_model=None,
     status_code=204,
+    dependencies=[Depends(auth_z)],
 )
 async def delete_project(
     async_session: AsyncSession = Depends(get_db),
@@ -211,6 +218,7 @@ async def delete_project(
     response_model=InitialViewState,
     response_model_exclude_none=True,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def read_project_initial_view_state(
     async_session: AsyncSession = Depends(get_db),
@@ -235,6 +243,7 @@ async def read_project_initial_view_state(
     response_model=InitialViewState,
     response_model_exclude_none=True,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def update_project_initial_view_state(
     async_session: AsyncSession = Depends(get_db),
@@ -277,6 +286,7 @@ async def update_project_initial_view_state(
     ],
     response_model_exclude_none=True,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def add_layers_to_project(
     async_session: AsyncSession = Depends(get_db),
@@ -313,6 +323,7 @@ async def add_layers_to_project(
     ],
     response_model_exclude_none=True,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def get_layers_from_project(
     async_session: AsyncSession = Depends(get_db),
@@ -340,6 +351,7 @@ async def get_layers_from_project(
     | IRasterProjectRead,
     response_model_exclude_none=True,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def get_layer_from_project(
     async_session: AsyncSession = Depends(get_db),
@@ -368,6 +380,7 @@ async def get_layer_from_project(
     | IRasterProjectRead,
     response_model_exclude_none=True,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def update_layer_in_project(
     async_session: AsyncSession = Depends(get_db),
@@ -416,6 +429,7 @@ async def update_layer_in_project(
     "/{project_id}/layer",
     response_model=None,
     status_code=204,
+    dependencies=[Depends(auth_z)],
 )
 async def delete_layer_from_project(
     async_session: AsyncSession = Depends(get_db),
@@ -465,6 +479,7 @@ async def delete_layer_from_project(
     response_model=dict,
     response_model_exclude_none=True,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def get_chart_data(
     async_session: AsyncSession = Depends(get_db),
@@ -506,6 +521,7 @@ async def get_chart_data(
     summary="Retrieve a list of scenarios",
     response_model=Page[Scenario],
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def read_scenarios(
     async_session: AsyncSession = Depends(get_db),
@@ -547,6 +563,7 @@ async def read_scenarios(
     status_code=201,
     response_model=Scenario,
     response_model_exclude_none=True,
+    dependencies=[Depends(auth_z)],
 )
 async def create_scenario(
     async_session: AsyncSession = Depends(get_db),
@@ -578,6 +595,7 @@ async def create_scenario(
     "/{project_id}/scenario/{scenario_id}",
     summary="Update scenario",
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def update_scenario(
     async_session: AsyncSession = Depends(get_db),
@@ -601,6 +619,7 @@ async def update_scenario(
     "/{project_id}/scenario/{scenario_id}",
     summary="Delete scenario",
     status_code=204,
+    dependencies=[Depends(auth_z)],
 )
 async def delete_scenario(
     async_session: AsyncSession = Depends(get_db),
@@ -626,6 +645,7 @@ async def delete_scenario(
     summary="Retrieve a list of scenario features",
     response_class=JSONResponse,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def read_scenario_features(
     async_session: AsyncSession = Depends(get_db),
@@ -648,6 +668,7 @@ async def read_scenario_features(
     summary="Create scenario features",
     response_class=JSONResponse,
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def create_scenario_features(
     async_session: AsyncSession = Depends(get_db),
@@ -674,6 +695,7 @@ async def create_scenario_features(
     "/{project_id}/layer/{layer_project_id}/scenario/{scenario_id}/features",
     summary="Update scenario features",
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def update_scenario_feature(
     async_session: AsyncSession = Depends(get_db),
@@ -716,6 +738,7 @@ async def update_scenario_feature(
     "/{project_id}/layer/{layer_project_id}/scenario/{scenario_id}/features/{feature_id}",
     summary="Delete scenario feature",
     status_code=204,
+    dependencies=[Depends(auth_z)],
 )
 async def delete_scenario_features(
     async_session: AsyncSession = Depends(get_db),

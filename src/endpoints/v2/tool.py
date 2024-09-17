@@ -1,20 +1,26 @@
 from fastapi import APIRouter, Body, Depends
+
 from src.core.tool import CRUDToolBase, start_calculation
 from src.crud.crud_data_management import CRUDJoin
-from src.crud.crud_geoanalysis import CRUDAggregatePoint, CRUDAggregatePolygon, CRUDOriginDestination
+from src.crud.crud_geoanalysis import (
+    CRUDAggregatePoint,
+    CRUDAggregatePolygon,
+    CRUDOriginDestination,
+)
 from src.crud.crud_geoprocessing import CRUDBuffer
+from src.deps.auth import auth_z
 from src.schemas.error import http_error_handler
 from src.schemas.job import JobType, Msg
 from src.schemas.tool import (
     IAggregationPoint,
     IAggregationPolygon,
-    IJoin,
     IBuffer,
+    IJoin,
     IOriginDestination,
+    request_example_buffer,
     request_examples_aggregation_point,
     request_examples_aggregation_polygon,
     request_examples_join,
-    request_example_buffer,
 )
 from src.schemas.toolbox_base import (
     CommonToolParams,
@@ -30,6 +36,7 @@ router = APIRouter()
     summary="Check reference area",
     response_model=Msg,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def check_reference_area(
     common: CommonToolParams = Depends(),
@@ -67,6 +74,7 @@ async def check_reference_area(
     summary="Join two layers.",
     response_model=IToolResponse,
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def join(
     common: CommonToolParams = Depends(),
@@ -95,6 +103,7 @@ async def join(
     summary="Aggregate points",
     response_model=IToolResponse,
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def aggregate_points(
     *,
@@ -123,6 +132,7 @@ async def aggregate_points(
     summary="Aggregate polygons",
     response_model=IToolResponse,
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def aggregate_polygons(
     *,
@@ -151,6 +161,7 @@ async def aggregate_polygons(
     summary="Buffer",
     response_model=IToolResponse,
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def buffer(
     *,
@@ -173,11 +184,13 @@ async def buffer(
         params=params,
     )
 
+
 @router.post(
     "/origin-destination",
     summary="Origin Destination",
     response_model=IToolResponse,
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def origin_destination(
     *,

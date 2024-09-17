@@ -27,7 +27,6 @@ from src.core.config import settings
 # Local application imports
 from src.core.content import (
     read_content_by_id,
-    read_contents_by_ids,
 )
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import CRUDLayerDatasetUpdate, CRUDLayerExport, CRUDLayerImport
@@ -41,8 +40,9 @@ from src.db.models.layer import (
     TableUploadType,
 )
 from src.db.session import AsyncSession
+from src.deps.auth import auth_z
 from src.endpoints.deps import get_db, get_user_id
-from src.schemas.common import ContentIdList, OrderEnum
+from src.schemas.common import OrderEnum
 from src.schemas.error import HTTPErrorHandler
 from src.schemas.job import JobType
 from src.schemas.layer import (
@@ -75,6 +75,7 @@ router = APIRouter()
     summary="Upload file to server and validate",
     response_model=IFileUploadMetadata,
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def file_upload(
     *,
@@ -122,6 +123,7 @@ async def file_upload(
     summary="Fetch data from external service into a file, upload file to server and validate",
     response_model=IFileUploadMetadata,
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def file_upload_external_service(
     *,
@@ -230,6 +232,7 @@ async def _create_layer_from_dataset(
     response_class=JSONResponse,
     status_code=201,
     description="Generate a new layer from a file that was previously uploaded using the file-upload endpoint.",
+    dependencies=[Depends(auth_z)],
 )
 async def create_layer_feature_standard(
     background_tasks: BackgroundTasks,
@@ -263,6 +266,7 @@ async def create_layer_feature_standard(
     response_model=IRasterRead,
     status_code=201,
     description="Generate a new layer based on a URL for a raster service hosted externally.",
+    dependencies=[Depends(auth_z)],
 )
 async def create_layer_raster(
     async_session: AsyncSession = Depends(get_db),
@@ -286,6 +290,7 @@ async def create_layer_raster(
     response_class=JSONResponse,
     status_code=201,
     description="Generate a new layer from a file that was previously uploaded using the file-upload endpoint.",
+    dependencies=[Depends(auth_z)],
 )
 async def create_layer_table(
     background_tasks: BackgroundTasks,
@@ -319,6 +324,7 @@ async def create_layer_table(
     response_class=FileResponse,
     status_code=201,
     description="Export a layer to a zip file.",
+    dependencies=[Depends(auth_z)],
 )
 async def export_layer(
     async_session: AsyncSession = Depends(get_db),
@@ -353,6 +359,7 @@ async def export_layer(
     response_model=ILayerRead,
     response_model_exclude_none=True,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def read_layer(
     async_session: AsyncSession = Depends(get_db),
@@ -367,12 +374,14 @@ async def read_layer(
         async_session=async_session, id=layer_id, model=Layer, crud_content=crud_layer
     )
 
+
 @router.post(
     "",
     response_model=Page[ILayerRead],
     response_model_exclude_none=True,
     status_code=200,
     summary="Retrieve a list of layers using different filters including a spatial filter. If not filter is specified, all layers will be returned.",
+    dependencies=[Depends(auth_z)],
 )
 async def read_layers(
     async_session: AsyncSession = Depends(get_db),
@@ -431,6 +440,7 @@ async def read_layers(
     response_model_exclude_none=True,
     status_code=200,
     summary="Retrieve a list of layers using different filters including a spatial filter. If not filter is specified, all layers will be returned.",
+    dependencies=[Depends(auth_z)],
 )
 async def read_catalog_layers(
     async_session: AsyncSession = Depends(get_db),
@@ -472,6 +482,7 @@ async def read_catalog_layers(
     response_model=ILayerRead,
     response_model_exclude_none=True,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def update_layer(
     async_session: AsyncSession = Depends(get_db),
@@ -496,6 +507,7 @@ async def update_layer(
     "/{layer_id}/dataset",
     response_class=JSONResponse,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def update_layer_dataset(
     background_tasks: BackgroundTasks,
@@ -564,6 +576,7 @@ async def update_layer_dataset(
     response_model=None,
     summary="Delete a layer and its data in case of an internal layer.",
     status_code=204,
+    dependencies=[Depends(auth_z)],
 )
 async def delete_layer(
     async_session: AsyncSession = Depends(get_db),
@@ -588,6 +601,7 @@ async def delete_layer(
     summary="Get feature count",
     response_class=JSONResponse,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def get_feature_count(
     async_session: AsyncSession = Depends(get_db),
@@ -628,6 +642,7 @@ async def get_feature_count(
     summary="Get area statistics of a layer",
     response_class=JSONResponse,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def get_area_statistics(
     async_session: AsyncSession = Depends(get_db),
@@ -666,6 +681,7 @@ async def get_area_statistics(
     summary="Get unique values of a column",
     response_model=Page[IUniqueValue],
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def get_unique_values(
     async_session: AsyncSession = Depends(get_db),
@@ -712,6 +728,7 @@ async def get_unique_values(
     summary="Get statistics of a column",
     response_class=JSONResponse,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def class_breaks(
     async_session: AsyncSession = Depends(get_db),
@@ -768,6 +785,7 @@ async def class_breaks(
     summary="Return the count of layers for different metadata values acting as filters",
     response_model=IMetadataAggregateRead,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def metadata_aggregate(
     async_session: AsyncSession = Depends(get_db),

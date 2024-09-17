@@ -1,19 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi import status
-from src.db.models.user import User
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import UUID4
+
+from src.crud.crud_folder import folder as crud_folder
+from src.crud.crud_user import user as crud_user
 from src.db.models.folder import Folder
 from src.db.session import AsyncSession
-from pydantic import UUID4
+from src.deps.auth import auth_z
 from src.endpoints.deps import get_db, get_user_id
-from src.crud.crud_user import user as crud_user
-from src.crud.crud_folder import folder as crud_folder
+
 router = APIRouter()
+
 
 @router.post(
     "/data-schema",
     response_model=None,
     summary="Create data base schemas for the user.",
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def create_user_base_data(
     *,
@@ -33,14 +36,18 @@ async def create_user_base_data(
         )
     except Exception as e:
         await crud_user.delete_user_data_tables(async_session, user_id)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
     return
+
 
 @router.delete(
     "/data-schema",
     response_model=None,
     summary="Delete all user related related contents.",
     status_code=204,
+    dependencies=[Depends(auth_z)],
 )
 async def delete_user(
     *,
@@ -53,5 +60,7 @@ async def delete_user(
     if user:
         await crud_user.delete_user_data_tables(async_session, user_id=user.id)
     else:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
     return

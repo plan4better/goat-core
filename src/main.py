@@ -7,7 +7,6 @@ from fastapi import FastAPI, Request, status
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sqlalchemy.exc import IntegrityError
 from starlette.middleware.cors import CORSMiddleware
 
@@ -15,6 +14,13 @@ from src.core.config import settings
 from src.db.session import session_manager
 from src.endpoints.deps import close_http_client
 from src.endpoints.v2.api import router as api_router_v2
+
+if settings.SENTRY_DSN and settings.ENVIRONMENT:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.ENVIRONMENT,
+        traces_sample_rate=1.0 if settings.ENVIRONMENT == "prod" else 0.1,
+    )
 
 
 @asynccontextmanager
@@ -68,30 +74,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if settings.SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
-        environment=os.getenv("NAMESPACE", "dev"),
-        traces_sample_rate=0.2,
-    )
-
-try:
-    app.add_middleware(SentryAsgiMiddleware)
-except Exception:
-    # pass silently if the Sentry integration failed
-    pass
-
 
 @app.get("/api/healthz", description="Health Check", tags=["Health Check"])
 def ping():
     """Health check."""
     return {"ping": "pong!"}
-
-
-# Calling this endpoint to see if the setup works. If yes, an error message will show in Sentry dashboard
-@app.get("/api/sentry", include_in_schema=False)
-async def sentry():
-    raise Exception("Test sentry integration")
 
 
 app.include_router(api_router_v2, prefix=settings.API_V2_STR)
