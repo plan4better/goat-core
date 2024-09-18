@@ -38,6 +38,7 @@ from tests.utils import check_job_status
             [
                 CatchmentAreaRoutingModePT.funicular,
                 CatchmentAreaRoutingModePT.gondola,
+                CatchmentAreaRoutingModePT.bus,
             ],
             PTSupportedDay.sunday,
             61200,
