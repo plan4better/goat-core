@@ -258,6 +258,8 @@ class FileUpload:
 
 class FetchLayerExternalService:
     def __init__(self, url: HttpUrl, output_file: str):
+        self.MAX_FEATURE_COUNT = 100000
+
         self.url = url
         self.output_file = output_file
 
@@ -275,6 +277,13 @@ class FetchLayerExternalService:
 
             if not layer.isValid():
                 raise ValueError(f"Unable to open layer: {layer_name}")
+
+            # Ensure layer is not too large
+            feature_count = layer.featureCount()
+            if feature_count > self.MAX_FEATURE_COUNT:
+                raise ValueError(
+                    f"Layer {layer_name} contains too many features ({feature_count})."
+                )
 
             # Add layer to project and write to GeoJSON file
             QgsProject.instance().addMapLayer(layer)
@@ -320,6 +329,13 @@ class FetchLayerExternalService:
         input_layer = wfs_data_source.GetLayerByName(layer_name)
         if input_layer is None:
             raise ValueError(f"Could not find layer {layer_name} in WFS service.")
+
+        # Ensure layer is not too large
+        feature_count = input_layer.GetFeatureCount()
+        if feature_count > self.MAX_FEATURE_COUNT:
+            raise ValueError(
+                f"Layer {layer_name} contains too many features ({feature_count})."
+            )
 
         # Get the layer definition
         input_layer_defn = input_layer.GetLayerDefn()
