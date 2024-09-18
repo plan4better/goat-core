@@ -8,9 +8,19 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy import text
+from jose import jwt
 
 # Local application imports
 from src.core.config import settings
+from src.db.models import (
+    LayerOrganizationLink,
+    LayerTeamLink,
+    Organization,
+    ProjectTeamLink,
+    Role,
+    Team,
+    User,
+)
 from src.db.models.layer import LayerType
 from src.endpoints.deps import get_db, session_manager
 from src.main import app
@@ -25,6 +35,7 @@ from src.schemas.layer import request_examples as layer_request_examples
 from src.schemas.project import (
     request_examples as project_request_examples,
 )
+from src.crud.base import CRUDBase
 from tests.utils import (
     check_job_status,
     check_user_data_deleted,
@@ -39,7 +50,8 @@ from tests.utils import (
 def set_test_mode():
     settings.RUN_AS_BACKGROUND_TASK = True
     settings.USER_DATA_SCHEMA = "test_user_data"
-    settings.CUSTOMER_SCHEMA = "test_customer"
+    settings.CUSTOMER_SCHEMA = "test_customer1"
+    settings.ACCOUNTS_SCHEMA = "test_accounts1"
     settings.MAX_FOLDER_COUNT = 15
     settings.TEST_MODE = True
 
@@ -64,15 +76,21 @@ def event_loop():
 async def session_fixture(event_loop):
     session_manager.init(settings.ASYNC_SQLALCHEMY_DATABASE_URI)
     session_manager._engine.update_execution_options(
-        schema_translate_map={"customer": settings.CUSTOMER_SCHEMA}
+        schema_translate_map={
+            "customer": settings.CUSTOMER_SCHEMA,
+            "accounts": settings.ACCOUNTS_SCHEMA,
+        }
     )
     async with session_manager.connect() as connection:
-        await connection.execute(
-            text(f"""CREATE SCHEMA IF NOT EXISTS {settings.CUSTOMER_SCHEMA}""")
-        )
-        await connection.execute(
-            text(f"""CREATE SCHEMA IF NOT EXISTS {settings.USER_DATA_SCHEMA}""")
-        )
+        for schema in [
+            settings.CUSTOMER_SCHEMA,
+            settings.USER_DATA_SCHEMA,
+            settings.ACCOUNTS_SCHEMA,
+        ]:
+            await connection.execute(
+                text(f"""DROP SCHEMA IF EXISTS {schema} CASCADE""")
+            )
+            await connection.execute(text(f"""CREATE SCHEMA IF NOT EXISTS {schema}"""))
         await session_manager.drop_all(connection)
         await session_manager.create_all(connection)
         await connection.commit()
@@ -80,12 +98,6 @@ async def session_fixture(event_loop):
     logging.info("Starting session_fixture finalizer")
     async with session_manager.connect() as connection:
         pass
-        await connection.execute(
-            text(f"""DROP SCHEMA IF EXISTS {settings.CUSTOMER_SCHEMA} CASCADE""")
-        )
-        await connection.execute(
-            text(f"""DROP SCHEMA IF EXISTS {settings.USER_DATA_SCHEMA} CASCADE""")
-        )
     await session_manager.close()
     logging.info("Finished session_fixture finalizer")
 
@@ -106,13 +118,29 @@ async def db_session():
 
 
 @pytest.fixture
-async def fixture_create_user(client: AsyncClient):
-    # Setup: Create the user
-    response = await client.post(f"{settings.API_V2_STR}/user")
-    user = response.json()
-    yield user
+async def fixture_create_user(client: AsyncClient, db_session):
+    # Get base user_id
+    scheme, _, token = settings.SAMPLE_AUTHORIZATION.partition(" ")
+    user_id = jwt.get_unverified_claims(token)["sub"]
+
+    # Create a user
+    user = User(
+        id=user_id,
+        firstname="Green",
+        lastname="GOAT",
+        avatar="https://assets.plan4better.de/img/goat_app_subscription_professional.jpg",
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    # Setup: Create user data schemas
+    result = await client.post(f"{settings.API_V2_STR}/user/data-schema")
+    assert result.status_code == 201
+    yield user.id
     # Teardown: Delete the user after the test
-    await client.delete(f"{settings.API_V2_STR}/user")
+    await CRUDBase(User).delete(db_session, id=user_id)
+    await client.delete(f"{settings.API_V2_STR}/user/data-schema")
 
 
 @pytest.fixture
@@ -1074,6 +1102,136 @@ def create_generic_toolbox_fixture(endpoint: str, request_examples: dict):
         return response.json()
 
     return generic_post_fixture
+
+
+@pytest.fixture
+async def fixture_create_shared_team_layers(
+    client: AsyncClient, fixture_create_folder, db_session
+):
+
+    # Create five layers
+    layers = []
+    for _i in range(5):
+        layer = await create_raster_layer(client, fixture_create_folder)
+        layers.append(layer)
+
+    # Create a team
+    team1 = Team(name="test_team", avatar="https://www.plan4better.de/logo.png")
+    team2 = Team(name="test_team2", avatar="https://www.plan4better.de/logo.png")
+
+    # Create role
+    role = Role(name="team-member")
+    db_session.add(role)
+    await db_session.commit()
+    await db_session.refresh(role)
+
+    # Create layer team links
+    layer_teams1 = []
+    layer_teams2 = []
+    for layer in layers:
+        layer_team1 = LayerTeamLink(
+            layer_id=layer["id"], team_id=team1.id, role_id=role.id
+        )
+        layer_team2 = LayerTeamLink(
+            layer_id=layer["id"], team_id=team2.id, role_id=role.id
+        )
+        layer_teams1.append(layer_team1)
+        layer_teams2.append(layer_team2)
+
+    team1.layer_links = layer_teams1
+    team2.layer_links = layer_teams2
+    db_session.add(team1)
+    db_session.add(team2)
+    await db_session.commit()
+
+    return {"teams": [team1, team2], "layers": layers}
+
+
+@pytest.fixture
+async def fixture_create_shared_organization_layers(
+    client: AsyncClient, fixture_create_folder, db_session
+):
+
+    # Create five layers
+    layers = []
+    for _i in range(5):
+        layer = await create_raster_layer(client, fixture_create_folder)
+        layers.append(layer)
+
+    # Create organization
+    organization1 = Organization(
+        name="test_organization", avatar="https://www.plan4better.de/logo.png"
+    )
+    organization2 = Organization(
+        name="test_organization2", avatar="https://www.plan4better.de/logo.png"
+    )
+
+    # Create role
+    role = Role(name="organization_member")
+    db_session.add(role)
+    await db_session.commit()
+    await db_session.refresh(role)
+
+    # Create layer organization links
+    layer_organizations1 = []
+    layer_organizations2 = []
+    for layer in layers:
+        layer_organization1 = LayerOrganizationLink(
+            layer_id=layer["id"], organization_id=organization1.id, role_id=role.id
+        )
+        layer_organization2 = LayerOrganizationLink(
+            layer_id=layer["id"], organization_id=organization2.id, role_id=role.id
+        )
+        layer_organizations1.append(layer_organization1)
+        layer_organizations2.append(layer_organization2)
+
+    organization1.layer_links = layer_organizations1
+    organization2.layer_links = layer_organizations2
+    db_session.add(organization1)
+    db_session.add(organization2)
+    await db_session.commit()
+
+    return {"organizations": [organization1, organization2], "layers": layers}
+
+
+@pytest.fixture
+async def fixture_create_shared_team_projects(
+    client: AsyncClient, fixture_create_folder, fixture_create_projects, db_session
+):
+
+    # Create projects
+    projects = fixture_create_projects
+
+    # Create a team
+    team1 = Team(name="test_team", avatar="https://www.plan4better.de/logo.png")
+    team2 = Team(name="test_team2", avatar="https://www.plan4better.de/logo.png")
+
+    # Create role
+    role = Role(name="team-member")
+    db_session.add(role)
+    await db_session.commit()
+    await db_session.refresh(role)
+
+    # Create layer team links
+    project_teams1 = []
+    project_teams2 = []
+    for project in projects:
+        project_team1 = ProjectTeamLink(
+            project_id=project["id"], team_id=team1.id, role_id=role.id
+        )
+        project_team2 = ProjectTeamLink(
+            project_id=project["id"], team_id=team2.id, role_id=role.id
+        )
+        project_teams1.append(project_team1)
+        project_teams2.append(project_team2)
+
+    team1.project_links = project_teams1
+    team2.project_links = project_teams2
+    db_session.add(team1)
+    db_session.add(team2)
+    await db_session.commit()
+
+    return {"teams": [team1, team2], "projects": projects}
 
 
 fixture_catchment_area_active_mobility = create_generic_toolbox_fixture(

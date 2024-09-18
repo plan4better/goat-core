@@ -474,7 +474,7 @@ class PrintMap:
             )
 
         for layer in layers_project:
-            if layer.type == LayerType.table or layer.feature_layer_type == FeatureType.street_network:
+            if layer.type != LayerType.feature or layer.feature_layer_type == FeatureType.street_network:
                 continue
 
             if (

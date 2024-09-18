@@ -3,6 +3,7 @@ from pydantic import UUID4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.crud.crud_system_setting import system_setting as crud_system_setting
+from src.deps.auth import auth_z
 from src.endpoints.deps import get_db, get_user_id
 from src.schemas.system_setting import (
     SystemSettingsCreate,
@@ -22,16 +23,21 @@ router = APIRouter()
     summary="Retrieve system settings",
     response_model=SystemSettingsRead,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def read_system_settings(
-    *, async_session: AsyncSession = Depends(get_db), user_id: UUID4 = Depends(get_user_id)
+    *,
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
 ):
     """Retrieve system settings"""
     system_settings = await crud_system_setting.get_by_multi_keys(
         async_session, keys={"user_id": user_id}
     )
     if not system_settings or len(system_settings) == 0:
-        default_system_settings_obj_in = SystemSettingsCreate(**default_system_settings.dict())
+        default_system_settings_obj_in = SystemSettingsCreate(
+            **default_system_settings.dict()
+        )
         default_system_settings_obj_in.user_id = user_id
         system_settings = await crud_system_setting.create(
             async_session, obj_in=default_system_settings_obj_in
@@ -45,6 +51,7 @@ async def read_system_settings(
     summary="Update system settings",
     response_model=SystemSettingsRead,
     status_code=200,
+    dependencies=[Depends(auth_z)],
 )
 async def update_system_settings(
     *,

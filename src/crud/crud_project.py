@@ -1,21 +1,36 @@
 from uuid import UUID
-from fastapi_pagination import Page, Params as PaginationParams
+
+from fastapi_pagination import Page
+from fastapi_pagination import Params as PaginationParams
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.core.content import update_content_by_id
+
 from src.core.config import settings
-from src.db.models.project import Project
+from src.core.content import (
+    create_query_shared_content,
+    update_content_by_id,
+    build_shared_with_object,
+)
+from src.crud.base import CRUDBase
+from src.crud.crud_layer_project import layer_project as crud_layer_project
+from src.crud.crud_user_project import user_project as crud_user_project
+from src.db.models import (
+    Organization,
+    Project,
+    ProjectOrganizationLink,
+    ProjectTeamLink,
+    Role,
+    Team,
+)
+from src.db.models._link_model import UserProjectLink
 from src.schemas.common import OrderEnum
 from src.schemas.project import (
-    IProjectBaseUpdate,
-    IProjectRead,
-    IProjectCreate,
     InitialViewState,
+    IProjectBaseUpdate,
+    IProjectCreate,
+    IProjectRead,
 )
-from src.crud.crud_user_project import user_project as crud_user_project
-from src.crud.crud_layer_project import layer_project as crud_layer_project
-from src.crud.base import CRUDBase
-from src.db.models._link_model import UserProjectLink
+
 
 class CRUDProject(CRUDBase):
     async def create(
@@ -32,7 +47,15 @@ class CRUDProject(CRUDBase):
             obj_in=project_in,
         )
         # Default initial view state
-        initial_view_state = {"zoom": 5, "pitch": 0, "bearing": 0, "latitude": 51.01364693631891, "max_zoom": 20, "min_zoom": 0, "longitude": 9.576740589534126}
+        initial_view_state = {
+            "zoom": 5,
+            "pitch": 0,
+            "bearing": 0,
+            "latitude": 51.01364693631891,
+            "max_zoom": 20,
+            "min_zoom": 0,
+            "longitude": 9.576740589534126,
+        }
 
         # Create link between user and project for initial view state
         await crud_user_project.create(
@@ -49,8 +72,8 @@ class CRUDProject(CRUDBase):
             await crud_layer_project.create(
                 async_session=async_session,
                 project_id=project.id,
-                layer_ids=[settings.BASE_STREET_NETWORK]
-        )
+                layer_ids=[settings.BASE_STREET_NETWORK],
+            )
         # Doing unneeded type conversion to make sure the relations of project are not loaded
         return IProjectRead(**project.dict())
 
@@ -64,23 +87,44 @@ class CRUDProject(CRUDBase):
         order_by: str = None,
         order: OrderEnum = None,
         ids: list = None,
+        team_id: UUID = None,
+        organization_id: UUID = None,
     ) -> Page[IProjectRead]:
         """Get projects for a user and folder"""
 
-        # If ids are provided apply filter by ids, otherwise apply filter by folder_id and user_id
+        # Build query and filters
+        if team_id or organization_id:
+            filters = []
+        elif folder_id:
+            filters = [
+                Project.user_id == user_id,
+                Project.folder_id == folder_id,
+            ]
+        else:
+            filters = [Project.user_id == user_id]
+
         if ids:
             query = select(Project).where(Project.id.in_(ids))
         else:
-            if not folder_id:
-                query = select(Project).where(Project.user_id == user_id)
-            else:
-                query = select(Project).where(
-                    and_(
-                        Project.user_id == user_id,
-                        Project.folder_id == folder_id,
-                    )
-                )
+            query = create_query_shared_content(
+                Project,
+                ProjectTeamLink,
+                ProjectOrganizationLink,
+                Team,
+                Organization,
+                Role,
+                filters,
+                team_id=team_id,
+                organization_id=organization_id,
+            )
 
+        # Get roles
+        roles = await CRUDBase(Role).get_all(
+            async_session,
+        )
+        role_mapping = {role.id: role.name for role in roles}
+
+        # Get projects
         projects = await self.get_multi(
             async_session,
             query=query,
@@ -89,7 +133,15 @@ class CRUDProject(CRUDBase):
             order_by=order_by,
             order=order,
         )
-
+        projects.items = build_shared_with_object(
+            items=projects.items,
+            role_mapping=role_mapping,
+            team_key="team_links",
+            org_key="organization_links",
+            model_name="project",
+            team_id=team_id,
+            organization_id=organization_id,
+        )
         return projects
 
     async def update_base(

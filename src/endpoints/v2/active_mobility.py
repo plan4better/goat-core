@@ -2,19 +2,22 @@ from fastapi import APIRouter, Body, Depends
 
 from src.core.tool import start_calculation
 from src.crud.crud_catchment_area import CRUDCatchmentAreaActiveMobility
+from src.crud.crud_heatmap_closest_average import CRUDHeatmapClosestAverage
+from src.crud.crud_heatmap_connectivity import CRUDHeatmapConnectivity
+from src.crud.crud_heatmap_gravity import CRUDHeatmapGravity
+from src.deps.auth import auth_z
 from src.endpoints.deps import get_http_client
 from src.schemas.catchment_area import (
     ICatchmentAreaActiveMobility,
+)
+from src.schemas.catchment_area import (
     request_examples_catchment_area_active_mobility as active_mobility_request_examples,
 )
 from src.schemas.heatmap import (
-    IHeatmapGravityActive,
     IHeatmapClosestAverageActive,
     IHeatmapConnectivityActive,
+    IHeatmapGravityActive,
 )
-from src.crud.crud_heatmap_gravity import CRUDHeatmapGravity
-from src.crud.crud_heatmap_closest_average import CRUDHeatmapClosestAverage
-from src.crud.crud_heatmap_connectivity import CRUDHeatmapConnectivity
 from src.schemas.job import JobType
 from src.schemas.toolbox_base import CommonToolParams, IToolResponse
 
@@ -26,6 +29,7 @@ router = APIRouter()
     summary="Compute catchment areas for active mobility",
     response_model=IToolResponse,
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def compute_active_mobility_catchment_area(
     *,
@@ -56,6 +60,7 @@ async def compute_active_mobility_catchment_area(
     summary="Compute heatmap gravity for active mobility",
     response_model=IToolResponse,
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def compute_active_mobility_heatmap_gravity(
     *,
@@ -85,6 +90,7 @@ async def compute_active_mobility_heatmap_gravity(
     summary="Compute heatmap closest-average for active mobility",
     response_model=IToolResponse,
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def compute_active_mobility_heatmap_closest_average(
     *,
@@ -114,6 +120,7 @@ async def compute_active_mobility_heatmap_closest_average(
     summary="Compute heatmap connectivity for active mobility",
     response_model=IToolResponse,
     status_code=201,
+    dependencies=[Depends(auth_z)],
 )
 async def compute_active_mobility_heatmap_connectivity(
     *,

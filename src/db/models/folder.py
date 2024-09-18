@@ -1,22 +1,18 @@
+from typing import List
 from uuid import UUID
+
 from sqlalchemy import ForeignKey
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
-from sqlmodel import (
-    Column,
-    Field,
-    Relationship,
-    Text,
-    text,
-    UniqueConstraint
-)
-from typing import List
+from sqlmodel import Column, Field, Relationship, Text, UniqueConstraint, text
+
 from src.db.models._base_class import DateTimeBase
-from src.db.models.user import User
 from src.db.models.layer import Layer
+from src.db.models.user import User
+from src.core.config import settings
 
 class Folder(DateTimeBase, table=True):
     __tablename__ = "folder"
-    __table_args__ = {"schema": "customer"}
+    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
 
     id: UUID | None = Field(
         sa_column=Column(
@@ -29,16 +25,24 @@ class Folder(DateTimeBase, table=True):
     user_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey("customer.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Folder owner ID",
     )
-    name: str = Field(sa_column=Column(Text, nullable=False), description="Folder name", max_length=255)
+    name: str = Field(
+        sa_column=Column(Text, nullable=False),
+        description="Folder name",
+        max_length=255,
+    )
 
     # Relationships
     user: "User" = Relationship(back_populates="folders")
-    layers: List["Layer"] = Relationship(back_populates="folder", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    layers: List["Layer"] = Relationship(
+        back_populates="folder",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+
 
 # Constraints
 UniqueConstraint(Folder.__table__.c.user_id, Folder.__table__.c.name)

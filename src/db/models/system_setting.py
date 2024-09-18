@@ -4,10 +4,9 @@ from uuid import UUID
 from sqlalchemy import ForeignKey, text
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import Column, Field, Relationship, SQLModel, Text
-
 from src.db.models._base_class import DateTimeBase
 from src.db.models.user import User
-
+from src.core.config import settings
 
 class ClientThemeType(str, Enum):
     """Layer types that are supported."""
@@ -42,7 +41,7 @@ class SystemSettingBase(SQLModel):
 
 class SystemSetting(SystemSettingBase, DateTimeBase, table=True):
     __tablename__ = "system_setting"
-    __table_args__ = {"schema": "customer"}
+    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
 
     id: UUID | None = Field(
         sa_column=Column(
@@ -56,7 +55,7 @@ class SystemSetting(SystemSettingBase, DateTimeBase, table=True):
     user_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey("customer.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="System Setting owner ID",
