@@ -831,7 +831,7 @@ class OGRFileHandling:
             task = asyncio.create_task(async_run_command(cmd))
             await task
         except Exception as e:
-            raise Ogr2OgrError(sanitize_error_message(e))
+            raise Ogr2OgrError(sanitize_error_message(str(e)))
 
         return self.file_path
 
