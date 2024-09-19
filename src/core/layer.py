@@ -739,13 +739,23 @@ class OGRFileHandling:
         if self.file_ending == FileUploadType.gpkg.value:
             layer_name = layer.GetName()
         else:
-            layer_name = ""
+            layer_name = None
 
         # Build CMD command
-        cmd = f"""ogr2ogr -f "PostgreSQL" "PG:host={settings.POSTGRES_SERVER} dbname={settings.POSTGRES_DB} user={settings.POSTGRES_USER} password={settings.POSTGRES_PASSWORD} port={settings.POSTGRES_PORT}" {self.file_path} {layer_name} -nln {temp_table_name} -t_srs "EPSG:4326" -progress -dim XY {geometry_type} -unsetFieldWidth"""
-        # Run as async task
-        task = asyncio.create_task(async_run_command(cmd))
-        await task
+        cmd = (
+            f'ogr2ogr -f "PostgreSQL" "PG:host={settings.POSTGRES_SERVER} dbname={settings.POSTGRES_DB} '
+            f'user={settings.POSTGRES_USER} password={settings.POSTGRES_PASSWORD} port={settings.POSTGRES_PORT}" '
+            f'"{self.file_path}" '
+        )
+        if layer_name:
+            cmd += f"{layer_name} "
+        cmd += f'-nln {temp_table_name} -t_srs "EPSG:4326" -progress -dim XY {geometry_type} -unsetFieldWidth'
+        try:
+            # Run as async task
+            task = asyncio.create_task(async_run_command(cmd))
+            await task
+        except Exception as e:
+            raise Ogr2OgrError(sanitize_error_message(str(e)))
 
         # Close data source
         data_source = None
