@@ -11,16 +11,15 @@ from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from geoalchemy2.shape import WKTElement
 from pydantic import BaseModel
-from sqlalchemy import and_, exists, func, or_, select, text
+from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import contains_eager, selectinload
 from sqlmodel import SQLModel
 from starlette.datastructures import UploadFile
 
 # Local application imports
 from src.core.config import settings
+from src.core.content import build_shared_with_object, create_query_shared_content
 from src.core.job import CRUDFailedJob, job_init, job_log, run_background_or_immediately
-from src.core.content import create_query_shared_content, build_shared_with_object
 from src.core.layer import (
     CRUDLayerBase,
     FileUpload,
@@ -956,7 +955,7 @@ class CRUDLayerExport:
         # Build select query based on attribute mapping
         select_query = ""
         for key, value in layer.attribute_mapping.items():
-            select_query += f"{key} AS {value}, "
+            select_query += f"{key} AS \"{value}\", "
 
         # Add id and geom
         if layer.type == LayerType.feature:

@@ -18,16 +18,16 @@ from openpyxl import load_workbook
 from osgeo import ogr, osr
 from pydantic import BaseModel, HttpUrl
 from pyproj import CRS
+from qgis.core import (
+    QgsProject,
+    QgsVectorFileWriter,
+    QgsVectorLayer,
+)
 from shapely import wkb
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import select, text
 from sqlmodel import SQLModel
 from starlette.datastructures import UploadFile
-from qgis.core import (
-    QgsVectorLayer,
-    QgsVectorFileWriter,
-    QgsProject,
-)
 
 # Local application imports
 from src.core.config import settings
@@ -57,8 +57,8 @@ from src.utils import (
     async_delete_dir,
     async_run_command,
     async_scandir,
-    sanitize_error_message,
     print_warning,
+    sanitize_error_message,
 )
 
 
@@ -293,7 +293,7 @@ class FetchLayerExternalService:
                 layer,
                 self.output_file,
                 QgsProject.instance().transformContext(),
-                options
+                options,
             )
             # Remove layer from project
             QgsProject.instance().removeMapLayer(layer)
@@ -303,9 +303,8 @@ class FetchLayerExternalService:
 
             return
         except Exception as e:
-            print_warning(f"QGIS failed to fetch WFS data, falling back to OGR.")
+            print_warning("QGIS failed to fetch WFS data, falling back to OGR.")
             print_warning(f"QGIS error: {e}")
-
 
         # Second, attempt to fetch data using OGR
         ogr.UseExceptions()
@@ -318,7 +317,9 @@ class FetchLayerExternalService:
         # Create output data source
         self.output_data_source = output_driver.CreateDataSource(self.output_file)
         if self.output_data_source is None:
-            raise Exception(f"Could not create output data source at {self.output_file}")
+            raise Exception(
+                f"Could not create output data source at {self.output_file}"
+            )
 
         # Initialize WFS data source
         wfs_data_source = ogr.Open(f"WFS:{str(self.url)}")
@@ -506,9 +507,7 @@ class OGRFileHandling:
                     raise Exception(
                         "Could not determine geometry type for layer, no features exist."
                     )
-            geometry_type = ogr.GeometryTypeToName(geometry_type).replace(
-                " ", "_"
-            )
+            geometry_type = ogr.GeometryTypeToName(geometry_type).replace(" ", "_")
 
             # Strip the "Measured " from beginning of the the geometry type name
             geometry_type = geometry_type.replace("Measured_", "")
@@ -825,6 +824,7 @@ class OGRFileHandling:
             to_crs_flag = ""
 
         # Build CMD command
+        sql_query = sql_query.replace('"', '\\"')
         cmd = f"""ogr2ogr -f "{OgrDriverType[file_type.value].value}" "{self.file_path}" PG:"host={settings.POSTGRES_SERVER} dbname={settings.POSTGRES_DB} user={settings.POSTGRES_USER} password={settings.POSTGRES_PASSWORD} port={settings.POSTGRES_PORT}" -sql "{sql_query}" -nln "{layer.name}" {to_crs_flag} -progress"""
         try:
             # Run as async task
