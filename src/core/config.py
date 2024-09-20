@@ -15,7 +15,7 @@ class SyncPostgresDsn(PostgresDsn):
 
 
 class Settings(BaseSettings):
-    AUTH: Optional[bool] = False
+    AUTH: Optional[bool] = True
     TEST_MODE: Optional[bool] = False
     ENVIRONMENT: Optional[str] = "dev"
     API_V2_STR: str = "/api/v2"

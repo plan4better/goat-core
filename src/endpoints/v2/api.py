@@ -10,6 +10,7 @@ from . import (
     system,
     tool,
     user,
+    status,
 )
 
 router = APIRouter()
@@ -31,3 +32,4 @@ router.include_router(
     tags=["Motorized Mobility Indicators"],
 )
 router.include_router(tool.router, prefix="/tool", tags=["Toolbox"])
+router.include_router(status.router, prefix="/status", tags=["Status"])

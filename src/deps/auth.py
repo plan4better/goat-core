@@ -79,27 +79,31 @@ async def auth_z(
     user_token: dict = Depends(user_token),
     async_session: AsyncSession = Depends(get_db),
 ) -> bool:
-    try:
-        user_id = user_token["sub"]
-        path = request.scope.get("path")
-        route = request.scope.get("route")
-        method = request.scope.get("method")
-        if path and route and method and user_id:
-            cleaned_path = clean_path(
-                path
-            )  # e.g /organizations/b65e040a-f8f0-453f-9888-baa2b9342cce
-            cleaned_route_path = clean_path(
-                route.path
-            )  # e.g /organizations/{organization_id}
-            authz_query = text(
-                f"SELECT * FROM {settings.ACCOUNTS_SCHEMA}.authorization('{user_id}', '{cleaned_route_path}', '{cleaned_path}', '{method}');"
-            )
-            response = await async_session.execute(authz_query)
-            state = response.scalars().all()
-            if not state or not len(state) or state[0] is False:
-                raise ValueError("Unauthorized")
-            return True
-        else:
-            raise ValueError("Missing path, route, or method in request scope")
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    if settings.AUTH is not False:
+        try:
+            user_id = user_token["sub"]
+            path = request.scope.get("path")
+            route = request.scope.get("route")
+            method = request.scope.get("method")
+            if path and route and method and user_id:
+                cleaned_path = clean_path(
+                    path
+                )  # e.g /organizations/b65e040a-f8f0-453f-9888-baa2b9342cce
+                cleaned_route_path = clean_path(
+                    route.path
+                )  # e.g /organizations/{organization_id}
+                authz_query = text(
+                    f"SELECT * FROM {settings.ACCOUNTS_SCHEMA}.authorization('{user_id}', '{cleaned_route_path}', '{cleaned_path}', '{method}');"
+                )
+                response = await async_session.execute(authz_query)
+                state = response.scalars().all()
+                if not state or not len(state) or state[0] is False:
+                    raise ValueError("Unauthorized")
+                return True
+            else:
+                raise ValueError("Missing path, route, or method in request scope")
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    return True
