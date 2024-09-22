@@ -60,7 +60,7 @@ BEGIN
 		SELECT DISTINCT basic.fill_polygon_h3(geom, 3) AS h3_index
 		FROM polygons 
 	)
-	SELECT to_short_h3_3(h3_index::bigint) AS h3_3, ST_SETSRID(h3_cell_to_boundary(h3_index)::geometry, 4326) AS geom, 
+	SELECT basic.to_short_h3_3(h3_index::bigint) AS h3_3, ST_SETSRID(h3_cell_to_boundary(h3_index)::geometry, 4326) AS geom, 
 	ST_Exteriorring(ST_SETSRID(h3_cell_to_boundary(h3_index)::geometry, 4326)) AS border 
 	FROM h3_3_ids;  
 	CREATE INDEX ON h3_3_grids_uuid USING GIST(geom); 
