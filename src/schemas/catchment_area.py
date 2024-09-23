@@ -207,7 +207,7 @@ class CatchmentAreaTravelDistanceCostMotorizedMobility(BaseModel):
 """Catchment area decay function schemas."""
 
 
-class CatchmentAreaDecayFunctionTypePT(Enum):
+class CatchmentAreaDecayFunctionTypePT(str, Enum):
     LOGISTIC = "logistic"
     LINEAR = "linear"
     EXPONENTIAL = "exponential"
