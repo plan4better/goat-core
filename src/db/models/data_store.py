@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, List
 from uuid import UUID
 
+from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
     Column,
     Field,
@@ -9,13 +10,13 @@ from sqlmodel import (
     Text,
     text,
 )
-
 from ._base_class import DateTimeBase
-from sqlalchemy.dialects.postgresql import UUID as UUID_PG
+from src.core.config import settings
 
 if TYPE_CHECKING:
     from src.schemas.data_store import DataStoreType
     from .layer import Layer
+
 
 # TODO: Add further attributes for the different data store types
 class DataStoreBase(SQLModel):
@@ -28,11 +29,14 @@ class DataStore(DataStoreBase, DateTimeBase, table=True):
     """Data store model."""
 
     __tablename__ = "data_store"
-    __table_args__ = {"schema": "customer"}
+    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
 
     id: UUID | None = Field(
         sa_column=Column(
-            UUID_PG(as_uuid=True), primary_key=True, nullable=False, server_default=text("uuid_generate_v4()")
+            UUID_PG(as_uuid=True),
+            primary_key=True,
+            nullable=False,
+            server_default=text("uuid_generate_v4()"),
         )
     )
     # Relationships

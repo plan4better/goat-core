@@ -1,5 +1,6 @@
-from sqlmodel import Field, SQLModel, Column, DateTime, Text
 from datetime import datetime
+from sqlmodel import Column, DateTime, Field, SQLModel, Text
+from src.core.config import settings
 
 class SystemTaskBase(SQLModel):
     """Base class for system tasks requiring a last run timestamp."""
@@ -18,8 +19,9 @@ class SystemTaskBase(SQLModel):
         ),
     )
 
+
 class SystemTask(SystemTaskBase, table=True):
     """Table class for system tasks requiring a last run timestamp."""
 
     __tablename__ = "system_task"
-    __table_args__ = {"schema": "customer"}
+    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}

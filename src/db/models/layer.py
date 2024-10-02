@@ -27,7 +27,7 @@ from src.db.models._base_class import ContentBaseAttributes, DateTimeBase
 if TYPE_CHECKING:
     from src.db.models.folder import Folder
 
-    from ._link_model import LayerProjectLink
+    from ._link_model import LayerOrganizationLink, LayerProjectLink, LayerTeamLink
     from .data_store import DataStore
 
 
@@ -353,7 +353,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     """Layer model."""
 
     __tablename__ = "layer"
-    __table_args__ = {"schema": "customer"}
+    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
 
     id: UUID | None = Field(
         sa_column=Column(
@@ -367,7 +367,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     user_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey("customer.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Layer owner ID",
@@ -375,7 +375,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     folder_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey("customer.folder.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.folder.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Layer folder ID",
@@ -384,7 +384,10 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         sa_column=Column(Text, nullable=False), description="Layer type"
     )
     data_store_id: UUID | None = Field(
-        sa_column=Column(UUID_PG(as_uuid=True), ForeignKey("customer.data_store.id")),
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.data_store.id"),
+        ),
         description="Data store ID of the layer",
     )
     extent: str | None = Field(
@@ -448,6 +451,12 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         back_populates="layer", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
     folder: "Folder" = Relationship(back_populates="layers")
+    organization_links: List["LayerOrganizationLink"] = Relationship(
+        back_populates="layer", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    team_links: List["LayerTeamLink"] = Relationship(
+        back_populates="layer", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
     @validator("extent", pre=True)
     def wkt_to_geojson(cls, v):

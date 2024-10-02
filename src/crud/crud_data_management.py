@@ -81,7 +81,7 @@ class CRUDJoin(CRUDToolBase):
             + list(result_column.keys())[0]
         )
         select_columns = ", ".join(
-            f"{target_layer_project.table_name}." + value
+            "target_layer." + value
             for value in ["geom"] + list(target_layer_project.attribute_mapping.keys())
         )
         insert_statement = (
@@ -90,13 +90,16 @@ class CRUDJoin(CRUDToolBase):
 
         # Get statistics column query
         statistics_column_query = get_statistics_sql(
-            f"{join_layer_project.table_name}." + mapped_statistics_field,
+            "join_layer." + mapped_statistics_field,
             operation=params.column_statistics.operation,
         )
 
         # Build combined where query
         where_query = build_where_clause(
-            [target_layer_project.where_query, join_layer_project.where_query]
+            [
+                target_layer_project.where_query.replace(f"{target_layer_project.table_name}.", "target_layer."),
+                join_layer_project.where_query.replace(f"{join_layer_project.table_name}.", "join_layer.")
+            ],
         )
 
         # Create query
@@ -104,9 +107,9 @@ class CRUDJoin(CRUDToolBase):
             insert_statement
             + f"""
             SELECT '{layer_in.id}', {select_columns}, {statistics_column_query}
-            FROM {target_layer_project.table_name}
-            LEFT JOIN {join_layer_project.table_name}
-            ON {target_layer_project.table_name}.{mapped_target_field}::text = {join_layer_project.table_name}.{mapped_join_field}::text
+            FROM {target_layer_project.table_name} target_layer
+            LEFT JOIN {join_layer_project.table_name} join_layer
+            ON target_layer.{mapped_target_field}::text = join_layer.{mapped_join_field}::text
             {where_query}
             GROUP BY {select_columns}
         """

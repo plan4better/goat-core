@@ -18,16 +18,16 @@ from openpyxl import load_workbook
 from osgeo import ogr, osr
 from pydantic import BaseModel, HttpUrl
 from pyproj import CRS
+from qgis.core import (
+    QgsProject,
+    QgsVectorFileWriter,
+    QgsVectorLayer,
+)
 from shapely import wkb
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import select, text
 from sqlmodel import SQLModel
 from starlette.datastructures import UploadFile
-from qgis.core import (
-    QgsVectorLayer,
-    QgsVectorFileWriter,
-    QgsProject,
-)
 
 # Local application imports
 from src.core.config import settings
@@ -57,8 +57,8 @@ from src.utils import (
     async_delete_dir,
     async_run_command,
     async_scandir,
-    sanitize_error_message,
     print_warning,
+    sanitize_error_message,
 )
 
 
@@ -258,6 +258,8 @@ class FileUpload:
 
 class FetchLayerExternalService:
     def __init__(self, url: HttpUrl, output_file: str):
+        self.MAX_FEATURE_COUNT = 100000
+
         self.url = url
         self.output_file = output_file
 
@@ -276,6 +278,13 @@ class FetchLayerExternalService:
             if not layer.isValid():
                 raise ValueError(f"Unable to open layer: {layer_name}")
 
+            # Ensure layer is not too large
+            feature_count = layer.featureCount()
+            if feature_count > self.MAX_FEATURE_COUNT:
+                raise ValueError(
+                    f"Layer {layer_name} contains too many features ({feature_count})."
+                )
+
             # Add layer to project and write to GeoJSON file
             QgsProject.instance().addMapLayer(layer)
             options = QgsVectorFileWriter.SaveVectorOptions()
@@ -284,7 +293,7 @@ class FetchLayerExternalService:
                 layer,
                 self.output_file,
                 QgsProject.instance().transformContext(),
-                options
+                options,
             )
             # Remove layer from project
             QgsProject.instance().removeMapLayer(layer)
@@ -294,9 +303,8 @@ class FetchLayerExternalService:
 
             return
         except Exception as e:
-            print_warning(f"QGIS failed to fetch WFS data, falling back to OGR.")
+            print_warning("QGIS failed to fetch WFS data, falling back to OGR.")
             print_warning(f"QGIS error: {e}")
-
 
         # Second, attempt to fetch data using OGR
         ogr.UseExceptions()
@@ -309,7 +317,9 @@ class FetchLayerExternalService:
         # Create output data source
         self.output_data_source = output_driver.CreateDataSource(self.output_file)
         if self.output_data_source is None:
-            raise Exception(f"Could not create output data source at {self.output_file}")
+            raise Exception(
+                f"Could not create output data source at {self.output_file}"
+            )
 
         # Initialize WFS data source
         wfs_data_source = ogr.Open(f"WFS:{str(self.url)}")
@@ -320,6 +330,13 @@ class FetchLayerExternalService:
         input_layer = wfs_data_source.GetLayerByName(layer_name)
         if input_layer is None:
             raise ValueError(f"Could not find layer {layer_name} in WFS service.")
+
+        # Ensure layer is not too large
+        feature_count = input_layer.GetFeatureCount()
+        if feature_count > self.MAX_FEATURE_COUNT:
+            raise ValueError(
+                f"Layer {layer_name} contains too many features ({feature_count})."
+            )
 
         # Get the layer definition
         input_layer_defn = input_layer.GetLayerDefn()
@@ -490,9 +507,7 @@ class OGRFileHandling:
                     raise Exception(
                         "Could not determine geometry type for layer, no features exist."
                     )
-            geometry_type = ogr.GeometryTypeToName(geometry_type).replace(
-                " ", "_"
-            )
+            geometry_type = ogr.GeometryTypeToName(geometry_type).replace(" ", "_")
 
             # Strip the "Measured " from beginning of the the geometry type name
             geometry_type = geometry_type.replace("Measured_", "")
@@ -724,13 +739,23 @@ class OGRFileHandling:
         if self.file_ending == FileUploadType.gpkg.value:
             layer_name = layer.GetName()
         else:
-            layer_name = ""
+            layer_name = None
 
         # Build CMD command
-        cmd = f"""ogr2ogr -f "PostgreSQL" "PG:host={settings.POSTGRES_SERVER} dbname={settings.POSTGRES_DB} user={settings.POSTGRES_USER} password={settings.POSTGRES_PASSWORD} port={settings.POSTGRES_PORT}" {self.file_path} {layer_name} -nln {temp_table_name} -t_srs "EPSG:4326" -progress -dim XY {geometry_type} -unsetFieldWidth"""
-        # Run as async task
-        task = asyncio.create_task(async_run_command(cmd))
-        await task
+        cmd = (
+            f'ogr2ogr -f "PostgreSQL" "PG:host={settings.POSTGRES_SERVER} dbname={settings.POSTGRES_DB} '
+            f'user={settings.POSTGRES_USER} password={settings.POSTGRES_PASSWORD} port={settings.POSTGRES_PORT}" '
+            f'"{self.file_path}" '
+        )
+        if layer_name:
+            cmd += f"{layer_name} "
+        cmd += f'-nln {temp_table_name} -t_srs "EPSG:4326" -progress -dim XY {geometry_type} -unsetFieldWidth'
+        try:
+            # Run as async task
+            task = asyncio.create_task(async_run_command(cmd))
+            await task
+        except Exception as e:
+            raise Ogr2OgrError(sanitize_error_message(str(e)))
 
         # Close data source
         data_source = None
@@ -809,13 +834,14 @@ class OGRFileHandling:
             to_crs_flag = ""
 
         # Build CMD command
+        sql_query = sql_query.replace('"', '\\"')
         cmd = f"""ogr2ogr -f "{OgrDriverType[file_type.value].value}" "{self.file_path}" PG:"host={settings.POSTGRES_SERVER} dbname={settings.POSTGRES_DB} user={settings.POSTGRES_USER} password={settings.POSTGRES_PASSWORD} port={settings.POSTGRES_PORT}" -sql "{sql_query}" -nln "{layer.name}" {to_crs_flag} -progress"""
         try:
             # Run as async task
             task = asyncio.create_task(async_run_command(cmd))
             await task
         except Exception as e:
-            raise Ogr2OgrError(sanitize_error_message(e))
+            raise Ogr2OgrError(sanitize_error_message(str(e)))
 
         return self.file_path
 

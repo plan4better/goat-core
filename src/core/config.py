@@ -15,6 +15,7 @@ class SyncPostgresDsn(PostgresDsn):
 
 
 class Settings(BaseSettings):
+    AUTH: Optional[bool] = True
     TEST_MODE: Optional[bool] = False
     ENVIRONMENT: Optional[str] = "dev"
     API_V2_STR: str = "/api/v2"
@@ -23,6 +24,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: Optional[str] = "GOAT Core API"
     USER_DATA_SCHEMA: Optional[str] = "user_data"
     CUSTOMER_SCHEMA: Optional[str] = "customer"
+    ACCOUNTS_SCHEMA: Optional[str] = "accounts"
     REGION_MAPPING_PT_TABLE: Optional[str] = "basic.region_mapping_pt"
     BASE_STREET_NETWORK: Optional[UUID] = "903ecdca-b717-48db-bbce-0219e41439cf"
 
@@ -115,6 +117,8 @@ class Settings(BaseSettings):
         return None
 
     SAMPLE_AUTHORIZATION = "Bearer eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICI0OG80Z1JXelh3YXBTY3NTdHdTMXZvREFJRlNOa0NtSVFpaDhzcEJTc2kwIn0.eyJleHAiOjE2OTEwMDQ1NTYsImlhdCI6MTY5MTAwNDQ5NiwiYXV0aF90aW1lIjoxNjkxMDAyNjIzLCJqdGkiOiI1MjBiN2RhNC0xYmM0LTRiM2QtODY2ZC00NDU0ODY2YThiYjIiLCJpc3MiOiJodHRwczovL2Rldi5hdXRoLnBsYW40YmV0dGVyLmRlL3JlYWxtcy9tYXN0ZXIiLCJzdWIiOiI3NDRlNGZkMS02ODVjLTQ5NWMtOGIwMi1lZmViY2U4NzUzNTkiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJzZWN1cml0eS1hZG1pbi1jb25zb2xlIiwibm9uY2UiOiJjNGIzMDQ3Yi0xODVmLTQyOWEtOGZlNS1lNDliNTVhMzE3MzIiLCJzZXNzaW9uX3N0YXRlIjoiMzk5ZTc2NWMtYjM1MC00NDEwLTg4YTMtYjU5NDIyMmJkZDlhIiwiYWNyIjoiMCIsImFsbG93ZWQtb3JpZ2lucyI6WyJodHRwczovL2Rldi5hdXRoLnBsYW40YmV0dGVyLmRlIl0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJzaWQiOiIzOTllNzY1Yy1iMzUwLTQ0MTAtODhhMy1iNTk0MjIyYmRkOWEiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInByZWZlcnJlZF91c2VybmFtZSI6InA0YiJ9.mjywr9Dv19egsXwM1fK6g3sZ0trk87X0tEfK7oOizuBuCdkr6PZN1Eg58FCdjIgEBXqjltOWV43UIkXde4iPVa-KU5Q34Qjv6w0STa3Aq9vFbaUfSm_690qCdr8XSKMJUWQXWYwD2cjck5UCqf7-QqsF2Ab56i40_CJLZkJOi25WKIC855qPDi8BkJgh5eWoxobdyCbwJMEeoM-3QnxY5ikib5a2_AASEN3_5MYmT6-fvpW2t-MS6u4vtcG-WfqriK8YNoGPS2a1pFjLqQLHkM__j0O_t4wXP56x9yjkUdHCXqVcSlDvZYNWrv5CLqecqjOoliNMs6RTu9gV0Gr-cA"
+    KEYCLOAK_SERVER_URL: Optional[str] = "http://auth-keycloak:8080"
+    REALM_NAME: Optional[str] = "p4b"
     CELERY_TASK_TIME_LIMIT: Optional[int] = 60  # seconds
     RUN_AS_BACKGROUND_TASK: Optional[bool] = True
     MAX_NUMBER_PARALLEL_JOBS: Optional[int] = 6
@@ -174,5 +178,4 @@ class Settings(BaseSettings):
         case_sensitive = True
 
 
-settings = Settings()
 settings = Settings()

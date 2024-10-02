@@ -18,6 +18,7 @@ from starlette.datastructures import UploadFile
 
 # Local application imports
 from src.core.config import settings
+from src.core.content import build_shared_with_object, create_query_shared_content
 from src.core.job import CRUDFailedJob, job_init, job_log, run_background_or_immediately
 from src.core.layer import (
     CRUDLayerBase,
@@ -28,7 +29,14 @@ from src.core.layer import (
 )
 from src.crud.base import CRUDBase
 from src.crud.crud_layer_project import layer_project as crud_layer_project
-from src.db.models.layer import Layer
+from src.db.models import (
+    Layer,
+    LayerOrganizationLink,
+    LayerTeamLink,
+    Organization,
+    Role,
+    Team,
+)
 from src.schemas.error import (
     ColumnNotFoundError,
     LayerNotFoundError,
@@ -524,6 +532,8 @@ class CRUDLayer(CRUDLayerBase):
         user_id: UUID,
         params: ILayerGet | ICatalogLayerGet,
         attributes_to_exclude: list = [],
+        team_id: UUID = None,
+        organization_id: UUID = None,
     ):
         """Get filter for get layer queries."""
         filters = []
@@ -538,22 +548,34 @@ class CRUDLayer(CRUDLayerBase):
                 )
                 and value is not None
             ):
+                # Avoid adding folder_id in case team_id or organization_id is provided
+                if key == "folder_id" and (team_id or organization_id):
+                    continue
+
                 # Convert value to list if not list
                 if not isinstance(value, list):
                     value = [value]
                 filters.append(getattr(Layer, key).in_(value))
 
-        # Check if ILayer get then it is for user owned layers
+        # Check if ILayer get then it is organization layers
         if isinstance(params, ILayerGet):
             if params.in_catalog is not None:
-                filters.append(
-                    and_(
-                        Layer.in_catalog == bool(params.in_catalog),
-                        Layer.user_id == user_id,
+                if not team_id and not organization_id:
+                    filters.append(
+                        and_(
+                            Layer.in_catalog == bool(params.in_catalog),
+                            Layer.user_id == user_id,
+                        )
                     )
-                )
+                else:
+                    filters.append(
+                        and_(
+                            Layer.in_catalog == bool(params.in_catalog),
+                        )
+                    )
             else:
-                filters.append(Layer.user_id == user_id)
+                if not team_id and not organization_id:
+                    filters.append(Layer.user_id == user_id)
         else:
             filters.append(Layer.in_catalog == bool(True))
 
@@ -582,6 +604,8 @@ class CRUDLayer(CRUDLayerBase):
         order: str,
         page_params: PaginationParams,
         params: ILayerGet | ICatalogLayerGet,
+        team_id: UUID = None,
+        organization_id: UUID = None,
     ):
         """Get layer with filter."""
 
@@ -597,10 +621,31 @@ class CRUDLayer(CRUDLayerBase):
                 detail="Feature layer type can only be set when layer type is feature",
             )
         # Get base filter
-        filters = await self.get_base_filter(user_id=user_id, params=params)
+        filters = await self.get_base_filter(
+            user_id=user_id,
+            params=params,
+            team_id=team_id,
+            organization_id=organization_id,
+        )
+
+        # Get roles
+        roles = await CRUDBase(Role).get_all(
+            async_session,
+        )
+        role_mapping = {role.id: role.name for role in roles}
 
         # Build query
-        query = select(Layer).where(and_(*filters))
+        query = create_query_shared_content(
+            Layer,
+            LayerTeamLink,
+            LayerOrganizationLink,
+            Team,
+            Organization,
+            Role,
+            filters,
+            team_id=team_id,
+            organization_id=organization_id,
+        )
 
         # Build params
         params = {
@@ -617,6 +662,16 @@ class CRUDLayer(CRUDLayerBase):
             page_params=page_params,
             **params,
         )
+        layers_arr = build_shared_with_object(
+            items=layers.items,
+            role_mapping=role_mapping,
+            team_key="team_links",
+            org_key="organization_links",
+            model_name="layer",
+            team_id=team_id,
+            organization_id=organization_id,
+        )
+        layers.items = layers_arr
         return layers
 
     async def metadata_aggregate(
@@ -900,7 +955,7 @@ class CRUDLayerExport:
         # Build select query based on attribute mapping
         select_query = ""
         for key, value in layer.attribute_mapping.items():
-            select_query += f"{key} AS {value}, "
+            select_query += f"{key} AS \"{value}\", "
 
         # Add id and geom
         if layer.type == LayerType.feature:

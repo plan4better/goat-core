@@ -1,24 +1,12 @@
-from sqlmodel import Field, SQLModel, Column, DateTime, text
 from datetime import datetime, timezone
-from typing import Optional, Any, List
-from sqlalchemy.ext.declarative import as_declarative, declared_attr
-from sqlalchemy.dialects.postgresql import UUID as UUID_PG
-from sqlalchemy import ForeignKey, Text, ARRAY
+from typing import Any, List, Optional
 from uuid import UUID
 
-
-# class DateTimeBase(SQLModel):
-#     """Base class for models with created_at and updated_at fields."""
-
-#     updated_at: Optional[datetime] = Field(
-#         sa_column=Column(DateTime(timezone=True), nullable=False, onupdate=datetime.utcnow),
-#         default_factory=datetime.utcnow,
-#     )
-#     created_at: Optional[datetime] = Field(
-#         sa_column=Column(
-#             DateTime(timezone=True), nullable=False, server_default=text("timezone('UTC', now())")
-#         )
-#     )
+from sqlalchemy import ARRAY, ForeignKey, Text
+from sqlalchemy.dialects.postgresql import UUID as UUID_PG
+from sqlalchemy.ext.declarative import as_declarative, declared_attr
+from sqlmodel import Column, DateTime, Field, SQLModel, text
+from src.core.config import settings
 
 
 class DateTimeBase(SQLModel):
@@ -34,7 +22,9 @@ class DateTimeBase(SQLModel):
         sa_column=Column(
             DateTime(timezone=True),
             nullable=False,
-            server_default=text("""to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SSOF')::timestamptz"""),
+            server_default=text(
+                """to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SSOF')::timestamptz"""
+            ),
         )
     )
 
@@ -45,7 +35,7 @@ class ContentBaseAttributes(SQLModel):
     folder_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey("customer.folder.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.folder.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Layer folder ID",

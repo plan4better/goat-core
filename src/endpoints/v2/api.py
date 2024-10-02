@@ -7,10 +7,10 @@ from . import (
     layer,
     motorized_mobility,
     project,
-    report,
     system,
     tool,
     user,
+    status,
 )
 
 router = APIRouter()
@@ -19,7 +19,6 @@ router.include_router(user.router, prefix="/user", tags=["User"])
 router.include_router(folder.router, prefix="/folder", tags=["Folder"])
 router.include_router(layer.router, prefix="/layer", tags=["Layer"])
 router.include_router(project.router, prefix="/project", tags=["Project"])
-router.include_router(report.router, prefix="/report", tags=["Report"])
 router.include_router(job.router, prefix="/job", tags=["Job"])
 router.include_router(system.router, prefix="/system", tags=["System Settings"])
 router.include_router(
@@ -33,3 +32,4 @@ router.include_router(
     tags=["Motorized Mobility Indicators"],
 )
 router.include_router(tool.router, prefix="/tool", tags=["Toolbox"])
+router.include_router(status.router, prefix="/status", tags=["Status"])

@@ -9,7 +9,7 @@ BEGIN
 	SELECT ARRAY_AGG(z.h3_3)
 	INTO h3_3_arr
 	FROM (
-		SELECT to_short_h3_3(h3_grid_ring_unsafe(to_full_from_short_h3_3(h3_3_input::integer)::h3index)::bigint) AS h3_3
+		SELECT basic.to_short_h3_3(h3_grid_ring_unsafe(to_full_from_short_h3_3(h3_3_input::integer)::h3index)::bigint) AS h3_3
 		UNION ALL
 		SELECT h3_3_input
 	) z;

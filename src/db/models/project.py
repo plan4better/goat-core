@@ -20,14 +20,19 @@ from src.db.models._base_class import DateTimeBase
 from src.db.models.layer import ContentBaseAttributes
 
 if TYPE_CHECKING:
-    from _link_model import LayerProjectLink, UserProjectLink
-    from .report import Report
+    from _link_model import (
+        LayerProjectLink,
+        ProjectOrganizationLink,
+        ProjectTeamLink,
+        UserProjectLink,
+    )
+
     from .scenario import Scenario
 
 
 class Project(ContentBaseAttributes, DateTimeBase, table=True):
     __tablename__ = "project"
-    __table_args__ = {"schema": "customer"}
+    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
 
     id: UUID | None = Field(
         sa_column=Column(
@@ -41,7 +46,7 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
     user_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey("customer.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Project owner ID",
@@ -49,7 +54,7 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
     folder_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey("customer.folder.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.folder.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Project folder ID",
@@ -74,10 +79,6 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         default=settings.DEFAULT_PROJECT_THUMBNAIL,
     )
     # Relationships
-    reports: List["Report"] = Relationship(
-        back_populates="project",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
     user_projects: List["UserProjectLink"] = Relationship(
         back_populates="project",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
@@ -87,6 +88,14 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     scenarios: List["Scenario"] = Relationship(
+        back_populates="project",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+    team_links: List["ProjectTeamLink"] = Relationship(
+        back_populates="project",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+    organization_links: List["ProjectOrganizationLink"] = Relationship(
         back_populates="project",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )

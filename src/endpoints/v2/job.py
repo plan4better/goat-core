@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.crud.crud_job import job as crud_job
 from src.db.models.job import Job
+from src.deps.auth import auth_z
 from src.endpoints.deps import get_db, get_user_id
 from src.schemas.common import OrderEnum
 from src.schemas.job import JobStatusType, JobType
@@ -22,6 +23,7 @@ router = APIRouter()
     response_model_exclude_none=True,
     status_code=200,
     summary="Get a job by its ID.",
+    dependencies=[Depends(auth_z)],
 )
 async def get_job(
     async_session: AsyncSession = Depends(get_db),
@@ -49,6 +51,7 @@ async def get_job(
     response_model_exclude_none=True,
     status_code=200,
     summary="Retrieve a list of jobs using different filters.",
+    dependencies=[Depends(auth_z)],
 )
 async def read_jobs(
     async_session: AsyncSession = Depends(get_db),
@@ -107,6 +110,7 @@ async def read_jobs(
     response_model_exclude_none=True,
     status_code=200,
     summary="Mark jobs as read.",
+    dependencies=[Depends(auth_z)],
 )
 async def mark_jobs_as_read(
     async_session: AsyncSession = Depends(get_db),
@@ -132,6 +136,7 @@ async def mark_jobs_as_read(
     response_model_exclude_none=True,
     status_code=200,
     summary="Kill a job.",
+    dependencies=[Depends(auth_z)],
 )
 async def kill_job(
     async_session: AsyncSession = Depends(get_db),
