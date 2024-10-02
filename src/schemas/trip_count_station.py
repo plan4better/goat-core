@@ -66,7 +66,11 @@ public_transport_types = {
         715: "Demand and Response Bus Service",
         800: "Trolleybus Service",
     },
-    "tram": {0: "Tram, Streetcar, Light rail", 900: "Tram Service"},
+    "tram": {
+        0: "Tram, Streetcar, Light rail",
+        5: "Cable tram",
+        900: "Tram Service",
+    },
     "metro": {
         1: "Subway, Metro",
         400: "Metro Service",
