@@ -73,6 +73,7 @@ class CRUDHeatmapClosestAverage(CRUDHeatmapBase):
                     '{layer["where_query"].replace("'", "''")}',
                     '{temp_points}',
                     {TRAVELTIME_MATRIX_RESOLUTION[routing_type]},
+                    {layer["geom_type"] == FeatureGeometryType.polygon},
                     {append_to_existing}
                 )"""
             )
@@ -94,16 +95,20 @@ class CRUDHeatmapClosestAverage(CRUDHeatmapBase):
         query = f"""
             INSERT INTO {result_table} (layer_id, geom, text_attr1, float_attr1)
             WITH grouped AS (
-                SELECT dest_id.value AS dest_id, (ARRAY_AGG(sub_matrix.traveltime ORDER BY sub_matrix.traveltime))[1:sub_matrix.num_destinations] AS traveltime
+                SELECT dest_id, (ARRAY_AGG(traveltime ORDER BY traveltime))[1:num_destinations] AS traveltime
                 FROM (
-                    SELECT matrix.orig_id, matrix.dest_id, matrix.traveltime, opportunity.num_destinations
-                    FROM {opportunity_table} opportunity, {TRAVELTIME_MATRIX_TABLE[params.routing_type]} matrix
-                    WHERE matrix.h3_3 = opportunity.h3_3
-                    AND matrix.orig_id = opportunity.h3_index
-                    AND matrix.traveltime <= opportunity.max_traveltime
-                ) sub_matrix
-                JOIN LATERAL UNNEST(sub_matrix.dest_id) dest_id(value) ON TRUE
-                GROUP BY dest_id.value, sub_matrix.num_destinations
+                    SELECT opportunity_id, dest_id.value AS dest_id, min(traveltime) AS traveltime, num_destinations
+                    FROM (
+                        SELECT opportunity.id AS opportunity_id, matrix.orig_id, matrix.dest_id, matrix.traveltime, opportunity.num_destinations
+                        FROM {opportunity_table} opportunity, {TRAVELTIME_MATRIX_TABLE[params.routing_type]} matrix
+                        WHERE matrix.h3_3 = opportunity.h3_3
+                        AND matrix.orig_id = opportunity.h3_index
+                        AND matrix.traveltime <= opportunity.max_traveltime
+                    ) sub_matrix
+                    JOIN LATERAL UNNEST(sub_matrix.dest_id) dest_id(value) ON TRUE
+                    GROUP BY opportunity_id, dest_id.value, num_destinations
+                ) grouped_opportunities
+                GROUP BY dest_id, num_destinations
             )
             SELECT '{result_layer_id}', ST_SetSRID(h3_cell_to_boundary(grouped.dest_id)::geometry, 4326), grouped.dest_id,
                 AVG(traveltime.value) AS accessibility
