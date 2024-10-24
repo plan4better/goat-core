@@ -10,6 +10,7 @@ from src.schemas.layer import ToolType
 from src.schemas.toolbox_base import (
     DefaultResultLayerName,
     input_layer_type_point,
+    input_layer_type_point_polygon,
     input_layer_type_polygon,
 )
 
@@ -195,7 +196,7 @@ class HeatmapClosestAverageBase(BaseModel):
     @property
     def input_layer_types(self):
         return {
-            "opportunity_layer_project_id": input_layer_type_point,
+            "opportunity_layer_project_id": input_layer_type_point_polygon,
             "opportunity_geofence_layer_project_id": input_layer_type_polygon,
         }
 

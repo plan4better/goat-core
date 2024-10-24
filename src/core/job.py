@@ -1,12 +1,13 @@
 import asyncio
+import datetime
 import inspect
 import logging
-import datetime
 import uuid
 from functools import wraps
+from uuid import UUID
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
 
 from src.core.config import settings
 from src.crud.crud_job import job as crud_job
@@ -50,7 +51,6 @@ async def delete_orphan_data(
         else:
             condition = f"feature_layer_geometry_type = '{table.value}'"
 
-
         # Create temp table with layers owned by user
         await async_session.execute(text("DROP TABLE IF EXISTS temp_layer;"))
         temp_table_name = str(uuid.uuid4()).replace("-", "")
@@ -62,7 +62,9 @@ async def delete_orphan_data(
             AND user_id = '{str(user_id)}';
         """
         await async_session.execute(text(sql_temp_layer_table))
-        await async_session.execute(text(f"""ALTER TABLE temporal."{temp_table_name}" ADD PRIMARY KEY(id);"""))
+        await async_session.execute(
+            text(f"""ALTER TABLE temporal."{temp_table_name}" ADD PRIMARY KEY(id);""")
+        )
         await async_session.commit()
 
         # Get layer_ids to delete from user data table
@@ -78,12 +80,16 @@ async def delete_orphan_data(
         layer_ids_to_delete = [row[0] for row in layer_ids_to_delete.fetchall()]
 
         # Drop temp table
-        await async_session.execute(text(f"""DROP TABLE IF EXISTS temporal."{temp_table_name}";"""))
+        await async_session.execute(
+            text(f"""DROP TABLE IF EXISTS temporal."{temp_table_name}";""")
+        )
         await async_session.commit()
 
         # Delete orphan data
         if len(layer_ids_to_delete) > 0:
-            print(f"Orphan data for {table_name} with the following layer-ids: {layer_ids_to_delete}")
+            print(
+                f"Orphan data for {table_name} with the following layer-ids: {layer_ids_to_delete}"
+            )
             for layer_id in layer_ids_to_delete:
                 # Delete orphan data
                 sql_delete_orphan_data = f"""
@@ -120,8 +126,14 @@ async def run_failure_func(instance, func, *args, **kwargs):
         delete_temp_tables_func = getattr(instance, "delete_temp_tables", None)
         delete_created_layers = getattr(instance, "delete_created_layers", None)
         # Delete all orphan data that is older then 20 minutes
-        min_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=20)
-        await delete_orphan_data(async_session=instance.async_session, user_id=instance.user_id, last_run=min_time)
+        min_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+            minutes=20
+        )
+        await delete_orphan_data(
+            async_session=instance.async_session,
+            user_id=instance.user_id,
+            last_run=min_time,
+        )
         # Run delete temp tables function
         await delete_temp_tables_func()
         # Delete all layers created by the job
@@ -184,7 +196,10 @@ def job_init():
                 JobStatusType.failed.value,
             ]:
                 if kwargs.get("params"):
-                    payload = {"status_simple": JobStatusType.finished.value, "payload": kwargs["params"].dict(exclude_none=True)}
+                    payload = {
+                        "status_simple": JobStatusType.finished.value,
+                        "payload": kwargs["params"].json(exclude_none=True),
+                    }
                 else:
                     payload = {"status_simple": JobStatusType.finished.value}
 
@@ -366,7 +381,9 @@ class CRUDFailedJob:
         """Delete orphan data from user tables"""
 
         await delete_orphan_data(
-            async_session=self.async_session, user_id=self.user_id, last_run=datetime.datetime.now(datetime.timezone.utc)
+            async_session=self.async_session,
+            user_id=self.user_id,
+            last_run=datetime.datetime.now(datetime.timezone.utc),
         )
 
     async def delete_temp_tables(self):

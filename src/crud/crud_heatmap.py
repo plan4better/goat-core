@@ -52,6 +52,7 @@ class CRUDHeatmapBase(CRUDToolBase):
                 {
                     "table_name": layer_project.table_name,
                     "where_query": layer_project.where_query,
+                    "geom_type": layer_project.feature_layer_geometry_type,
                     "layer": layer,
                 }
             )

@@ -34,7 +34,7 @@ def decode_token(token: str):
         token,
         key=auth_key,
         options={
-            "verify_signature": True,
+            "verify_signature": settings.AUTH,
             "verify_aud": False,
             "verify_iss": ISSUER_URL,
         },
