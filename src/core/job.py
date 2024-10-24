@@ -184,7 +184,7 @@ def job_init():
                 JobStatusType.failed.value,
             ]:
                 if kwargs.get("params"):
-                    payload = {"status_simple": JobStatusType.finished.value, "payload": kwargs["params"].dict(exclude_none=True)}
+                    payload = {"status_simple": JobStatusType.finished.value, "payload": kwargs["params"].json(exclude_none=True)}
                 else:
                     payload = {"status_simple": JobStatusType.finished.value}
 
