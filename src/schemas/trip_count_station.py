@@ -68,7 +68,7 @@ public_transport_types = {
     },
     "tram": {
         0: "Tram, Streetcar, Light rail",
-        5: "Cable tram",
+        5: "Cable Tram",
         900: "Tram Service",
     },
     "metro": {
