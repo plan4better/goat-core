@@ -473,6 +473,7 @@ def build_where(id: UUID, table_name: str, query: str | dict, attribute_mapping:
             r"(ST_GeomFromWKB\((.*?)\))", r"ST_SetSRID(\1, 4326)", converted_cql
         )
         where = where + converted_cql
+        where = where.replace("LIKE", "ILIKE")
         return where
 
 
