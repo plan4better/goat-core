@@ -418,3 +418,4 @@ class IHeatmapConnectivityMotorized(HeatmapConnectivityBase):
                 "color_scale": "quantile",
             }
         }
+
