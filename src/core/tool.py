@@ -130,7 +130,7 @@ def get_statistics_sql(field, operation):
     field = convert_geom_measurement_field(field)
 
     if operation == ColumnStatisticsOperation.count:
-        query = f"COUNT({field})"
+        query = "COUNT(*)"
     elif operation == ColumnStatisticsOperation.sum:
         query = f"SUM({field})"
     # elif operation == ColumnStatisticsOperation.mean:
@@ -599,11 +599,14 @@ class CRUDToolBase(CRUDFailedJob):
                 "mapped_statistics_field_type": OgrPostgresType.Real.value,
             }
 
-        # Get mapped field
-        mapped_statistics_field = search_value(
-            layer_project.attribute_mapping, column_statistics_field
-        )
-        mapped_statistics_field_type = mapped_statistics_field.split("_")[0]
+        # Get mapped field if operation type is not count
+        mapped_statistics_field = None
+        mapped_statistics_field_type = None
+        if column_statistics_operation != ColumnStatisticsOperation.count:
+            mapped_statistics_field = search_value(
+                layer_project.attribute_mapping, column_statistics_field
+            )
+            mapped_statistics_field_type = mapped_statistics_field.split("_")[0]
 
         # Check if mapped statistics field is float, integer or biginteger if the operation is not count
         if column_statistics_operation != ColumnStatisticsOperation.count:

@@ -4,15 +4,16 @@ import random
 import string
 from typing import List
 from uuid import uuid4
-from uuid import UUID
 
 from httpx import AsyncClient
 from sqlalchemy.sql import text
+
 from src.core.config import settings
-from src.schemas.job import JobStatusType
-from src.schemas.toolbox_base import ColumnStatisticsOperation
 from src.core.layer import get_user_table
 from src.db.session import session_manager
+from src.schemas.job import JobStatusType
+from src.schemas.toolbox_base import ColumnStatisticsOperation
+
 
 async def check_job_status(
     client: AsyncClient, job_id: str, target_status: str = JobStatusType.finished.value
@@ -217,10 +218,7 @@ async def test_aggregate(
         params = {
             "source_layer_project_id": source_layer_project_id,
             "area_type": area_type,
-            "column_statistics": {
-                "operation": operation.value,
-                "field": statistics_field,
-            },
+            "column_statistics": {"operation": operation.value},
             **other_properties,
         }
         if aggregation_layer_project_id:
@@ -229,6 +227,8 @@ async def test_aggregate(
             params["source_group_by_field"] = group_by_field
         if area_type == "h3_grid":
             params["h3_resolution"] = 10
+        if operation != ColumnStatisticsOperation.count:
+            params["column_statistics"]["field"] = statistics_field
 
         response = await client.post(
             f"{settings.API_V2_STR}/tool/aggregate-{aggregate_type}?project_id={project_id}",

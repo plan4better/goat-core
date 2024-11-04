@@ -167,6 +167,16 @@ class IAggregationBase(BaseModel):
                 )
         return v
 
+    @validator("column_statistics", pre=True, always=True)
+    def check_column_statistics(cls, v, values):
+        if v.get("operation") == ColumnStatisticsOperation.count:
+            if v.get("field") is not None:
+                raise ValueError("Field is not allowed for count operation.")
+        else:
+            if v.get("field") is None:
+                raise ValueError("Field is required for all operations except count.")
+        return v
+
 
 class IAggregationPoint(IAggregationBase):
     """Aggregation tool schema."""

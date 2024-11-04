@@ -123,7 +123,11 @@ class CRUDAggregateBase(CRUDToolBase, Chart):
 
         # Get statistics column query
         statistics_column_query = get_statistics_sql(
-            f"{temp_source}." + mapped_statistics_field,
+            (
+                f"{temp_source}." + mapped_statistics_field
+                if mapped_statistics_field
+                else ""
+            ),
             operation=params.column_statistics.operation,
         )
 
