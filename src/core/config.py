@@ -34,8 +34,8 @@ class Settings(BaseSettings):
     ASYNC_CLIENT_READ_TIMEOUT: Optional[float] = (
         30.0  # Read timeout for async http client
     )
-    CRUD_NUM_RETRIES: Optional[int] = 20  # Number of times to retry calling an endpoint
-    CRUD_RETRY_INTERVAL: Optional[int] = 2  # Number of seconds to wait between retries
+    CRUD_NUM_RETRIES: Optional[int] = 30  # Number of times to retry calling an endpoint
+    CRUD_RETRY_INTERVAL: Optional[int] = 3  # Number of seconds to wait between retries
 
     HEATMAP_GRAVITY_MAX_SENSITIVITY: int = 1000000
 
