@@ -555,6 +555,7 @@ async def update_layer_dataset(
         description=existing_layer.description,
         folder_id=existing_layer.folder_id,
         properties=existing_layer.properties,
+        other_properties=existing_layer.other_properties,
         dataset_id=dataset_id,
     )
     await CRUDLayerDatasetUpdate(
