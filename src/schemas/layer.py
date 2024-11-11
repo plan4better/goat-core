@@ -65,8 +65,8 @@ class OgrPostgresType(str, Enum):
     Integer64 = "bigint"
     Real = "float"
     String = "text"
-    Date = "timestamp"
-    Time = "timestamp"
+    Date = "text"
+    Time = "text"
     DateTime = "timestamp"
 
 
