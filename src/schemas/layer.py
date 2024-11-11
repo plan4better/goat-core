@@ -271,7 +271,9 @@ class IFeatureStandardCreateAdditionalAttributes(BaseModel):
     attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
 
 
-class IFeatureStandardRead(FeatureReadBaseAttributes, DateTimeBase):
+class IFeatureStandardRead(
+    FeatureReadBaseAttributes, DateTimeBase, ExternalServiceAttributesBase
+):
     pass
 
 
@@ -368,6 +370,7 @@ class IRasterRead(
     GeospatialAttributes,
     RasterAttributesBase,
     DateTimeBase,
+    ExternalServiceAttributesBase,
 ):
     """Model to read a raster layer."""
 
@@ -414,7 +417,9 @@ class ITableCreateAdditionalAttributes(BaseModel):
     attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
 
 
-class ITableRead(LayerBase, LayerReadBaseAttributes, DateTimeBase):
+class ITableRead(
+    LayerBase, LayerReadBaseAttributes, DateTimeBase, ExternalServiceAttributesBase
+):
     """Model to read a table layer."""
 
     attribute_mapping: dict = Field(..., description="Attribute mapping of the layer")
