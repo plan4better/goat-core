@@ -258,7 +258,7 @@ class FileUpload:
 
 class FetchLayerExternalService:
     def __init__(self, url: HttpUrl, output_file: str):
-        self.MAX_FEATURE_COUNT = 100000
+        self.MAX_FEATURE_COUNT = 200000
 
         self.url = url
         self.output_file = output_file

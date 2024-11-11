@@ -123,7 +123,11 @@ class CRUDAggregateBase(CRUDToolBase, Chart):
 
         # Get statistics column query
         statistics_column_query = get_statistics_sql(
-            f"{temp_source}." + mapped_statistics_field,
+            (
+                f"{temp_source}." + mapped_statistics_field
+                if mapped_statistics_field
+                else ""
+            ),
             operation=params.column_statistics.operation,
         )
 
@@ -258,7 +262,7 @@ class CRUDAggregatePoint(CRUDAggregateBase):
                     FROM {aggregation_layer_project.table_name}
                     LEFT JOIN first_join f
                     ON {aggregation_layer_project.table_name}.id = f.id
-                    WHERE {aggregation_layer_project.table_name}.layer_id = '{aggregation_layer_project.layer_id}'
+                    WHERE {aggregation_layer_project.where_query}
                 """
             else:
                 # Build combined query with one left join
@@ -268,7 +272,7 @@ class CRUDAggregatePoint(CRUDAggregateBase):
                     FROM {aggregation_layer_project.table_name}
                     LEFT JOIN {self.table_name_total_stats} t
                     ON {aggregation_layer_project.table_name}.id = t.id
-                    WHERE {aggregation_layer_project.table_name}.layer_id = '{aggregation_layer_project.layer_id}'
+                    WHERE {aggregation_layer_project.where_query}
                 """
         else:
             # If aggregation_layer_project_id does not exist the h3 grid will be taken for the intersection
@@ -426,7 +430,7 @@ class CRUDAggregatePolygon(CRUDAggregateBase):
                     FROM {aggregation_layer_project.table_name}
                     LEFT JOIN first_join f
                     ON {aggregation_layer_project.table_name}.id = f.id
-                    WHERE {aggregation_layer_project.table_name}.layer_id = '{aggregation_layer_project.layer_id}'
+                    WHERE {aggregation_layer_project.where_query}
                 """
             else:
                 # Build combined query with one left join
@@ -436,7 +440,7 @@ class CRUDAggregatePolygon(CRUDAggregateBase):
                     FROM {aggregation_layer_project.table_name}
                     LEFT JOIN {self.table_name_total_stats} t
                     ON {aggregation_layer_project.table_name}.id = t.id
-                    WHERE {aggregation_layer_project.table_name}.layer_id = '{aggregation_layer_project.layer_id}'
+                    WHERE {aggregation_layer_project.where_query}
                 """
         else:
             # Get average edge length of h3 grid

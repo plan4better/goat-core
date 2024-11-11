@@ -27,7 +27,7 @@ class ColumnStatistic(BaseModel):
     """Column statistic schema."""
 
     operation: ColumnStatisticsOperation
-    field: str
+    field: str | None = None
 
 
 class DefaultResultLayerName(str, Enum):
