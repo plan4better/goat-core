@@ -1,18 +1,20 @@
 import asyncio
+from datetime import datetime, timezone
 from uuid import uuid4
-from src.crud.base import CRUDBase
-from src.core.print import PrintMap
+
 from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+from utils import fetch_last_run_timestamp, update_last_run_timestamp
+
 from src.core.config import settings
+from src.core.print import PrintMap
+from src.crud.base import CRUDBase
+from src.crud.crud_layer_project import layer_project as crud_layer_project
+from src.crud.crud_user_project import user_project as crud_user_project
 from src.db.models.layer import Layer
-from src.schemas.layer import LayerType, FeatureType
 from src.db.models.project import Project
 from src.db.session import session_manager
-from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timezone
-from src.crud.crud_user_project import user_project as crud_user_project
-from src.crud.crud_layer_project import layer_project as crud_layer_project
-from utils import fetch_last_run_timestamp, update_last_run_timestamp
+from src.schemas.layer import FeatureType, LayerType
 
 SYSTEM_TASK_ID = "thumbnail_update"
 
@@ -99,11 +101,12 @@ async def process_layers(async_session: AsyncSession, last_run: datetime):
 
     # Process all layers requiring a thumbnail update
     layers = await fetch_layers_to_update(async_session, last_run)
+
     if len(layers) > 0:
         for layer in layers:
             try:
                 layer = layer[0]
-                if layer.type in (LayerType.feature, LayerType.table):
+                if layer.type in (LayerType.feature, LayerType.table, LayerType.raster):
                     # If there is a feature_layer_type and it is street_network then skip the layer
                     if (
                         layer.feature_layer_type
@@ -158,7 +161,6 @@ async def main():
 
         # Update project thumbnails
         await process_projects(async_session, last_run)
-
         # Update layer thumbnails
         await process_layers(async_session, last_run)
 
