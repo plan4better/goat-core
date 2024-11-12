@@ -298,12 +298,13 @@ class CRUDLayerProject(CRUDLayerBase):
         layer_dict.update(layer_project_dict)
         layer_project = model_type_read(**layer_dict)
 
-        # Get feature cnt
-        feature_cnt = await self.get_feature_cnt(
-            async_session, layer_project=layer_project
-        )
-        layer_project.total_count = feature_cnt.get("total_count")
-        layer_project.filtered_count = feature_cnt.get("filtered_count")
+        # Get feature cnt for non-raster layers
+        if layer_project.type in [LayerType.feature.value, LayerType.table.value]:
+            feature_cnt = await self.get_feature_cnt(
+                async_session, layer_project=layer_project
+            )
+            layer_project.total_count = feature_cnt.get("total_count")
+            layer_project.filtered_count = feature_cnt.get("filtered_count")
         return layer_project
 
     async def get_feature_cnt(
