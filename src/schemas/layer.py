@@ -335,6 +335,9 @@ class IFeatureStreetNetworkUpdate(IFeatureStandardUpdate):
 class RasterAttributesBase(ExternalServiceAttributesBase):
     """Base model for attributes pertaining to an external service providing a raster."""
 
+    type: LayerType = Field(..., description="Layer type")
+    properties: dict = Field(..., description="Layer properties.")
+
     pass
 
 
@@ -361,7 +364,7 @@ imagery_layer_attributes_example = {
 class IRasterCreate(LayerBase, GeospatialAttributes, RasterAttributesBase):
     """Model to create a raster layer."""
 
-    type: LayerType = Field(..., description="Layer type")
+    pass
 
 
 class IRasterRead(
