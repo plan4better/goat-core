@@ -311,7 +311,7 @@ class PrintMap:
             xmin, ymin, xmax, ymax = geom_shape.bounds
         else:
             # Define global extent
-            xmin, ymin, xmax, ymax = -180.0, -90.0, 180.0, 90.0  # Example global extent
+            xmin, ymin, xmax, ymax = -180.0, -90.0, 180.0, 90.0
 
         map.setBounds(
             xmin=xmin,
@@ -341,6 +341,9 @@ class PrintMap:
                     "type": "raster",
                     "source": layer.name,
                     "source-layer": "default",
+                    "layout": {
+                        "visibility": "visible",
+                    },
                     "paint": {
                         "raster-opacity": layer.properties.get("opacity", 1),
                     },
@@ -350,7 +353,6 @@ class PrintMap:
 
         img_bytes = map.renderPNG()
         image = io.BytesIO(img_bytes)
-
         return image
 
     async def create_feature_layer_thumbnail(self, layer: Layer) -> io.BytesIO:
@@ -536,61 +538,89 @@ class PrintMap:
 
         for layer in layers_project:
             if (
-                layer.type != LayerType.feature
-                or layer.feature_layer_type == FeatureType.street_network
-            ):
-                continue
-
-            if (
                 layer.properties["visibility"] is False
                 or layer.properties["visibility"] is None
             ):
                 continue
 
-            # Get collection id
-            layer_id = layer.layer_id
-            collection_id = "user_data." + str(layer_id).replace("-", "")
+            if (
+                layer.type == LayerType.feature
+                and layer.feature_layer_type != FeatureType.street_network
+            ):
+                # Get collection id
+                layer_id = layer.layer_id
+                collection_id = "user_data." + str(layer_id).replace("-", "")
 
-            # Request in recursive loop if layer was already added in geoapi if it does not fail the layer was added
-            header = {"Content-Type": "application/json"}
-            await async_get_with_retry(
-                url=f"{settings.GOAT_GEOAPI_HOST}/collections/" + collection_id,
-                headers=header,
-                num_retries=10,
-                retry_delay=1,
-            )
-
-            # Transform style
-            style = transform_to_mapbox_layer_style_spec(layer.dict())
-
-            # Add layer source
-            tile_url = (
-                f"{settings.GOAT_GEOAPI_HOST}/collections/"
-                + collection_id
-                + "/tiles/{z}/{x}/{y}"
-            )
-            map.addSource(
-                layer.name,
-                json.dumps(
-                    {
-                        "type": "vector",
-                        "tiles": [tile_url],
-                    }
-                ),
-            )
-            # Add layer
-            map.addLayer(
-                json.dumps(
-                    {
-                        "id": layer.name,
-                        "type": style["type"],
-                        "source": layer.name,
-                        "source-layer": "default",
-                        "paint": style["paint"],
-                    }
+                # Request in recursive loop if layer was already added in geoapi if it does not fail the layer was added
+                header = {"Content-Type": "application/json"}
+                await async_get_with_retry(
+                    url=f"{settings.GOAT_GEOAPI_HOST}/collections/" + collection_id,
+                    headers=header,
+                    num_retries=10,
+                    retry_delay=1,
                 )
-            )
 
+                # Transform style
+                style = transform_to_mapbox_layer_style_spec(layer.dict())
+
+                # Add layer source
+                tile_url = (
+                    f"{settings.GOAT_GEOAPI_HOST}/collections/"
+                    + collection_id
+                    + "/tiles/{z}/{x}/{y}"
+                )
+                map.addSource(
+                    layer.name,
+                    json.dumps(
+                        {
+                            "type": "vector",
+                            "tiles": [tile_url],
+                        }
+                    ),
+                )
+                # Add layer
+                map.addLayer(
+                    json.dumps(
+                        {
+                            "id": layer.name,
+                            "type": style["type"],
+                            "source": layer.name,
+                            "source-layer": "default",
+                            "paint": style["paint"],
+                        }
+                    )
+                )
+            elif layer.type == LayerType.raster:
+                # Add raster layer source
+                map.addSource(
+                    layer.name,
+                    json.dumps(
+                        {
+                            "type": "raster",
+                            "tileSize": getattr(layer, "other_properties", {}).get(
+                                "tileSize", 256
+                            ),
+                            "tiles": [layer.url],
+                        }
+                    ),
+                )
+                # Add raster layer
+                map.addLayer(
+                    json.dumps(
+                        {
+                            "id": layer.name,
+                            "type": "raster",
+                            "source": layer.name,
+                            "source-layer": "default",
+                            "layout": {
+                                "visibility": "visible",
+                            },
+                            "paint": {
+                                "raster-opacity": layer.properties.get("opacity", 1),
+                            },
+                        }
+                    )
+                )
         # img_bytes = map.renderPNG()
         try:
             img_bytes = map.renderPNG()
