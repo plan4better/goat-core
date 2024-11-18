@@ -336,7 +336,9 @@ class RasterAttributesBase(ExternalServiceAttributesBase):
     """Base model for attributes pertaining to an external service providing a raster."""
 
     type: LayerType = Field(..., description="Layer type")
-    properties: dict = Field({"visibility": True}, description="Layer properties.")
+    properties: dict | None = Field(
+        {"visibility": True}, description="Layer properties."
+    )
 
     pass
 

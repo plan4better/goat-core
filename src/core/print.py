@@ -6,9 +6,8 @@ from typing import Dict, List, Union
 import aiohttp
 import matplotlib.pyplot as plt
 import pandas as pd
-from PIL import Image
-
 from cairosvg import svg2png
+from PIL import Image
 from pydantic import BaseModel
 from pymgl import Map
 from shapely import from_wkb
@@ -17,8 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.config import settings
 from src.db.models import Project
 from src.db.models.layer import Layer, LayerType
-from src.schemas.project import InitialViewState
 from src.schemas.layer import FeatureType
+from src.schemas.project import InitialViewState
 from src.utils import async_get_with_retry
 
 
@@ -71,7 +70,6 @@ def get_mapbox_style_color(data: Dict, type: str) -> Union[str, List]:
                 values_and_colors.append(color_map_hex)
 
         return ["match", ["get", field_name]] + values_and_colors + ["#AAAAAA"]
-
 
     if (
         not field_name
@@ -268,11 +266,15 @@ class PrintMap:
 
     async def create_layer_thumbnail(self, layer: Layer, file_name: str) -> str:
         """Create layer thumbnail."""
-
         # Check layer type
         if layer.type == LayerType.table:
             image = await self.create_table_thumbnail(layer)
-        elif layer.type == LayerType.feature and layer.feature_layer_type != FeatureType.street_network:
+        elif layer.type == LayerType.raster:
+            image = await self.create_raster_layer_thumbnail(layer)
+        elif (
+            layer.type == LayerType.feature
+            and layer.feature_layer_type != FeatureType.street_network
+        ):
             image = await self.create_feature_layer_thumbnail(layer)
         else:
             raise ValueError("Invalid layer type.")
@@ -291,6 +293,67 @@ class PrintMap:
             Config=None,
         )
         return url
+
+    async def create_raster_layer_thumbnail(self, layer: Layer) -> io.BytesIO:
+        """Create raster layer thumbnail."""
+
+        # Define map
+        map = Map(
+            "mapbox://styles/mapbox/light-v11",
+            provider="mapbox",
+            token=settings.MAPBOX_TOKEN,
+        )
+        map.load()
+
+        # Set map extent
+        if layer.extent and layer.extent.data:
+            geom_shape = from_wkb(layer.extent.data)
+            xmin, ymin, xmax, ymax = geom_shape.bounds
+        else:
+            # Define global extent
+            xmin, ymin, xmax, ymax = -180.0, -90.0, 180.0, 90.0
+
+        map.setBounds(
+            xmin=xmin,
+            ymin=ymin,
+            xmax=xmax,
+            ymax=ymax,
+        )
+        map.setSize(self.thumbnail_width, self.thumbnail_height)
+
+        map.addSource(
+            layer.name,
+            json.dumps(
+                {
+                    "type": "raster",
+                    "tileSize": getattr(layer, "other_properties", {}).get(
+                        "tileSize", 256
+                    ),
+                    "tiles": [layer.url],
+                }
+            ),
+        )
+        # Add layer
+        map.addLayer(
+            json.dumps(
+                {
+                    "id": layer.name,
+                    "type": "raster",
+                    "source": layer.name,
+                    "source-layer": "default",
+                    "layout": {
+                        "visibility": "visible",
+                    },
+                    "paint": {
+                        "raster-opacity": layer.properties.get("opacity", 1),
+                    },
+                }
+            )
+        )
+
+        img_bytes = map.renderPNG()
+        image = io.BytesIO(img_bytes)
+        return image
 
     async def create_feature_layer_thumbnail(self, layer: Layer) -> io.BytesIO:
         """Create feature layer thumbnail."""
@@ -474,59 +537,90 @@ class PrintMap:
             )
 
         for layer in layers_project:
-            if layer.type != LayerType.feature or layer.feature_layer_type == FeatureType.street_network:
-                continue
-
             if (
                 layer.properties["visibility"] is False
                 or layer.properties["visibility"] is None
             ):
                 continue
 
-            # Get collection id
-            layer_id = layer.layer_id
-            collection_id = "user_data." + str(layer_id).replace("-", "")
+            if (
+                layer.type == LayerType.feature
+                and layer.feature_layer_type != FeatureType.street_network
+            ):
+                # Get collection id
+                layer_id = layer.layer_id
+                collection_id = "user_data." + str(layer_id).replace("-", "")
 
-            # Request in recursive loop if layer was already added in geoapi if it does not fail the layer was added
-            header = {"Content-Type": "application/json"}
-            await async_get_with_retry(
-                url=f"{settings.GOAT_GEOAPI_HOST}/collections/" + collection_id,
-                headers=header,
-                num_retries=10,
-                retry_delay=1,
-            )
-
-            # Transform style
-            style = transform_to_mapbox_layer_style_spec(layer.dict())
-
-            # Add layer source
-            tile_url = (
-                f"{settings.GOAT_GEOAPI_HOST}/collections/"
-                + collection_id
-                + "/tiles/{z}/{x}/{y}"
-            )
-            map.addSource(
-                layer.name,
-                json.dumps(
-                    {
-                        "type": "vector",
-                        "tiles": [tile_url],
-                    }
-                ),
-            )
-            # Add layer
-            map.addLayer(
-                json.dumps(
-                    {
-                        "id": layer.name,
-                        "type": style["type"],
-                        "source": layer.name,
-                        "source-layer": "default",
-                        "paint": style["paint"],
-                    }
+                # Request in recursive loop if layer was already added in geoapi if it does not fail the layer was added
+                header = {"Content-Type": "application/json"}
+                await async_get_with_retry(
+                    url=f"{settings.GOAT_GEOAPI_HOST}/collections/" + collection_id,
+                    headers=header,
+                    num_retries=10,
+                    retry_delay=1,
                 )
-            )
 
+                # Transform style
+                style = transform_to_mapbox_layer_style_spec(layer.dict())
+
+                # Add layer source
+                tile_url = (
+                    f"{settings.GOAT_GEOAPI_HOST}/collections/"
+                    + collection_id
+                    + "/tiles/{z}/{x}/{y}"
+                )
+                map.addSource(
+                    layer.name,
+                    json.dumps(
+                        {
+                            "type": "vector",
+                            "tiles": [tile_url],
+                        }
+                    ),
+                )
+                # Add layer
+                map.addLayer(
+                    json.dumps(
+                        {
+                            "id": layer.name,
+                            "type": style["type"],
+                            "source": layer.name,
+                            "source-layer": "default",
+                            "paint": style["paint"],
+                        }
+                    )
+                )
+            elif layer.type == LayerType.raster:
+                # Add raster layer source
+                map.addSource(
+                    layer.name,
+                    json.dumps(
+                        {
+                            "type": "raster",
+                            "tileSize": getattr(layer, "other_properties", {}).get(
+                                "tileSize", 256
+                            ),
+                            "tiles": [layer.url],
+                        }
+                    ),
+                )
+                # Add raster layer
+                map.addLayer(
+                    json.dumps(
+                        {
+                            "id": layer.name,
+                            "type": "raster",
+                            "source": layer.name,
+                            "source-layer": "default",
+                            "layout": {
+                                "visibility": "visible",
+                            },
+                            "paint": {
+                                "raster-opacity": layer.properties.get("opacity", 1),
+                            },
+                        }
+                    )
+                )
         # img_bytes = map.renderPNG()
         try:
             img_bytes = map.renderPNG()
