@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     REGION_MAPPING_PT_TABLE: Optional[str] = "basic.region_mapping_pt"
     BASE_STREET_NETWORK: Optional[UUID] = "903ecdca-b717-48db-bbce-0219e41439cf"
 
+    JOB_TIMEOUT_DEFAULT: int = 120
     ASYNC_CLIENT_DEFAULT_TIMEOUT: Optional[float] = (
         10.0  # Default timeout for async http client
     )
@@ -104,7 +105,7 @@ class Settings(BaseSettings):
 
     @validator("GOAT_ROUTING_URL", pre=True)
     def goat_routing_url(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
-        return f'{values.get("GOAT_ROUTING_HOST")}:{values.get("GOAT_ROUTING_PORT")}/api/v2/routing'
+        return "http://goat_routing:8000/api/v2/routing"
 
     GOAT_ROUTING_AUTHORIZATION: str = None
 
