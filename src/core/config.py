@@ -105,7 +105,7 @@ class Settings(BaseSettings):
 
     @validator("GOAT_ROUTING_URL", pre=True)
     def goat_routing_url(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
-        return "http://goat_routing:8000/api/v2/routing"
+        return f'{values.get("GOAT_ROUTING_HOST")}:{values.get("GOAT_ROUTING_PORT")}/api/v2/routing'
 
     GOAT_ROUTING_AUTHORIZATION: str = None
 
