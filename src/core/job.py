@@ -227,7 +227,7 @@ def job_init():
     return decorator
 
 
-def job_log(job_step_name: str, timeout: int = 120):
+def job_log(job_step_name: str, timeout: int = settings.JOB_TIMEOUT_DEFAULT):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
