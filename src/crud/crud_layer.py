@@ -829,7 +829,11 @@ class CRUDLayerImport(CRUDFailedJob):
             for field_name in field_names:
                 if field_name == "id":
                     continue
-                attribute_mapping[field_type + "_attr" + str(cnt)] = field_name
+                # Replace hyphens with an underscore as ogr2ogr also does this while importing the layer
+                # TODO: Find a more robust way to sync changes made by ogr2ogr to field names and this attribute mapping
+                attribute_mapping[field_type + "_attr" + str(cnt)] = field_name.replace(
+                    "-", "_"
+                )
                 cnt += 1
 
         # Upload file to temporary table using ogr2ogr
