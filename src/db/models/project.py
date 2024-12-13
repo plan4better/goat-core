@@ -9,6 +9,7 @@ from sqlmodel import (
     ARRAY,
     Column,
     Field,
+    Float,
     ForeignKey,
     Integer,
     Relationship,
@@ -77,6 +78,13 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         sa_column=Column(Text, nullable=True),
         description="Project thumbnail URL",
         default=settings.DEFAULT_PROJECT_THUMBNAIL,
+    )
+    max_extent: list[float] | None = Field(
+        sa_column=Column(
+            ARRAY(Float),
+            nullable=True,
+        ),
+        description="Max extent of the project",
     )
     # Relationships
     user_projects: List["UserProjectLink"] = Relationship(

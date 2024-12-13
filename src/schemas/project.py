@@ -73,11 +73,17 @@ class IProjectRead(ContentBaseAttributes, DateTimeBase):
     active_scenario_id: UUID | None = Field(None, description="Active scenario ID")
     shared_with: dict | None = Field(None, description="Shared with")
     owned_by: dict | None = Field(None, description="Owned by")
+    max_extent: list[float] | None = Field(
+        None, description="Max extent of the project"
+    )
 
 
 @optional
 class IProjectBaseUpdate(ContentBaseAttributes):
     layer_order: list[int] | None = Field(None, description="Layer order in project")
+    max_extent: list[float] | None = Field(
+        None, description="Max extent of the project"
+    )
     active_scenario_id: UUID | None = Field(None, description="Active scenario ID")
 
 
