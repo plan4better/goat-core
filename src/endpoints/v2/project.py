@@ -779,3 +779,64 @@ async def delete_scenario_features(
     )
 
     return None
+
+
+##############################################
+### Project public endpoints
+##############################################
+
+
+@router.get(
+    "/{project_id}/public",
+    summary="Get public project",
+)
+async def get_public_project(
+    project_id: str,
+    async_session: AsyncSession = Depends(get_db),
+):
+    """
+    Get shared project
+    """
+    result = await crud_project.get_public_project(
+        async_session=async_session, project_id=project_id
+    )
+
+    return result
+
+
+@router.post(
+    "/{project_id}/publish",
+    summary="Publish a project",
+    # dependencies=[Depends(auth_z)],
+)
+async def publish_project(
+    project_id: str,
+    async_session: AsyncSession = Depends(get_db),
+):
+    """
+    Publish a project
+    """
+    result = await crud_project.publish_project(
+        async_session=async_session, project_id=project_id
+    )
+
+    return result
+
+
+@router.delete(
+    "/{project_id}/unpublish",
+    summary="Unpublish a project",
+    # dependencies=[Depends(auth_z)],
+)
+async def unpublish_project(
+    project_id: str,
+    async_session: AsyncSession = Depends(get_db),
+):
+    """
+    Unpublish a project
+    """
+    result = await crud_project.unpublish_project(
+        async_session=async_session, project_id=project_id
+    )
+
+    return result

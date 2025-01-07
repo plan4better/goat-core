@@ -3,6 +3,7 @@ from uuid import UUID
 
 from pydantic import HttpUrl
 from sqlalchemy import Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlalchemy.sql import text
 from sqlmodel import (
@@ -86,6 +87,13 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         ),
         description="Max extent of the project",
     )
+    builder_config: dict | None = Field(
+        sa_column=Column(
+            JSONB,
+            nullable=True,
+        ),
+        description="Builder config",
+    )
     # Relationships
     user_projects: List["UserProjectLink"] = Relationship(
         back_populates="project",
@@ -107,6 +115,45 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         back_populates="project",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
+
+    project_public: "ProjectPublic" = Relationship(
+        back_populates="project",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan", "uselist": False},
+    )
+
+
+class ProjectPublic(DateTimeBase, table=True, extend_existing=True):
+    """
+    A table representing a public project. A public project is a project that is accessible to the public.
+
+    Attributes:
+        password (str): The password required to access the project.
+        config (dict): The configuration of the project. This is a JSON object which includes project settings, layers etc.
+        project_id (UUID): The unique identifier for the project.
+    """
+
+    __tablename__ = "project_public"
+    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
+    id: UUID | None = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            server_default=text("uuid_generate_v4()"),
+            nullable=False,
+            index=True,
+            primary_key=True,
+        )
+    )
+    password: str | None = Field(sa_column=Column(Text, nullable=True), max_length=255)
+    config: dict = Field(sa_column=Column(JSONB, nullable=False))
+    project_id: UUID = Field(
+        nullable=False,
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.project.id", ondelete="CASCADE"),
+        ),
+    )
+
+    project: Project = Relationship(back_populates="project_public")
 
 
 UniqueConstraint(Project.__table__.c.folder_id, Project.__table__.c.name)
