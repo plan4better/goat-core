@@ -1,5 +1,6 @@
+from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, HttpUrl, validator
@@ -73,11 +74,17 @@ class IProjectRead(ContentBaseAttributes, DateTimeBase):
     active_scenario_id: UUID | None = Field(None, description="Active scenario ID")
     shared_with: dict | None = Field(None, description="Shared with")
     owned_by: dict | None = Field(None, description="Owned by")
+    max_extent: list[float] | None = Field(
+        None, description="Max extent of the project"
+    )
 
 
 @optional
 class IProjectBaseUpdate(ContentBaseAttributes):
     layer_order: list[int] | None = Field(None, description="Layer order in project")
+    max_extent: list[float] | None = Field(
+        None, description="Max extent of the project"
+    )
     active_scenario_id: UUID | None = Field(None, description="Active scenario ID")
 
 
@@ -230,6 +237,43 @@ layer_type_mapping_update = {
     "raster": IRasterProjectUpdate,
     "table": ITableProjectUpdate,
 }
+
+
+class ProjectPublicProjectConfig(BaseModel):
+    id: UUID = Field(..., description="Project ID")
+    name: str = Field(..., description="Project name")
+    description: str | None = Field(..., description="Project description")
+    tags: List[str] | None = Field(..., description="Project tags")
+    thumbnail_url: HttpUrl | None = Field(None, description="Project thumbnail URL")
+    initial_view_state: InitialViewState = Field(
+        ..., description="Initial view state of the project"
+    )
+    layer_order: list[int] | None = Field(None, description="Layer order in project")
+    max_extent: list[float] | None = Field(
+        None, description="Max extent of the project"
+    )
+    folder_id: UUID = Field(..., description="Folder ID")
+    builder_config: dict | None = Field(None, description="Builder config")
+
+
+class ProjectPublicConfig(BaseModel):
+    layers: List[
+        IFeatureStandardProjectRead
+        | IFeatureToolProjectRead
+        | ITableProjectRead
+        | IRasterProjectRead
+    ] = Field(..., description="Layers of the project")
+    project: ProjectPublicProjectConfig = Field(
+        ..., description="Project configuration"
+    )
+
+
+class ProjectPublicRead(BaseModel):
+    created_at: datetime = Field(..., description="Created at")
+    updated_at: datetime = Field(..., description="Updated at")
+    project_id: UUID
+    config: ProjectPublicConfig
+
 
 # TODO: Refactor
 request_examples = {

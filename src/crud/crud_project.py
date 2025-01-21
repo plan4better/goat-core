@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 
 from fastapi_pagination import Page
@@ -7,9 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
 from src.core.content import (
+    build_shared_with_object,
     create_query_shared_content,
     update_content_by_id,
-    build_shared_with_object,
 )
 from src.crud.base import CRUDBase
 from src.crud.crud_layer_project import layer_project as crud_layer_project
@@ -23,12 +24,16 @@ from src.db.models import (
     Team,
 )
 from src.db.models._link_model import UserProjectLink
+from src.db.models.project import ProjectPublic
 from src.schemas.common import OrderEnum
 from src.schemas.project import (
     InitialViewState,
     IProjectBaseUpdate,
     IProjectCreate,
     IProjectRead,
+    ProjectPublicConfig,
+    ProjectPublicProjectConfig,
+    ProjectPublicRead,
 )
 
 
@@ -159,6 +164,86 @@ class CRUDProject(CRUDBase):
         )
 
         return IProjectRead(**project.dict())
+
+    async def get_public_project(
+        self, *, async_session: AsyncSession, project_id: str
+    ) -> ProjectPublicRead | None:
+        project_public = select(ProjectPublic).where(
+            ProjectPublic.project_id == project_id
+        )
+        result = await async_session.execute(project_public)
+        project = result.scalars().first()
+        if not project:
+            return None
+        project_public_read = ProjectPublicRead(**project.dict())
+        return project_public_read
+
+    async def publish_project(
+        self, *, async_session: AsyncSession, project_id: str
+    ) -> ProjectPublic:
+        project = select(Project).where(Project.id == project_id)
+        project = await async_session.execute(project)
+        project: Project | None = project.scalars().first()
+        if not project:
+            raise Exception("Project not found")
+        project_public = select(ProjectPublic).where(
+            ProjectPublic.project_id == project_id
+        )
+        project_public = await async_session.execute(project_public)
+        project_public: ProjectPublic | None = project_public.scalars().first()
+        user_project = select(UserProjectLink).where(
+            and_(
+                UserProjectLink.project_id == project_id,
+                Project.user_id == UserProjectLink.user_id,
+            )
+        )
+        user_project = await async_session.execute(user_project)
+        user_project: UserProjectLink = user_project.scalars().first()
+        if project_public:
+            await async_session.delete(project_public)
+
+        project_layers = await crud_layer_project.get_layers(
+            async_session=async_session, project_id=project_id
+        )
+
+        new_project_public_project_config = ProjectPublicProjectConfig(
+            id=project.id,
+            name=project.name,
+            description=project.description,
+            tags=project.tags,
+            thumbnail_url=project.thumbnail_url,
+            initial_view_state=user_project.initial_view_state,
+            layer_order=project.layer_order,
+            max_extent=project.max_extent,
+            folder_id=project.folder_id,
+            builder_config=project.builder_config,
+        )
+        new_project_public_config = ProjectPublicConfig(
+            layers=project_layers,
+            project=new_project_public_project_config,
+        )
+        new_project_public = ProjectPublic(
+            project_id=project_id, config=json.loads(new_project_public_config.json())
+        )
+
+        async_session.add(new_project_public)
+        await async_session.commit()
+        return new_project_public
+
+    async def unpublish_project(
+        self, *, async_session: AsyncSession, project_id: str
+    ) -> None:
+        public_project = select(ProjectPublic).where(
+            ProjectPublic.project_id == project_id
+        )
+        public_project = await async_session.execute(public_project)
+        public_project = public_project.scalars().first()
+        if public_project:
+            await async_session.delete(public_project)
+            await async_session.commit()
+        else:
+            raise Exception("Project not found")
+        return None
 
 
 project = CRUDProject(Project)
