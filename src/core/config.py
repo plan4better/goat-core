@@ -127,6 +127,7 @@ class Settings(BaseSettings):
     MAX_FOLDER_COUNT: Optional[int] = 100
 
     MAPBOX_TOKEN: Optional[str] = None
+    MAPTILER_TOKEN: Optional[str] = None
     AWS_ACCESS_KEY_ID: Optional[str] = None
     AWS_SECRET_ACCESS_KEY: Optional[str] = None
     AWS_REGION: Optional[str] = "eu-central-1"
