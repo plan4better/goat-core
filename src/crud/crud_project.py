@@ -213,6 +213,7 @@ class CRUDProject(CRUDBase):
             tags=project.tags,
             thumbnail_url=project.thumbnail_url,
             initial_view_state=user_project.initial_view_state,
+            basemap=project.basemap,
             layer_order=project.layer_order,
             max_extent=project.max_extent,
             folder_id=project.folder_id,

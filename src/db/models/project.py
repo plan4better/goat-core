@@ -75,6 +75,10 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         ),
         description="Layer order in project",
     )
+    basemap: str | None = Field(
+        sa_column=Column(Text, nullable=True),
+        description="Project basemap",
+    )
     thumbnail_url: HttpUrl | None = Field(
         sa_column=Column(Text, nullable=True),
         description="Project thumbnail URL",
