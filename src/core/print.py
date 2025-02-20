@@ -2,6 +2,7 @@ import io
 import json
 import random
 from typing import Dict, List, Union
+from urllib.parse import quote
 
 import aiohttp
 import matplotlib.pyplot as plt
@@ -567,12 +568,20 @@ class PrintMap:
                 # Transform style
                 style = transform_to_mapbox_layer_style_spec(layer.dict())
 
+                cql_filter = ""
+
+                if layer.query and layer.query.cql:
+                    json_cql_str = json.dumps(layer.query.cql)
+                    cql_filter = f"?filter={quote(json_cql_str)}"
+
                 # Add layer source
                 tile_url = (
                     f"{settings.GOAT_GEOAPI_HOST}/collections/"
                     + collection_id
                     + "/tiles/{z}/{x}/{y}"
+                    + cql_filter
                 )
+
                 map.addSource(
                     layer.name,
                     json.dumps(
