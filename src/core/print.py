@@ -21,13 +21,10 @@ from src.schemas.project import InitialViewState
 from src.utils import async_get_with_retry
 
 basemaps = {
-    "streets": f"https://api.maptiler.com/maps/streets-v2/style.json?key={settings.MAPTILER_TOKEN}",
-    "satellite": f"https://api.maptiler.com/maps/hybrid/style.json?key={settings.MAPTILER_TOKEN}",
-    "light": f"https://api.maptiler.com/maps/dataviz-light/style.json?key={settings.MAPTILER_TOKEN}",
-    "dark": f"https://api.maptiler.com/maps/dataviz-dark/style.json?key={settings.MAPTILER_TOKEN}",
-    "basemap_de_col": "https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_col.json",
-    "basemap_de_gry": "https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_gry.json",
-    "basemap_de_top": "https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_top.json",
+    "streets": "mapbox://styles/mapbox/streets-v12",
+    "satellite": "mapbox://styles/mapbox/satellite-v9",
+    "light": "mapbox://styles/mapbox/light-v11",
+    "dark": "mapbox://styles/mapbox/dark-v11",
 }
 
 
@@ -308,7 +305,7 @@ class PrintMap:
         """Create raster layer thumbnail."""
 
         # Define map
-        map = Map(basemaps["light"], provider="maplibre")
+        map = Map(basemaps["light"], provider="mapbox", token=settings.MAPBOX_TOKEN)
         map.load()
 
         # Set map extent
@@ -365,7 +362,7 @@ class PrintMap:
         """Create feature layer thumbnail."""
 
         # Define map
-        map = Map(basemaps["light"], provider="maplibre")
+        map = Map(basemaps["light"], provider="mapbox", token=settings.MAPBOX_TOKEN)
         map.load()
 
         # Set map extent
@@ -523,15 +520,13 @@ class PrintMap:
         style_url = None
         if not basemap:
             style_url = basemaps["strets"]
-        elif basemap and basemap.startswith("http"):
-            style_url = basemap
         elif basemaps.get(basemap):
             style_url = basemaps[basemap]
         else:
             style_url = basemaps["streets"]
 
         # Define map
-        map = Map(style_url, provider="maplibre")
+        map = Map(style_url, provider="mapbox", token=settings.MAPBOX_TOKEN)
         map.load()
 
         # Set map extent
