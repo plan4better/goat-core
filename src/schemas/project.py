@@ -72,8 +72,10 @@ class IProjectRead(ContentBaseAttributes, DateTimeBase):
     layer_order: list[int] | None = Field(None, description="Layer order in project")
     thumbnail_url: HttpUrl | None = Field(description="Project thumbnail URL")
     active_scenario_id: UUID | None = Field(None, description="Active scenario ID")
+    basemap: str | None = Field(None, description="Project basemap")
     shared_with: dict | None = Field(None, description="Shared with")
     owned_by: dict | None = Field(None, description="Owned by")
+    builder_config: dict | None = Field(None, description="Builder config")
     max_extent: list[float] | None = Field(
         None, description="Max extent of the project"
     )
@@ -82,10 +84,12 @@ class IProjectRead(ContentBaseAttributes, DateTimeBase):
 @optional
 class IProjectBaseUpdate(ContentBaseAttributes):
     layer_order: list[int] | None = Field(None, description="Layer order in project")
+    basemap: str | None = Field(None, description="Project basemap")
     max_extent: list[float] | None = Field(
         None, description="Max extent of the project"
     )
     active_scenario_id: UUID | None = Field(None, description="Active scenario ID")
+    builder_config: dict | None = Field(None, description="Builder config")
 
 
 class dict(dict):
@@ -248,6 +252,7 @@ class ProjectPublicProjectConfig(BaseModel):
     initial_view_state: InitialViewState = Field(
         ..., description="Initial view state of the project"
     )
+    basemap: str | None = Field(None, description="Project basemap")
     layer_order: list[int] | None = Field(None, description="Layer order in project")
     max_extent: list[float] | None = Field(
         None, description="Max extent of the project"

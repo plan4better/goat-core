@@ -2,6 +2,7 @@ import io
 import json
 import random
 from typing import Dict, List, Union
+from urllib.parse import quote
 
 import aiohttp
 import matplotlib.pyplot as plt
@@ -19,6 +20,13 @@ from src.db.models.layer import Layer, LayerType
 from src.schemas.layer import FeatureType
 from src.schemas.project import InitialViewState
 from src.utils import async_get_with_retry
+
+basemaps = {
+    "streets": "mapbox://styles/mapbox/streets-v12",
+    "satellite": "mapbox://styles/mapbox/satellite-v9",
+    "light": "mapbox://styles/mapbox/light-v11",
+    "dark": "mapbox://styles/mapbox/dark-v11",
+}
 
 
 def rgb_to_hex(rgb: tuple) -> str:
@@ -298,11 +306,7 @@ class PrintMap:
         """Create raster layer thumbnail."""
 
         # Define map
-        map = Map(
-            "mapbox://styles/mapbox/light-v11",
-            provider="mapbox",
-            token=settings.MAPBOX_TOKEN,
-        )
+        map = Map(basemaps["light"], provider="mapbox", token=settings.MAPBOX_TOKEN)
         map.load()
 
         # Set map extent
@@ -359,11 +363,7 @@ class PrintMap:
         """Create feature layer thumbnail."""
 
         # Define map
-        map = Map(
-            "mapbox://styles/mapbox/light-v11",
-            provider="mapbox",
-            token=settings.MAPBOX_TOKEN,
-        )
+        map = Map(basemaps["light"], provider="mapbox", token=settings.MAPBOX_TOKEN)
         map.load()
 
         # Set map extent
@@ -517,12 +517,17 @@ class PrintMap:
         layers_project: [BaseModel],
         file_name: str,
     ):
+        basemap = project.basemap
+        style_url = None
+        if not basemap:
+            style_url = basemaps["strets"]
+        elif basemaps.get(basemap):
+            style_url = basemaps[basemap]
+        else:
+            style_url = basemaps["streets"]
+
         # Define map
-        map = Map(
-            "mapbox://styles/mapbox/light-v11",
-            provider="mapbox",
-            token=settings.MAPBOX_TOKEN,
-        )
+        map = Map(style_url, provider="mapbox", token=settings.MAPBOX_TOKEN)
         map.load()
 
         # Set map extent
@@ -563,12 +568,20 @@ class PrintMap:
                 # Transform style
                 style = transform_to_mapbox_layer_style_spec(layer.dict())
 
+                cql_filter = ""
+
+                if layer.query and layer.query.cql:
+                    json_cql_str = json.dumps(layer.query.cql)
+                    cql_filter = f"?filter={quote(json_cql_str)}"
+
                 # Add layer source
                 tile_url = (
                     f"{settings.GOAT_GEOAPI_HOST}/collections/"
                     + collection_id
                     + "/tiles/{z}/{x}/{y}"
+                    + cql_filter
                 )
+
                 map.addSource(
                     layer.name,
                     json.dumps(
