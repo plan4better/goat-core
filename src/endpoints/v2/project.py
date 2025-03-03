@@ -44,6 +44,7 @@ from src.schemas.scenario import (
 from src.schemas.scenario import (
     request_examples as scenario_request_examples,
 )
+from src.schemas.toolbox_base import ColumnStatisticsOperation
 from src.utils import delete_orphans, to_feature_collection
 
 router = APIRouter()
@@ -509,6 +510,73 @@ async def get_chart_data(
             layer_project_id=layer_project_id,
             cumsum=cumsum,
         )
+
+
+@router.get(
+    "/{project_id}/layer/{layer_project_id}/statistic-aggregation",
+    summary="Get aggregated statistics for a column",
+    response_model=dict,
+    status_code=200,
+    dependencies=[Depends(auth_z)],
+)
+async def get_statistic_aggregation(
+    async_session: AsyncSession = Depends(get_db),
+    project_id: UUID4 = Path(
+        ...,
+        description="The ID of the project to get",
+        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ),
+    layer_project_id: int = Path(
+        ...,
+        description="Layer Project ID to get chart data",
+        example="1",
+    ),
+    column_name: str = Query(
+        ...,
+        description="The column name to get the unique values from",
+        example="name",
+    ),
+    operation: ColumnStatisticsOperation = Query(
+        ...,
+        description="The operation to perform",
+        example="sum",
+    ),
+    group_by_column_name: str = Query(
+        ...,
+        description="The name of the column to group by",
+        example="name",
+    ),
+    size: int = Query(
+        None, description="The number of grouped values to return", example=5
+    ),
+    query: str = Query(
+        None,
+        description="CQL2-Filter in JSON format",
+        example={"op": "=", "args": [{"property": "category"}, "bus_stop"]},
+    ),
+    order: OrderEnum = Query(
+        "descendent",
+        description="Specify the order to apply. There are the option ascendent or descendent.",
+        example="descendent",
+    ),
+):
+    """Get aggregated statistics for a numeric column based on the supplied group-by column and CQL-filter."""
+
+    with HTTPErrorHandler():
+        values = await crud_layer_project.get_statistic_aggregation(
+            async_session=async_session,
+            project_id=project_id,
+            layer_project_id=layer_project_id,
+            column_name=column_name,
+            operation=operation,
+            group_by_column_name=group_by_column_name,
+            size=size,
+            query=query,
+            order=order,
+        )
+
+    # Return result
+    return values
 
 
 ##############################################

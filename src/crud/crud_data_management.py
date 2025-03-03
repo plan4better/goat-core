@@ -2,9 +2,9 @@ from sqlalchemy import text
 
 from src.core.config import settings
 from src.core.job import job_init, job_log, run_background_or_immediately
-from src.core.tool import CRUDToolBase, get_statistics_sql
+from src.core.layer import get_user_table
+from src.core.tool import CRUDToolBase
 from src.db.models.layer import ToolType
-from src.schemas.error import ColumnTypeError
 from src.schemas.job import JobStatusType, JobType
 from src.schemas.layer import (
     IFeatureLayerToolCreate,
@@ -16,7 +16,6 @@ from src.utils import (
     get_result_column,
     search_value,
 )
-from src.core.layer import get_user_table
 
 
 class CRUDJoin(CRUDToolBase):
@@ -46,7 +45,8 @@ class CRUDJoin(CRUDToolBase):
         # Check if mapped statistics field is float, integer or biginteger
         mapped_statistics_field = await self.check_column_statistics(
             layer_project=join_layer_project,
-            column_statistics=params.column_statistics,
+            column_name=params.column_statistics.field,
+            operation=params.column_statistics.operation,
         )
         mapped_statistics_field = mapped_statistics_field["mapped_statistics_field"]
 
@@ -89,7 +89,7 @@ class CRUDJoin(CRUDToolBase):
         )
 
         # Get statistics column query
-        statistics_column_query = get_statistics_sql(
+        statistics_column_query = self.get_statistics_sql(
             "join_layer." + mapped_statistics_field,
             operation=params.column_statistics.operation,
         )
@@ -97,8 +97,12 @@ class CRUDJoin(CRUDToolBase):
         # Build combined where query
         where_query = build_where_clause(
             [
-                target_layer_project.where_query.replace(f"{target_layer_project.table_name}.", "target_layer."),
-                join_layer_project.where_query.replace(f"{join_layer_project.table_name}.", "join_layer.")
+                target_layer_project.where_query.replace(
+                    f"{target_layer_project.table_name}.", "target_layer."
+                ),
+                join_layer_project.where_query.replace(
+                    f"{join_layer_project.table_name}.", "join_layer."
+                ),
             ],
         )
 

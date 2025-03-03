@@ -10,6 +10,7 @@ from sqlmodel import SQLModel
 
 from src.core.config import settings
 from src.core.job import CRUDFailedJob
+from src.core.statistics import StatisticsBase
 from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import layer as crud_layer
 from src.crud.crud_layer_project import layer_project as crud_layer_project
@@ -30,7 +31,6 @@ from src.schemas.layer import (
     ComputeBreakOperation,
     FeatureGeometryType,
     IFeatureLayerToolCreate,
-    OgrPostgresType,
     UserDataGeomType,
 )
 from src.schemas.style import (
@@ -41,7 +41,6 @@ from src.schemas.style import (
 )
 from src.schemas.tool import IToolParam
 from src.schemas.toolbox_base import (
-    ColumnStatistic,
     ColumnStatisticsOperation,
     DefaultResultLayerName,
     GeofenceTable,
@@ -117,37 +116,7 @@ async def start_calculation(
     return {"job_id": job.id}
 
 
-def convert_geom_measurement_field(field):
-    if field.endswith("$intersected_area"):
-        field = f"ST_AREA({field.replace('$intersected_area', 'geom')}::geography)"
-    elif field.endswith("$length"):
-        field = f"ST_LENGTH({field.replace('$length', 'geom')}::geography)"
-    return field
-
-
-def get_statistics_sql(field, operation):
-    # Check if field endswith $intersected_area
-    field = convert_geom_measurement_field(field)
-
-    if operation == ColumnStatisticsOperation.count:
-        query = "COUNT(*)"
-    elif operation == ColumnStatisticsOperation.sum:
-        query = f"SUM({field})"
-    # elif operation == ColumnStatisticsOperation.mean:
-    #     query = f"AVG({field})"
-    # elif operation == ColumnStatisticsOperation.median:
-    #     query = f"PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {field})"
-    elif operation == ColumnStatisticsOperation.min:
-        query = f"MIN({field})"
-    elif operation == ColumnStatisticsOperation.max:
-        query = f"MAX({field})"
-    else:
-        raise ValueError(f"Unsupported operation {operation}")
-
-    return query
-
-
-class CRUDToolBase(CRUDFailedJob):
+class CRUDToolBase(StatisticsBase, CRUDFailedJob):
     def __init__(self, job_id, background_tasks, async_session, user_id, project_id):
         super().__init__(job_id, background_tasks, async_session, user_id)
         self.project_id = project_id
@@ -565,56 +534,6 @@ class CRUDToolBase(CRUDFailedJob):
                 layer_project=layer_project, tool_type=tool_type
             ),
             "layer_project": layer_project,
-        }
-
-    async def check_is_number(self, data_type: str):
-        """Check if the data type is a number."""
-        if data_type not in [
-            OgrPostgresType.Integer,
-            OgrPostgresType.Real,
-            OgrPostgresType.Integer64,
-        ]:
-            raise ColumnTypeError(
-                f"Field has to be {OgrPostgresType.Integer}, {OgrPostgresType.Real}, {OgrPostgresType.Integer64}."
-            )
-
-    async def check_column_statistics(
-        self,
-        layer_project: BaseModel,
-        column_statistics: ColumnStatistic,
-    ):
-        """Check if the column statistics field is valid and return the mapped statistics field and the mapped statistics field type."""
-
-        # Check if field is $intersected_area and geometry type is polygon
-        column_statistics_field = column_statistics.field
-        column_statistics_operation = column_statistics.operation
-
-        if column_statistics_field == "$intersected_area":
-            if layer_project.feature_layer_geometry_type != FeatureGeometryType.polygon:
-                raise GeometryTypeError(
-                    "The layer does not contain polygon geometries and therefore $intersected_area cannot be computed. Pick a layer with polygon geometries."
-                )
-            return {
-                "mapped_statistics_field": "$intersected_area",
-                "mapped_statistics_field_type": OgrPostgresType.Real.value,
-            }
-
-        # Get mapped field if operation type is not count
-        mapped_statistics_field = None
-        mapped_statistics_field_type = None
-        if column_statistics_operation != ColumnStatisticsOperation.count:
-            mapped_statistics_field = search_value(
-                layer_project.attribute_mapping, column_statistics_field
-            )
-            mapped_statistics_field_type = mapped_statistics_field.split("_")[0]
-
-        # Check if mapped statistics field is float, integer or biginteger if the operation is not count
-        if column_statistics_operation != ColumnStatisticsOperation.count:
-            await self.check_is_number(mapped_statistics_field_type)
-
-        return {
-            "mapped_statistics_field": mapped_statistics_field,
-            "mapped_statistics_field_type": mapped_statistics_field_type,
         }
 
     async def check_column_same_type(

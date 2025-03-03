@@ -1,16 +1,20 @@
-from sqlmodel import SQLModel
-from pydantic import BaseModel
 from uuid import UUID
-from src.utils import search_value
-from src.crud.crud_layer_project import layer_project as crud_layer_project
+
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.schemas.toolbox_base import ColumnStatisticsOperation
-from src.core.tool import get_statistics_sql
+from sqlmodel import SQLModel
+
+from src.crud.crud_layer_project import layer_project as crud_layer_project
 from src.db.models.layer import ToolType
+from src.schemas.toolbox_base import ColumnStatisticsOperation
+from src.utils import search_value
 
 
 async def read_chart_data(
-    async_session: AsyncSession, project_id: UUID, layer_project_id: int, cumsum: bool = False
+    async_session: AsyncSession,
+    project_id: UUID,
+    layer_project_id: int,
+    cumsum: bool = False,
 ):
 
     # Get layer project data
@@ -19,7 +23,10 @@ async def read_chart_data(
     )
 
     # Make sure that layer is aggregation_point or aggregation_polygon
-    if layer_project.tool_type not in [ToolType.aggregate_point, ToolType.aggregate_polygon]:
+    if layer_project.tool_type not in [
+        ToolType.aggregate_point,
+        ToolType.aggregate_polygon,
+    ]:
         raise ValueError("Layer is not aggregation point or aggregation polygon")
 
     # Get chart data
@@ -32,7 +39,6 @@ async def read_chart_data(
     if cumsum:
         operation = ColumnStatisticsOperation.sum.value
 
-
     # Get y_query
     x_label_mapped = search_value(layer_project.attribute_mapping, x_label)
     y_label_mapped = search_value(layer_project.attribute_mapping, y_label)
@@ -43,7 +49,7 @@ async def read_chart_data(
 
     if not group_by:
         # Define statistics query
-        y_query = get_statistics_sql(y_label_mapped, operation)
+        y_query = crud_layer_project.get_statistics_sql(y_label_mapped, operation)
         # Get data from layer
 
         sql_base = f"""
@@ -75,7 +81,7 @@ async def read_chart_data(
             """
     else:
         # Define statistics query
-        y_query = get_statistics_sql("value", operation)
+        y_query = crud_layer_project.get_statistics_sql("value", operation)
 
         # Cast value inside query to float
         y_query = y_query.replace("value", "value::float")

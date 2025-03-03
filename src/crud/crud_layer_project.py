@@ -10,22 +10,31 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
 from src.core.layer import CRUDLayerBase
+from src.core.statistics import StatisticsBase
 from src.db.models._link_model import LayerProjectLink
 from src.db.models.layer import Layer
 from src.db.models.project import Project
 from src.schemas.error import LayerNotFoundError, UnsupportedLayerTypeError
-from src.schemas.layer import FeatureGeometryType, LayerType
+from src.schemas.layer import (
+    FeatureGeometryType,
+    LayerType,
+)
 from src.schemas.project import (
     layer_type_mapping_read,
     layer_type_mapping_update,
 )
-from src.utils import build_where_clause
+from src.schemas.toolbox_base import ColumnStatisticsOperation
+from src.utils import (
+    build_where,
+    build_where_clause,
+    search_value,
+)
 
 # Local application imports
 from .base import CRUDBase
 
 
-class CRUDLayerProject(CRUDLayerBase):
+class CRUDLayerProject(CRUDLayerBase, StatisticsBase):
     async def layer_projects_to_schemas(
         self, async_session: AsyncSession, layers_project
     ):
@@ -375,6 +384,97 @@ class CRUDLayerProject(CRUDLayerBase):
         async with async_session.begin():
             await async_session.execute(query)
             await async_session.commit()
+
+    ##############################################
+    ### Statistical endpoints
+    ##############################################
+
+    async def get_statistic_aggregation(
+        self,
+        async_session: AsyncSession,
+        project_id: UUID,
+        layer_project_id: int,
+        column_name: str,
+        operation: ColumnStatisticsOperation,
+        group_by_column_name: str,
+        size: int,
+        query: str,
+        order: str,
+    ) -> dict:
+        """Get aggregated statistics for a numeric column based on the supplied group-by column and CQL-filter."""
+
+        # Get layer project data
+        layer_project = await self.get_internal(
+            async_session=async_session, project_id=project_id, id=layer_project_id
+        )
+
+        # Check if mapped statistics field is float, integer or biginteger
+        mapped_statistics_field = (
+            await self.check_column_statistics(
+                layer_project=layer_project,
+                column_name=column_name,
+                operation=operation,
+            )
+        )["mapped_statistics_field"]
+
+        # TODO: Consider performing a data type check on the group-by column
+        mapped_group_by_field = search_value(
+            layer_project.attribute_mapping,
+            group_by_column_name,
+        )
+
+        # Build statistics portion of select clause
+        statistics_column_query = self.get_statistics_sql(
+            field=mapped_statistics_field,
+            operation=operation,
+        )
+
+        # Build where clause combining layer project and CQL query
+        where_query = build_where_clause(
+            [
+                layer_project.where_query,  # Clause from the layer-project filter
+                build_where(
+                    id=layer_project.layer_id,
+                    table_name=layer_project.table_name,
+                    query=query,
+                    attribute_mapping=layer_project.attribute_mapping,
+                    return_basic_filter=False,
+                ),  # Clause from the supplied CQL query
+            ],
+        )
+
+        # Build count query
+        sql_count_query = f"""
+            SELECT COUNT({mapped_statistics_field})
+            FROM {layer_project.table_name}
+            {where_query};
+        """
+        total_count = (await async_session.execute(text(sql_count_query))).scalar_one()
+
+        # Build final statistics queries
+        order_mapped = {"descendent": "DESC", "ascendent": "ASC"}[order]
+        sql_data_query = f"""
+            SELECT *
+            FROM (
+                SELECT {mapped_group_by_field} AS grouped_value, {statistics_column_query} AS operation_value
+                FROM {layer_project.table_name}
+                {where_query}
+                GROUP BY {mapped_group_by_field}
+            ) subquery
+            ORDER BY operation_value {order_mapped};
+        """
+        result = (await async_session.execute(text(sql_data_query))).fetchall()
+
+        # Create a response object
+        response = {
+            "items": [
+                {"grouped_value": res[0], "operation_value": res[1]}
+                for res in result[:size]
+            ],
+            "total_items": len(result),
+            "total_count": total_count,
+        }
+        return response
 
 
 layer_project = CRUDLayerProject(LayerProjectLink)

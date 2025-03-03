@@ -444,9 +444,19 @@ def get_result_column(
         return {mapped_column: base_column_name}
 
 
-def build_where(id: UUID, table_name: str, query: str | dict, attribute_mapping: dict):
+def build_where(
+    id: UUID,
+    table_name: str,
+    query: str | dict,
+    attribute_mapping: dict,
+    return_basic_filter: bool = True,
+):
+    """Builds a PostgreSQL WHERE clause based on a CQL query and layer ID."""
+
     if query is None:
-        return f"{table_name}.layer_id = '{str(id)}'"
+        if return_basic_filter:
+            return f"{table_name}.layer_id = '{str(id)}'"
+        return None
     else:
         if isinstance(query, str):
             query = {"cql": json.loads(query)}

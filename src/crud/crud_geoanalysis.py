@@ -6,8 +6,6 @@ from src.core.job import job_init, job_log, run_background_or_immediately
 from src.core.tool import (
     CRUDToolBase,
     assign_attribute,
-    convert_geom_measurement_field,
-    get_statistics_sql,
 )
 from src.schemas.error import ColumnTypeError
 from src.schemas.job import JobStatusType
@@ -47,7 +45,8 @@ class CRUDAggregateBase(CRUDToolBase, Chart):
         # Check if mapped statistics field is float, integer or biginteger
         result_check_statistics_field = await self.check_column_statistics(
             layer_project=source_layer_project,
-            column_statistics=params.column_statistics,
+            column_name=params.column_statistics.field,
+            operation=params.column_statistics.operation,
         )
         mapped_statistics_field = result_check_statistics_field[
             "mapped_statistics_field"
@@ -122,7 +121,7 @@ class CRUDAggregateBase(CRUDToolBase, Chart):
             group_column_name = f"ARRAY_TO_STRING(ARRAY[{group_by_select_columns}], '_') AS group_column_name"
 
         # Get statistics column query
-        statistics_column_query = get_statistics_sql(
+        statistics_column_query = self.get_statistics_sql(
             (
                 f"{temp_source}." + mapped_statistics_field
                 if mapped_statistics_field
@@ -477,13 +476,13 @@ class CRUDAggregatePolygon(CRUDAggregateBase):
                 statistics_sql = "SUM(val)"
             else:
                 if mapped_statistics_field == "$intersected_area":
-                    statistics_val = convert_geom_measurement_field(
+                    statistics_val = self.convert_geom_measurement_field(
                         "j." + mapped_statistics_field
                     )
                 else:
                     statistics_val = "p." + mapped_statistics_field
 
-                statistics_sql = get_statistics_sql(
+                statistics_sql = self.get_statistics_sql(
                     "val", params.column_statistics.operation
                 )
 
