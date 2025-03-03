@@ -476,5 +476,89 @@ class CRUDLayerProject(CRUDLayerBase, StatisticsBase):
         }
         return response
 
+    async def get_statistic_histogram(
+        self,
+        async_session: AsyncSession,
+        project_id: UUID,
+        layer_project_id: int,
+        column_name: str,
+        num_bins: int,
+        query: str,
+        order: str,
+    ) -> dict:
+        """Get histogram statistics for a numeric column based on the specified number of bins and CQL-filter."""
+
+        # Get layer project data
+        layer_project = await self.get_internal(
+            async_session=async_session, project_id=project_id, id=layer_project_id
+        )
+
+        # Check if mapped statistics field is float, integer or biginteger
+        mapped_statistics_field = (
+            await self.check_column_statistics(
+                layer_project=layer_project,
+                column_name=column_name,
+                operation=ColumnStatisticsOperation.sum,
+            )
+        )["mapped_statistics_field"]
+
+        # Build where clause combining layer project and CQL query
+        where_query = build_where_clause(
+            [
+                layer_project.where_query,  # Clause from the layer-project filter
+                build_where(
+                    id=layer_project.layer_id,
+                    table_name=layer_project.table_name,
+                    query=query,
+                    attribute_mapping=layer_project.attribute_mapping,
+                    return_basic_filter=False,
+                ),  # Clause from the supplied CQL query
+            ],
+        )
+
+        # Build statistics column metadata query
+        sql_metadata_query = f"""
+            SELECT COUNT(*), MIN({mapped_statistics_field}), MAX({mapped_statistics_field})
+            FROM {layer_project.table_name}
+            {where_query};
+        """
+        result = (await async_session.execute(text(sql_metadata_query))).fetchone()
+        total_count, min_val, max_val = result[0], result[1], result[2]
+
+        # Build final statistics queries
+        order_mapped = {"descendent": "DESC", "ascendent": "ASC"}[order]
+        sql_data_query = f"""
+            WITH bins AS (
+                SELECT generate_series(1, {num_bins}) AS bin_number
+            ),
+            histogram AS (
+                SELECT
+                    width_bucket({mapped_statistics_field}, {min_val}, {max_val + 1}, {num_bins}) AS bin_number,
+                    COUNT(*) AS count
+                FROM {layer_project.table_name}
+                {where_query}
+                AND {mapped_statistics_field} IS NOT NULL
+                GROUP BY bin_number
+            )
+            SELECT
+                bins.bin_number,
+                ROUND(({min_val} + (bins.bin_number - 1) * ({max_val} - {min_val}) / {num_bins})::NUMERIC, 2) AS lower_bound,
+                ROUND(({min_val} + bins.bin_number * ({max_val} - {min_val}) / {num_bins})::NUMERIC, 2) AS upper_bound,
+                COALESCE(histogram.count, 0) AS count
+            FROM bins
+            LEFT JOIN histogram ON bins.bin_number = histogram.bin_number
+            ORDER BY bins.bin_number {order_mapped};
+        """
+        result = (await async_session.execute(text(sql_data_query))).fetchall()
+
+        # Create a response object
+        missing_count = total_count - sum([res[3] for res in result])
+        response = {
+            "bins": [{"range": [res[1], res[2]], "count": res[3]} for res in result],
+            "missing_count": missing_count,
+            "total_rows": total_count,
+        }
+        return response
+
 
 layer_project = CRUDLayerProject(LayerProjectLink)
