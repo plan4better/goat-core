@@ -394,7 +394,7 @@ class CRUDLayerProject(CRUDLayerBase, StatisticsBase):
         async_session: AsyncSession,
         project_id: UUID,
         layer_project_id: int,
-        column_name: str,
+        column_name: str | None,
         operation: ColumnStatisticsOperation,
         group_by_column_name: str,
         size: int,
@@ -445,7 +445,7 @@ class CRUDLayerProject(CRUDLayerBase, StatisticsBase):
 
         # Build count query
         sql_count_query = f"""
-            SELECT COUNT({mapped_statistics_field})
+            SELECT COUNT({mapped_statistics_field if mapped_statistics_field else '*'})
             FROM {layer_project.table_name}
             {where_query};
         """

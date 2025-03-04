@@ -78,7 +78,7 @@ class StatisticsBase:
                 "mapped_statistics_field_type": OgrPostgresType.Real.value,
             }
 
-        # Get mapped column name of field if speicfied (some count operations do not require a field)
+        # Get mapped column name of field if specified (some count operations do not require a field)
         mapped_statistics_field = None
         mapped_statistics_field_type = None
         if column_name:

@@ -531,8 +531,8 @@ async def get_statistic_aggregation(
         description="Layer Project ID to get chart data",
         example="1",
     ),
-    column_name: str = Query(
-        ...,
+    column_name: str | None = Query(
+        None,
         description="The column name to get the unique values from",
         example="name",
     ),
@@ -561,6 +561,13 @@ async def get_statistic_aggregation(
     ),
 ):
     """Get aggregated statistics for a numeric column based on the supplied group-by column and CQL-filter."""
+
+    # Ensure a column name is specified for all operations except count
+    if operation != ColumnStatisticsOperation.count and column_name is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A column name must be specified for all operations except count.",
+        )
 
     # Ensure the size is not excessively large
     if size > 100:
