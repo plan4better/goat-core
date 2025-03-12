@@ -29,8 +29,9 @@ class StatisticsBase:
         field: str | None,
         operation: ColumnStatisticsOperation,
     ):
-        # Check if field endswith $intersected_area
-        field = self.convert_geom_measurement_field(field)
+        # Parse pseudo columns when a column name is supplied
+        if field:
+            field = self.convert_geom_measurement_field(field)
 
         if operation == ColumnStatisticsOperation.count:
             query = f"COUNT({field})" if field else "COUNT(*)"
