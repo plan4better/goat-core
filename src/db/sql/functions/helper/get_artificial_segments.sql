@@ -67,7 +67,7 @@ BEGIN
                         id, geom,
                         ST_SETSRID(ST_Buffer(geom::geography, 100)::GEOMETRY, 4326) AS buffer_geom,
                         basic.to_short_h3_3(h3_lat_lng_to_cell(ST_Centroid(geom)::point, 3)::bigint) AS h3_3
-                    FROM %I
+                    FROM %s
                     LIMIT %s::int
                 )
                 SELECT original_features.*
@@ -108,7 +108,7 @@ BEGIN
                     id, geom,
                     ST_SETSRID(ST_Buffer(geom::geography, 100)::GEOMETRY, 4326) AS buffer_geom,
                     basic.to_short_h3_3(h3_lat_lng_to_cell(ST_Centroid(geom)::point, 3)::bigint) AS h3_3
-                FROM %I
+                FROM %s
                 LIMIT %s::int
             ),
             best_segment AS (
