@@ -416,7 +416,7 @@ class ICatchmentAreaPT(BaseModel):
     bike_traffic_stress: int = 4
     max_rides: int = 4
     zoom: int = 9
-    percentiles: List[int] = [5]
+    percentiles: List[int] = [1]
     monte_carlo_draws: int = 200
 
     # Check that polygon difference exists if catchment area type is polygon
