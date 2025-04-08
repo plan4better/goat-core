@@ -48,8 +48,8 @@ class IJoin(BaseModel):
         title="Join Field",
         description="The field in the join layer that is used for the join.",
     )
-    column_statistics: ColumnStatistic | None = Field(
-        None,
+    column_statistics: ColumnStatistic = Field(
+        ...,
         title="Column Statistics",
         description="The column statistics to be calculated.",
     )
