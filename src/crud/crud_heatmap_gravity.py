@@ -17,7 +17,10 @@ from src.schemas.heatmap import (
 from src.schemas.job import JobStatusType
 from src.schemas.layer import FeatureGeometryType, IFeatureLayerToolCreate
 from src.schemas.toolbox_base import DefaultResultLayerName
-from src.utils import format_value_null_sql
+from src.utils import (
+    format_value_null_sql,
+    search_value,
+)
 
 
 class CRUDHeatmapGravity(CRUDHeatmapBase):
@@ -60,13 +63,23 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
                 else "NULL"
             )
 
-            # Create distributed point table using sql
-            potential_column = layer["layer"].destination_potential_column
-            if layer["layer"].destination_potential_column == "$area":
-                potential_column = "'ST_Area(geom::geography)'"
-            elif not potential_column:
-                potential_column = 1
+            # Prepare destination potential column
+            destination_potential_column = layer["layer"].destination_potential_column
+            if destination_potential_column == "$area":
+                # The computed area of polygons in the opportunity layer will be used
+                destination_potential_column = "'ST_Area(geom::geography)'"
+            elif not destination_potential_column:
+                # A destination potential column was not specified
+                destination_potential_column = "1::text"
+            else:
+                # Fetch the specified destination potential column from the attribute mapping
+                destination_potential_column = search_value(
+                    layer["layer_project"].attribute_mapping,
+                    destination_potential_column,
+                )
+                destination_potential_column = f"'{destination_potential_column}'"
 
+            # Create temporary distributed table from supplied opportunity layer
             await self.async_session.execute(
                 f"""SELECT basic.create_heatmap_gravity_opportunity_table(
                     {layer["layer"].opportunity_layer_project_id},
@@ -78,7 +91,7 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
                     {geofence_buffer_dist},
                     {layer["layer"].max_traveltime},
                     {layer["layer"].sensitivity},
-                    {potential_column}::text,
+                    {destination_potential_column},
                     '{layer["where_query"].replace("'", "''")}',
                     '{temp_points}',
                     {TRAVELTIME_MATRIX_RESOLUTION[routing_type]},
