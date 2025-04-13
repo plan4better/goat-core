@@ -24,7 +24,8 @@ CREATE OR REPLACE FUNCTION basic.get_artificial_segments(
     origin_points_table TEXT,
     num_origin_points INT,
     classes TEXT,
-    point_cell_resolution INT
+    point_cell_resolution INT,
+    additional_filters TEXT
 )
 RETURNS SETOF basic.artificial_segment
 LANGUAGE plpgsql
@@ -121,6 +122,7 @@ BEGIN
                 FROM %s s, origin o
                 WHERE class_ = ANY(string_to_array(''%s'', '',''))
                 AND ST_Intersects(s.geom, o.buffer_geom)
+                %s
                 ORDER BY o.id, ST_ClosestPoint(s.geom, o.geom) <-> o.geom
             )
             SELECT
@@ -136,8 +138,9 @@ BEGIN
             GROUP BY
                 bs.id, bs.class_, bs.impedance_slope, bs.impedance_slope_reverse,
                 bs.impedance_surface, bs.maxspeed_forward, bs.maxspeed_backward,
-                bs."source", bs.target, bs.geom, bs.h3_3, bs.h3_6;'
-        , origin_points_table, num_origin_points, combined_network_table, classes);
+                bs."source", bs.target, bs.geom, bs.h3_3, bs.h3_6;',
+            origin_points_table, num_origin_points, combined_network_table, classes, additional_filters
+        );
 	LOOP
 		FETCH custom_cursor INTO origin_segment;
 		EXIT WHEN NOT FOUND;
