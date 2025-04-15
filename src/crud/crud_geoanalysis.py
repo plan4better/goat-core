@@ -711,10 +711,10 @@ class CRUDOriginDestination(CRUDToolBase):
         sql_query_relations = f"""
             INSERT INTO {self.result_table_relation} (layer_id, geom, {', '.join(list(result_layer_relation.attribute_mapping.keys()))})
             SELECT '{result_layer_relation.id}',
-            ST_MakeLine(ST_CENTROID((ARRAY_AGG(origin.geom))[1]), ST_CENTROID((ARRAY_AGG(destination.geom))[1])),
+            ST_MakeLine(ST_CENTROID((ARRAY_AGG(origin.geom ORDER BY ST_Area(origin.geom) DESC))[1]), ST_CENTROID((ARRAY_AGG(destination.geom ORDER BY ST_Area(destination.geom) DESC))[1])),
             (ARRAY_AGG(matrix.{mapped_origin_column}))[1] AS origin, (ARRAY_AGG(matrix.{mapped_destination_column}))[1] AS destination,
             SUM(matrix.{mapped_weight_column}) AS weight,
-            ST_LENGTH(ST_MakeLine(ST_CENTROID((ARRAY_AGG(origin.geom))[1]), ST_CENTROID((ARRAY_AGG(destination.geom))[1]))::geography) AS length_m
+            ST_LENGTH(ST_MakeLine(ST_CENTROID((ARRAY_AGG(origin.geom ORDER BY ST_Area(origin.geom) DESC))[1]), ST_CENTROID((ARRAY_AGG(destination.geom ORDER BY ST_Area(destination.geom) DESC))[1]))::geography) AS length_m
             FROM {temp_geometry_layer} origin, {temp_geometry_layer} destination, {temp_origin_destination_matrix_layer} matrix
             WHERE origin.{mapped_unique_id_column}::text = matrix.{mapped_origin_column}::text
             AND destination.{mapped_unique_id_column}::text = matrix.{mapped_destination_column}::text
@@ -732,9 +732,10 @@ class CRUDOriginDestination(CRUDToolBase):
                 WHERE g.{mapped_unique_id_column}::text = m.{mapped_destination_column}::text
                 GROUP BY g.{mapped_unique_id_column}
             )
-            SELECT '{result_layer_point.id}', ST_CENTROID(g.geom), gg.weight
+            SELECT '{result_layer_point.id}', ST_CENTROID((ARRAY_AGG(g.geom ORDER BY ST_Area(g.geom) DESC))[1]), gg.weight
             FROM {temp_geometry_layer} g, grouped gg
             WHERE g.{mapped_unique_id_column}::text = gg.{mapped_unique_id_column}::text
+            GROUP BY g.text_attr2, gg.weight;
         """
         await self.async_session.execute(sql_query_points)
 
