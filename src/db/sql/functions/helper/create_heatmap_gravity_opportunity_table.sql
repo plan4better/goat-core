@@ -11,6 +11,7 @@ AS $function$
 DECLARE
     temp_opportunities_table TEXT;
     base_query TEXT;
+    hexagon_dia NUMERIC = h3_get_hexagon_edge_length_avg(grid_resolution, 'm') * 2;
 BEGIN
     IF NOT append_existing THEN
         -- Create empty distributed table 
@@ -90,11 +91,17 @@ BEGIN
                 potential,
                 basic.to_short_h3_3(h3_lat_lng_to_cell(input_features.geom::point, 3)::bigint) AS h3_3
             FROM (
-                SELECT id, (ST_DumpPoints(ST_Boundary(geom))).geom AS geom, potential
-                FROM %I
+                SELECT id, (dump).geom, potential
+                FROM (
+                    SELECT id, ST_DumpPoints(ST_LineInterpolatePoints(geom, (%s / ST_Length(geom::geography)))) AS dump, potential
+                    FROM (
+                        SELECT id, (ST_Dump(ST_Boundary(geom))).geom as geom, potential
+                        FROM %I
+                    ) lines
+                ) points
             ) input_features',
             result_table_name, grid_resolution, grid_resolution, max_traveltime,
-            sensitivity, temp_opportunities_table
+            sensitivity, hexagon_dia, temp_opportunities_table
         );
     END IF;
 
