@@ -29,6 +29,7 @@ from src.utils import (
     build_where_clause,
     search_value,
 )
+from src.expression_converter import QgsExpressionToSqlConverter
 
 # Local application imports
 from .base import CRUDBase
@@ -395,8 +396,9 @@ class CRUDLayerProject(CRUDLayerBase, StatisticsBase):
         project_id: UUID,
         layer_project_id: int,
         column_name: str | None,
-        operation: ColumnStatisticsOperation,
-        group_by_column_name: str,
+        operation: ColumnStatisticsOperation | None,
+        group_by_column_name: str | None,
+        expression: str | None,
         size: int,
         query: str,
         order: str,
@@ -408,26 +410,48 @@ class CRUDLayerProject(CRUDLayerBase, StatisticsBase):
             async_session=async_session, project_id=project_id, id=layer_project_id
         )
 
-        # Check if mapped statistics field is float, integer or biginteger
-        mapped_statistics_field = (
-            await self.check_column_statistics(
-                layer_project=layer_project,
-                column_name=column_name,
+        mapped_statistics_field = None
+
+        # For expression-based operations, validate columns and attribute mapping
+        if expression:
+            converter = QgsExpressionToSqlConverter(expression)
+            column_names = converter.extract_field_names()
+            for column in column_names:
+                try:
+                    # Check if column is in attribute mapping
+                    column_mapped = search_value(layer_project.attribute_mapping, column)
+                except ValueError:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"Column {column} not found in layer attribute mapping",
+                    )
+
+                # Replace original column name with mapped column name
+                converter.replace_field_name(column, column_mapped)
+
+            # Convert expression to SQL
+            statistics_column_query, mapped_group_by_field = converter.translate()
+        else:
+            # Check if mapped statistics field is float, integer or biginteger
+            mapped_statistics_field = (
+                await self.check_column_statistics(
+                    layer_project=layer_project,
+                    column_name=column_name,
+                    operation=operation,
+                )
+            )["mapped_statistics_field"]
+
+            # TODO: Consider performing a data type check on the group-by column
+            mapped_group_by_field = search_value(
+                layer_project.attribute_mapping,
+                group_by_column_name,
+            )
+
+            # Build statistics portion of select clause
+            statistics_column_query = self.get_statistics_sql(
+                field=mapped_statistics_field,
                 operation=operation,
             )
-        )["mapped_statistics_field"]
-
-        # TODO: Consider performing a data type check on the group-by column
-        mapped_group_by_field = search_value(
-            layer_project.attribute_mapping,
-            group_by_column_name,
-        )
-
-        # Build statistics portion of select clause
-        statistics_column_query = self.get_statistics_sql(
-            field=mapped_statistics_field,
-            operation=operation,
-        )
 
         # Build where clause combining layer project and CQL query
         where_query = build_where_clause(
@@ -452,14 +476,16 @@ class CRUDLayerProject(CRUDLayerBase, StatisticsBase):
         total_count = (await async_session.execute(text(sql_count_query))).scalar_one()
 
         # Build final statistics queries
+        group_by_clause = f"GROUP BY {mapped_group_by_field}" if mapped_group_by_field else ""
         order_mapped = {"descendent": "DESC", "ascendent": "ASC"}[order]
         sql_data_query = f"""
             SELECT *
             FROM (
-                SELECT {mapped_group_by_field} AS grouped_value, {statistics_column_query} AS operation_value
+                SELECT {statistics_column_query} operation_value
+                    {f',{mapped_group_by_field}' if mapped_group_by_field else ''}
                 FROM {layer_project.table_name}
                 {where_query}
-                GROUP BY {mapped_group_by_field}
+                {group_by_clause}
             ) subquery
             ORDER BY operation_value {order_mapped};
         """
@@ -468,7 +494,10 @@ class CRUDLayerProject(CRUDLayerBase, StatisticsBase):
         # Create a response object
         response = {
             "items": [
-                {"grouped_value": res[0], "operation_value": res[1]}
+                {
+                    "operation_value": res[0],
+                    "grouped_value": res[1] if mapped_group_by_field else None,
+                }
                 for res in result[:size]
             ],
             "total_items": len(result),
