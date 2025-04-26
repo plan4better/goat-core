@@ -536,18 +536,23 @@ async def get_statistic_aggregation(
         description="The column name to get the unique values from",
         example="name",
     ),
-    operation: ColumnStatisticsOperation = Query(
-        ...,
+    operation: ColumnStatisticsOperation | None = Query(
+        None,
         description="The operation to perform",
         example="sum",
     ),
-    group_by_column_name: str = Query(
-        ...,
+    group_by_column_name: str | None = Query(
+        None,
         description="The name of the column to group by",
         example="name",
     ),
+    expression: str | None = Query(
+        None,
+        description="The QGIS expression to use for the statistic operation",
+        example="sum(\"population\")",
+    ),
     size: int = Query(
-        None, description="The number of grouped values to return", example=5
+        100, description="The number of grouped values to return", example=5
     ),
     query: str = Query(
         None,
@@ -562,11 +567,25 @@ async def get_statistic_aggregation(
 ):
     """Get aggregated statistics for a numeric column based on the supplied group-by column and CQL-filter."""
 
+    # Ensure an operation or expression is specified
+    if operation is None and expression is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="An operation or expression must be specified.",
+        )
+
     # Ensure a column name is specified for all operations except count
-    if operation != ColumnStatisticsOperation.count and column_name is None:
+    if operation and operation != ColumnStatisticsOperation.count and column_name is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A column name must be specified for all operations except count.",
+        )
+    
+    # If an operation is specified, a group-by column name must also be specified
+    if operation and group_by_column_name is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A group-by column name must be specified.",
         )
 
     # Ensure the size is not excessively large
@@ -584,6 +603,7 @@ async def get_statistic_aggregation(
             column_name=column_name,
             operation=operation,
             group_by_column_name=group_by_column_name,
+            expression=expression,
             size=size,
             query=query,
             order=order,
