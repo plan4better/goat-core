@@ -1,7 +1,7 @@
-from typing import List
+from typing import List, Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status, Request
 from fastapi.responses import JSONResponse
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
@@ -18,7 +18,7 @@ from src.db.models.project import Project
 from src.db.models.scenario import Scenario
 from src.db.models.scenario_feature import ScenarioFeature
 from src.db.session import AsyncSession
-from src.deps.auth import auth_z
+from src.deps.auth import auth_z, auth_z_lite
 from src.endpoints.deps import get_db, get_scenario, get_user_id
 from src.schemas.common import OrderEnum
 from src.schemas.error import HTTPErrorHandler
@@ -517,9 +517,9 @@ async def get_chart_data(
     summary="Get aggregated statistics for a column",
     response_model=dict,
     status_code=200,
-    dependencies=[Depends(auth_z)],
 )
 async def get_statistic_aggregation(
+    request: Request,
     async_session: AsyncSession = Depends(get_db),
     project_id: UUID4 = Path(
         ...,
@@ -566,6 +566,18 @@ async def get_statistic_aggregation(
     ),
 ):
     """Get aggregated statistics for a numeric column based on the supplied group-by column and CQL-filter."""
+
+    # Check authorization status
+    try:
+        await auth_z_lite(request, async_session)
+    except HTTPException as e:
+        # Check publication status if unauthorized
+        public_project = await crud_project.get_public_project(
+            async_session=async_session,
+            project_id=str(project_id),
+        )
+        if not public_project:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
     # Ensure an operation or expression is specified
     if operation is None and expression is None:
@@ -618,9 +630,9 @@ async def get_statistic_aggregation(
     summary="Get histogram statistics for a column",
     response_model=dict,
     status_code=200,
-    dependencies=[Depends(auth_z)],
 )
 async def get_statistic_histogram(
+    request: Request,
     async_session: AsyncSession = Depends(get_db),
     project_id: UUID4 = Path(
         ...,
@@ -654,6 +666,18 @@ async def get_statistic_histogram(
     ),
 ):
     """Get histogram statistics for a numeric column based on the specified number of bins and CQL-filter."""
+
+    # Check authorization status
+    try:
+        await auth_z_lite(request, async_session)
+    except HTTPException as e:
+        # Check publication status if unauthorized
+        public_project = await crud_project.get_public_project(
+            async_session=async_session,
+            project_id=str(project_id),
+        )
+        if not public_project:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
     # Ensure the number of bins is not excessively large
     if num_bins > 100:
