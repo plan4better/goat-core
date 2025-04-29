@@ -40,6 +40,14 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         # Create temp table name for points
         temp_points = await self.create_temp_table_name("points")
 
+        # Create temp table name for filler cells
+        temp_filler_cells = None
+        for layer in layers:
+            if layer["geom_type"] == FeatureGeometryType.polygon:
+                # Create temp table name for filler cells
+                temp_filler_cells = await self.create_temp_table_name("filler_cells")
+                break
+
         # Create formatted opportunity geofence layer strings for SQL query
         geofence_table = (
             "NULL"
@@ -96,6 +104,7 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
                     '{temp_points}',
                     {TRAVELTIME_MATRIX_RESOLUTION[routing_type]},
                     {layer["geom_type"] == FeatureGeometryType.polygon},
+                    {format_value_null_sql(temp_filler_cells)},
                     {append_to_existing}
                 )"""
             )
@@ -103,7 +112,7 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
             await self.async_session.commit()
             append_to_existing = True
 
-        return temp_points
+        return temp_points, temp_filler_cells
 
     # TODO: Verify function formulas
     def build_impedance_function(
@@ -131,6 +140,7 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         self,
         params: IHeatmapGravityActive | IHeatmapGravityMotorized,
         opportunity_table: str,
+        filler_cells_table: str | None,
         max_traveltime: int,
         max_sensitivity: float,
         result_table: str,
@@ -145,9 +155,7 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
         )
 
         query = f"""
-            INSERT INTO {result_table} (layer_id, geom, text_attr1, float_attr1)
-            SELECT '{result_layer_id}', ST_SetSRID(h3_cell_to_boundary(dest_id)::geometry, 4326), dest_id,
-                {impedance_function} AS accessibility
+            SELECT dest_id, {impedance_function} AS accessibility
             FROM (
                 SELECT opportunity_id, dest_id.value AS dest_id, min(traveltime) AS traveltime, sensitivity, potential
                 FROM
@@ -162,6 +170,30 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
                 JOIN LATERAL UNNEST(sub_matrix.dest_id) dest_id(value) ON TRUE
                 GROUP BY opportunity_id, dest_id.value, sensitivity, potential
             ) grouped_opportunities
+            GROUP BY dest_id
+        """
+
+        if filler_cells_table:
+            query += f"""
+                UNION ALL
+                SELECT h3_index AS dest_id, {impedance_function} AS accessibility
+                FROM (
+                    SELECT *, 1.0 AS traveltime
+                    FROM {filler_cells_table}
+                ) filler_cells
+                GROUP BY h3_index
+            """
+
+        query = f"""
+            INSERT INTO {result_table} (layer_id, geom, text_attr1, float_attr1)
+            SELECT
+                '{result_layer_id}',
+                ST_SetSRID(h3_cell_to_boundary(dest_id)::geometry, 4326),
+                dest_id,
+                MAX(accessibility)
+            FROM (
+                {query}
+            ) result
             GROUP BY dest_id;
         """
 
@@ -173,7 +205,7 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
 
         # Fetch opportunity tables
         layers, opportunity_geofence_layer = await self.fetch_opportunity_layers(params)
-        opportunity_table = await self.create_distributed_opportunity_table(
+        opportunity_table, filler_cells_table = await self.create_distributed_opportunity_table(
             params.routing_type,
             layers,
             params.scenario_id,
@@ -207,6 +239,7 @@ class CRUDHeatmapGravity(CRUDHeatmapBase):
             self.build_query(
                 params=params,
                 opportunity_table=opportunity_table,
+                filler_cells_table=filler_cells_table,
                 max_traveltime=max_traveltime,
                 max_sensitivity=settings.HEATMAP_GRAVITY_MAX_SENSITIVITY,
                 result_table=result_table,

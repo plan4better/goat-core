@@ -3,7 +3,8 @@ CREATE OR REPLACE FUNCTION basic.create_heatmap_gravity_opportunity_table(
     input_layer_project_id int, input_table text, customer_schema text, scenario_id text,
     geofence_table text, geofence_where_filter text, geofence_buffer_dist float,
     max_traveltime int, sensitivity float, potential_column text, where_filter text,
-    result_table_name text, grid_resolution int, is_area_based boolean, append_existing boolean
+    result_table_name text, grid_resolution int, is_area_based boolean,
+    filler_cells_table_name text, append_existing boolean
 )
 RETURNS SETOF void
 LANGUAGE plpgsql
@@ -11,6 +12,8 @@ AS $function$
 DECLARE
     temp_opportunities_table TEXT;
     base_query TEXT;
+    filler_cells_query TEXT;
+    geofence_query TEXT;
     hexagon_dia NUMERIC = h3_get_hexagon_edge_length_avg(grid_resolution, 'm') * 2;
 BEGIN
     IF NOT append_existing THEN
@@ -29,6 +32,20 @@ BEGIN
         );	
         -- Make table distributed
         PERFORM create_distributed_table(result_table_name, 'h3_3');
+
+        -- Create filler cells table if opportunities are area-based
+        IF filler_cells_table_name IS NOT NULL THEN
+            EXECUTE format(
+                'DROP TABLE IF EXISTS %s;
+                CREATE TABLE %s (
+                    h3_index h3index,
+                    max_traveltime smallint,
+                    sensitivity float,
+                    potential float
+                );',
+                filler_cells_table_name, filler_cells_table_name
+            );
+        END IF;
     END IF;
 
     -- Ensure grid resolution is supported
@@ -93,7 +110,13 @@ BEGIN
             FROM (
                 SELECT id, (dump).geom, potential
                 FROM (
-                    SELECT id, ST_DumpPoints(ST_LineInterpolatePoints(geom, (%s / ST_Length(geom::geography)))) AS dump, potential
+                    SELECT id, ST_DumpPoints(
+                            CASE
+                                WHEN ST_Length(geom::geography) > %s
+                                THEN ST_LineInterpolatePoints(geom, (%s / ST_Length(geom::geography)))
+                                ELSE geom
+                            END
+                        ) AS dump, potential
                     FROM (
                         SELECT id, (ST_Dump(ST_Boundary(geom))).geom as geom, potential
                         FROM %I
@@ -101,22 +124,50 @@ BEGIN
                 ) points
             ) input_features',
             result_table_name, grid_resolution, grid_resolution, max_traveltime,
-            sensitivity, hexagon_dia, temp_opportunities_table
+            sensitivity, hexagon_dia, hexagon_dia, temp_opportunities_table
+        );
+
+        -- Produce filled H3 grid for area-based opportunities
+        filler_cells_query := format(
+            'INSERT INTO %s
+            SELECT
+                filled.h3index,
+                %s AS max_traveltime,
+                %s AS sensitivity,
+                potential
+            FROM %I input_features,
+            LATERAL basic.fill_polygon_h3(geom, %s) filled',
+            filler_cells_table_name, max_traveltime, sensitivity, temp_opportunities_table,
+            grid_resolution
         );
     END IF;
 
     -- Append geofence check if required
     IF geofence_table IS NOT NULL THEN
-        base_query := base_query || format(
+        -- Build geofence query
+        geofence_query := format(
             ', (SELECT ST_Buffer(ST_Union(geom)::geography, %s) AS geom FROM %s WHERE %s) geofence
             WHERE input_features.geom && geofence.geom
             AND ST_Intersects(input_features.geom, geofence.geom)',
             geofence_buffer_dist, geofence_table, geofence_where_filter
         );
+
+        -- Append geofence check for main query
+        base_query := base_query || geofence_query;
+
+        -- Append geofence check for filler cells query if required
+        IF is_area_based THEN
+            filler_cells_query := filler_cells_query || geofence_query;
+        END IF;
     END IF;
 
     -- Execute the final query
     EXECUTE base_query;
+
+    -- Execute the filler cells query if required
+    IF is_area_based THEN
+        EXECUTE filler_cells_query;
+    END IF;
 
     IF NOT append_existing THEN
         -- Add index 
