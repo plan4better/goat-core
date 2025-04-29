@@ -73,13 +73,7 @@ def is_superuser(user_token: dict = Depends(user_token), throw_error: bool = Tru
 def clean_path(path: str) -> str:
     return path.replace(settings.API_V2_STR + "/", "")
 
-
-async def auth_z(
-    request: Request,
-    user_token: dict = Depends(user_token),
-    async_session: AsyncSession = Depends(get_db),
-) -> bool:
-
+async def _validate_authorization(request: Request, user_token: dict, async_session: AsyncSession):
     if settings.AUTH is not False:
         try:
             user_id = user_token["sub"]
@@ -107,3 +101,36 @@ async def auth_z(
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
     return True
+
+async def auth_z(
+    request: Request,
+    user_token: dict = Depends(user_token),
+    async_session: AsyncSession = Depends(get_db),
+) -> bool:
+    """
+    Authorization function to check if the user has access to the requested resource.
+    """
+    try:
+        await _validate_authorization(request, user_token, async_session)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    return True
+
+async def auth_z_lite(request: Request, async_session: AsyncSession):
+    """
+    Authorization function to check if the user has access to the requested resource (without FastAPI dependencies).
+    """
+
+    try:
+        token = request.headers.get("Authorization")
+        if token:
+            token = token.split(" ")[1]
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization token"
+            )
+        user_token = decode_token(token)
+        return await _validate_authorization(request, user_token, async_session)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
