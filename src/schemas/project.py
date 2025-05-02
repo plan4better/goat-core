@@ -247,7 +247,7 @@ class ProjectPublicProjectConfig(BaseModel):
     id: UUID = Field(..., description="Project ID")
     name: str = Field(..., description="Project name")
     description: str | None = Field(..., description="Project description")
-    tags: List[str] | None = Field(..., description="Project tags")
+    tags: List[str] | None = Field(None, description="Project tags")
     thumbnail_url: HttpUrl | None = Field(None, description="Project thumbnail URL")
     initial_view_state: InitialViewState = Field(
         ..., description="Initial view state of the project"

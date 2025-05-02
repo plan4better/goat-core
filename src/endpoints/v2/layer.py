@@ -14,6 +14,7 @@ from fastapi import (
     HTTPException,
     Path,
     Query,
+    Request,
     UploadFile,
     status,
 )
@@ -21,6 +22,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
+from sqlmodel import select
 
 from src.core.config import settings
 
@@ -32,6 +34,7 @@ from src.crud.crud_job import job as crud_job
 from src.crud.crud_layer import CRUDLayerDatasetUpdate, CRUDLayerExport, CRUDLayerImport
 from src.crud.crud_layer import layer as crud_layer
 from src.crud.crud_layer_project import layer_project as crud_layer_project
+from src.db.models._link_model import LayerProjectLink
 from src.db.models.layer import (
     FeatureUploadType,
     FileUploadType,
@@ -39,8 +42,9 @@ from src.db.models.layer import (
     LayerType,
     TableUploadType,
 )
+from src.db.models.project import ProjectPublic
 from src.db.session import AsyncSession
-from src.deps.auth import auth_z
+from src.deps.auth import auth_z, auth_z_lite
 from src.endpoints.deps import get_db, get_user_id
 from src.schemas.common import OrderEnum
 from src.schemas.error import HTTPErrorHandler
@@ -684,9 +688,10 @@ async def get_area_statistics(
     summary="Get unique values of a column",
     response_model=Page[IUniqueValue],
     status_code=200,
-    dependencies=[Depends(auth_z)],
+    # dependencies=[Depends(auth_z)],
 )
 async def get_unique_values(
+    request: Request,
     async_session: AsyncSession = Depends(get_db),
     page_params: PaginationParams = Depends(),
     layer_id: UUID4 = Path(
@@ -711,6 +716,30 @@ async def get_unique_values(
     ),
 ):
     """Get unique values of a column. Based on the passed CQL-filter and order."""
+
+    # Check authorization status
+    try:
+        await auth_z_lite(request, async_session)
+    except HTTPException:
+
+        public_layer = (
+            select(LayerProjectLink)
+            .join(
+                ProjectPublic,
+                LayerProjectLink.project_id == ProjectPublic.project_id,
+            )
+            .where(
+                LayerProjectLink.layer_id == layer_id,
+            )
+            .limit(1)
+        )
+        result = await async_session.execute(public_layer)
+        public_layer = result.scalars().first()
+        # Check if layer is public
+        if not public_layer:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+            )
 
     with HTTPErrorHandler():
         values = await crud_layer.get_unique_values(
