@@ -1,7 +1,16 @@
-from typing import List, Annotated
+from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status, Request
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    status,
+)
 from fastapi.responses import JSONResponse
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
@@ -31,6 +40,7 @@ from src.schemas.project import (
     IProjectRead,
     IRasterProjectRead,
     ITableProjectRead,
+    ProjectPublicRead,
 )
 from src.schemas.project import (
     request_examples as project_request_examples,
@@ -549,7 +559,7 @@ async def get_statistic_aggregation(
     expression: str | None = Query(
         None,
         description="The QGIS expression to use for the statistic operation",
-        example="sum(\"population\")",
+        example='sum("population")',
     ),
     size: int = Query(
         100, description="The number of grouped values to return", example=5
@@ -570,14 +580,16 @@ async def get_statistic_aggregation(
     # Check authorization status
     try:
         await auth_z_lite(request, async_session)
-    except HTTPException as e:
+    except HTTPException:
         # Check publication status if unauthorized
         public_project = await crud_project.get_public_project(
             async_session=async_session,
             project_id=str(project_id),
         )
         if not public_project:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+            )
 
     # Ensure an operation or expression is specified
     if operation is None and expression is None:
@@ -587,12 +599,16 @@ async def get_statistic_aggregation(
         )
 
     # Ensure a column name is specified for all operations except count
-    if operation and operation != ColumnStatisticsOperation.count and column_name is None:
+    if (
+        operation
+        and operation != ColumnStatisticsOperation.count
+        and column_name is None
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A column name must be specified for all operations except count.",
         )
-    
+
     # If an operation is specified, a group-by column name must also be specified
     if operation and group_by_column_name is None:
         raise HTTPException(
@@ -670,14 +686,16 @@ async def get_statistic_histogram(
     # Check authorization status
     try:
         await auth_z_lite(request, async_session)
-    except HTTPException as e:
+    except HTTPException:
         # Check publication status if unauthorized
         public_project = await crud_project.get_public_project(
             async_session=async_session,
             project_id=str(project_id),
         )
         if not public_project:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+            )
 
     # Ensure the number of bins is not excessively large
     if num_bins > 100:
@@ -979,6 +997,8 @@ async def delete_scenario_features(
 @router.get(
     "/{project_id}/public",
     summary="Get public project",
+    response_model=ProjectPublicRead | None,
+    response_model_exclude_none=True,
 )
 async def get_public_project(
     project_id: str,
@@ -997,7 +1017,7 @@ async def get_public_project(
 @router.post(
     "/{project_id}/publish",
     summary="Publish a project",
-    # dependencies=[Depends(auth_z)],
+    dependencies=[Depends(auth_z)],
 )
 async def publish_project(
     project_id: str,
@@ -1016,7 +1036,7 @@ async def publish_project(
 @router.delete(
     "/{project_id}/unpublish",
     summary="Unpublish a project",
-    # dependencies=[Depends(auth_z)],
+    dependencies=[Depends(auth_z)],
 )
 async def unpublish_project(
     project_id: str,
