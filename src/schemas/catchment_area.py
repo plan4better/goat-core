@@ -39,6 +39,7 @@ class CatchmentAreaRoutingModeActiveMobility(str, Enum):
     """Routing active mobility type schema."""
 
     walking = "walking"
+    wheelchair = "wheelchair"
     bicycle = "bicycle"
     pedelec = "pedelec"
 
