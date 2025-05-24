@@ -9,6 +9,7 @@ class JobType(str, Enum):
 
     file_import = "file_import"
     join = "join"
+    join_classical = "join_classical"
     catchment_area_active_mobility = "catchment_area_active_mobility"
     catchment_area_pt = "catchment_area_pt"
     catchment_area_car = "catchment_area_car"

@@ -4,6 +4,7 @@ from httpx import AsyncClient
 from src.core.config import settings
 from src.db.models.layer import ToolType
 from src.schemas.job import JobStatusType
+from src.schemas.tool import JoinType, DuplicateHandling
 from src.schemas.toolbox_base import ColumnStatisticsOperation
 from tests.utils import check_job_status, test_aggregate
 
@@ -36,6 +37,115 @@ async def test_join(client: AsyncClient, fixture_add_join_layers_to_project):
         assert response.status_code == 201
         job = await check_job_status(client, response.json()["job_id"])
         assert job["status_simple"] == "finished"
+
+
+@pytest.mark.asyncio
+async def test_join_classical_left(client: AsyncClient, fixture_add_join_layers_to_project):
+    (
+        layer_id_table,
+        layer_id_gpkg,
+        project_id,
+    ) = fixture_add_join_layers_to_project.values()
+    
+    # Request classical join endpoint with LEFT join
+    params = {
+        "target_layer_project_id": layer_id_gpkg,
+        "target_field": "zipcode",
+        "join_layer_project_id": layer_id_table,
+        "join_field": "plz",
+        "join_type": JoinType.left.value,
+        "handle_duplicates": DuplicateHandling.keep_all.value,
+        "layer_name": "Left Join Result",
+    }
+
+    response = await client.post(
+        f"{settings.API_V2_STR}/tool/join-classical?project_id={project_id}", json=params
+    )
+    assert response.status_code == 201
+    job = await check_job_status(client, response.json()["job_id"])
+    assert job["status_simple"] == "finished"
+
+
+@pytest.mark.asyncio
+async def test_join_classical_right(client: AsyncClient, fixture_add_join_layers_to_project):
+    (
+        layer_id_table,
+        layer_id_gpkg,
+        project_id,
+    ) = fixture_add_join_layers_to_project.values()
+    
+    # Request classical join endpoint with RIGHT join
+    params = {
+        "target_layer_project_id": layer_id_gpkg,
+        "target_field": "zipcode",
+        "join_layer_project_id": layer_id_table,
+        "join_field": "plz",
+        "join_type": JoinType.right.value,
+        "handle_duplicates": DuplicateHandling.keep_first.value,
+        "layer_name": "Right Join Result",
+    }
+
+    response = await client.post(
+        f"{settings.API_V2_STR}/tool/join-classical?project_id={project_id}", json=params
+    )
+    assert response.status_code == 201
+    job = await check_job_status(client, response.json()["job_id"])
+    assert job["status_simple"] == "finished"
+
+
+@pytest.mark.asyncio
+async def test_join_classical_inner(client: AsyncClient, fixture_add_join_layers_to_project):
+    (
+        layer_id_table,
+        layer_id_gpkg,
+        project_id,
+    ) = fixture_add_join_layers_to_project.values()
+    
+    # Request classical join endpoint with INNER join
+    params = {
+        "target_layer_project_id": layer_id_gpkg,
+        "target_field": "zipcode",
+        "join_layer_project_id": layer_id_table,
+        "join_field": "plz",
+        "join_type": JoinType.inner.value,
+        "handle_duplicates": DuplicateHandling.aggregate.value,
+        "layer_name": "Inner Join Result",
+    }
+
+    response = await client.post(
+        f"{settings.API_V2_STR}/tool/join-classical?project_id={project_id}", json=params
+    )
+    assert response.status_code == 201
+    job = await check_job_status(client, response.json()["job_id"])
+    assert job["status_simple"] == "finished"
+
+
+@pytest.mark.asyncio
+async def test_join_classical_spatial(client: AsyncClient, fixture_add_spatial_join_layers_to_project):
+    (
+        layer_id_polygons,
+        layer_id_points,
+        project_id,
+    ) = fixture_add_spatial_join_layers_to_project.values()
+    
+    # Request classical join endpoint with spatial join
+    params = {
+        "target_layer_project_id": layer_id_polygons,
+        "target_field": "zipcode", # This field is actually ignored for spatial joins
+        "join_layer_project_id": layer_id_points,
+        "join_field": "value", # This field is actually ignored for spatial joins
+        "join_type": JoinType.left.value,
+        "spatial_join": True,
+        "handle_duplicates": DuplicateHandling.keep_all.value,
+        "layer_name": "Spatial Join Result",
+    }
+
+    response = await client.post(
+        f"{settings.API_V2_STR}/tool/join-classical?project_id={project_id}", json=params
+    )
+    assert response.status_code == 201
+    job = await check_job_status(client, response.json()["job_id"])
+    assert job["status_simple"] == "finished"
 
 
 @pytest.mark.asyncio

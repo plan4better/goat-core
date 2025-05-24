@@ -25,6 +25,22 @@ from src.schemas.toolbox_base import (
 )
 
 
+class JoinType(str, Enum):
+    """Join type schema."""
+
+    left = "left"
+    right = "right"
+    inner = "inner"
+
+
+class DuplicateHandling(str, Enum):
+    """How to handle duplicates in joins."""
+    
+    keep_all = "keep_all"
+    keep_first = "keep_first"
+    aggregate = "aggregate"
+
+
 class IJoin(BaseModel):
     """Join tool schema."""
 
@@ -88,6 +104,80 @@ class IJoin(BaseModel):
                     "name": self.column_statistics.operation.value,
                     "type": "number",
                 },
+                "color_scale": "quantile",
+            }
+        }
+
+
+class IJoinClassical(BaseModel):
+    """Classical join tool schema for left, right and inner join."""
+
+    target_layer_project_id: int = Field(
+        ...,
+        title="Target Layer Project ID",
+        description="The ID of the layer project the data will be joined.",
+    )
+    target_field: str = Field(
+        ...,
+        title="Target Field",
+        description="The field in the target layer that is used for the join.",
+    )
+    join_layer_project_id: int = Field(
+        ...,
+        title="Join Layer ID",
+        description="The ID of the layer project that contains the joined data.",
+    )
+    join_field: str = Field(
+        ...,
+        title="Join Field",
+        description="The field in the join layer that is used for the join.",
+    )
+    join_type: JoinType = Field(
+        ...,
+        title="Join Type",
+        description="The type of join to perform (left, right, inner).",
+    )
+    spatial_join: bool = Field(
+        False,
+        title="Spatial Join",
+        description="If true, the join will be based on the intersection of geometries rather than field values.",
+    )
+    handle_duplicates: DuplicateHandling = Field(
+        DuplicateHandling.keep_all,
+        title="Handle Duplicates",
+        description="How to handle duplicate rows in the join result.",
+    )
+
+    @property
+    def input_layer_types(self):
+        return {
+            "target_layer_project_id": InputLayerType(
+                layer_types=[LayerType.feature, LayerType.table],
+                feature_layer_geometry_types=[
+                    FeatureGeometryType.point,
+                    FeatureGeometryType.polygon,
+                    FeatureGeometryType.line,
+                ],
+            ),
+            "join_layer_project_id": InputLayerType(
+                layer_types=[LayerType.feature, LayerType.table],
+                feature_layer_geometry_types=[
+                    FeatureGeometryType.point,
+                    FeatureGeometryType.polygon,
+                    FeatureGeometryType.line,
+                ],
+            ),
+        }
+
+    @property
+    def tool_type(self):
+        return ToolType.join_classical
+
+    @property
+    def properties_base(self):
+        return {
+            DefaultResultLayerName.join_classical: {
+                "color_range_type": ColorRangeType.sequential,
                 "color_scale": "quantile",
             }
         }
@@ -391,6 +481,7 @@ class IToolParam(BaseModel):
     def check_type(cls, v):
         allowed_types = (
             IJoin,
+            IJoinClassical,
             IAggregationPoint,
             ICatchmentAreaActiveMobility,
             IOevGueteklasse,
@@ -427,6 +518,53 @@ request_examples_join = {
                 "operation": ColumnStatisticsOperation.sum.value,
                 "field": "field_example2",
             },
+        },
+    },
+}
+
+request_examples_join_classical = {
+    "left_join": {
+        "summary": "Left Join",
+        "value": {
+            "target_layer_project_id": 1,
+            "target_field": "target_field_example",
+            "join_layer_project_id": 2,
+            "join_field": "join_field_example",
+            "join_type": JoinType.left.value,
+            "handle_duplicates": DuplicateHandling.keep_all.value,
+        },
+    },
+    "right_join": {
+        "summary": "Right Join",
+        "value": {
+            "target_layer_project_id": 1,
+            "target_field": "target_field_example",
+            "join_layer_project_id": 2,
+            "join_field": "join_field_example",
+            "join_type": JoinType.right.value,
+            "handle_duplicates": DuplicateHandling.keep_first.value,
+        },
+    },
+    "inner_join": {
+        "summary": "Inner Join",
+        "value": {
+            "target_layer_project_id": 1,
+            "target_field": "target_field_example",
+            "join_layer_project_id": 2,
+            "join_field": "join_field_example",
+            "join_type": JoinType.inner.value,
+            "handle_duplicates": DuplicateHandling.aggregate.value,
+        },
+    },
+    "spatial_join": {
+        "summary": "Spatial Join",
+        "value": {
+            "target_layer_project_id": 1,
+            "target_field": "target_field_example",
+            "join_layer_project_id": 2,
+            "join_field": "join_field_example",
+            "join_type": JoinType.left.value,
+            "spatial_join": True,
         },
     },
 }

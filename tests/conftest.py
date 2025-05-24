@@ -683,6 +683,55 @@ async def fixture_add_join_layers_to_project(
 
 
 @pytest.fixture
+@pytest.fixture
+async def fixture_create_spatial_join_layers(client: AsyncClient, fixture_get_home_folder):
+    # For spatial join we need two layers with geometries that intersect
+    dir_points = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "tool", "points_with_category.gpkg"
+    )
+    dir_polygons = os.path.join(
+        settings.TEST_DATA_DIR, "layers", "tool", "zipcode_polygon.gpkg"
+    )
+    
+    layer_points = await upload_and_create_layer(
+        client, dir_points, fixture_get_home_folder, LayerType.feature
+    )
+    layer_polygons = await upload_and_create_layer(
+        client, dir_polygons, fixture_get_home_folder, LayerType.feature
+    )
+    
+    return {
+        "home_folder": fixture_get_home_folder,
+        "layer_points": layer_points,
+        "layer_polygons": layer_polygons,
+    }
+
+@pytest.fixture
+async def fixture_add_spatial_join_layers_to_project(
+    client: AsyncClient, fixture_create_project, fixture_create_spatial_join_layers
+):
+    layer_points = fixture_create_spatial_join_layers["layer_points"]
+    layer_polygons = fixture_create_spatial_join_layers["layer_polygons"]
+    project_id = fixture_create_project["id"]
+    
+    # Add layers to project
+    response = await client.post(
+        f"{settings.API_V2_STR}/project/{project_id}/layer?layer_ids={layer_points['id']}&layer_ids={layer_polygons['id']}"
+    )
+    assert response.status_code == 200
+    layers_project = response.json()
+    
+    for layer in layers_project:
+        if layer["feature_layer_geometry_type"] == FeatureGeometryType.point.value:
+            layer_id_points = layer["id"]
+        elif layer["feature_layer_geometry_type"] == FeatureGeometryType.polygon.value:
+            layer_id_polygons = layer["id"]
+    
+    return {
+        "layer_id_points": layer_id_points,
+        "layer_id_polygons": layer_id_polygons,
+        "project_id": project_id,
+    }
 async def fixture_add_aggregate_point_layers_to_project(
     client: AsyncClient, fixture_create_project, fixture_create_aggregate_point_layers
 ):
