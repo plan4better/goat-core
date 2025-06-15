@@ -328,9 +328,9 @@ async def create_layer_table(
     response_class=FileResponse,
     status_code=201,
     description="Export a layer to a zip file.",
-    dependencies=[Depends(auth_z)],
 )
 async def export_layer(
+    request: Request,
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
     layer_id: UUID4 = Path(
@@ -344,6 +344,30 @@ async def export_layer(
         description="Layer to export",
     ),
 ):
+    # Check authorization status
+    try:
+        await auth_z_lite(request, async_session)
+    except HTTPException:
+
+        public_layer = (
+            select(LayerProjectLink)
+            .join(
+                ProjectPublic,
+                LayerProjectLink.project_id == ProjectPublic.project_id,
+            )
+            .where(
+                LayerProjectLink.layer_id == layer_id,
+            )
+            .limit(1)
+        )
+        result = await async_session.execute(public_layer)
+        public_layer = result.scalars().first()
+        # Check if layer is public
+        if not public_layer:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+            )
+
     # Run the export
     crud_export = CRUDLayerExport(
         id=layer_id,
