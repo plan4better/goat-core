@@ -34,6 +34,7 @@ class DefaultResultLayerName(str, Enum):
     """Default result layer name schema."""
 
     join = "Join & Group"
+    join_classical = "Join"
     catchment_area_starting_points = "Start - Catchment"
     catchment_area_active_mobility = "Catchment Area"
     catchment_area_pt = "Catchment Area"
@@ -62,6 +63,7 @@ class MaxFeatureCnt(int, Enum):
 
     area_statistics = 100000
     join = 100000
+    join_classical = 100000
     catchment_area_active_mobility = 1000
     catchment_area_pt = 5
     catchment_area_car = 50

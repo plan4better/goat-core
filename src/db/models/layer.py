@@ -41,6 +41,7 @@ class ToolType(str, Enum):
     oev_gueteklasse = "oev_gueteklasse"
     trip_count_station = "trip_count_station"
     join = "join"
+    join_classical = "join_classical"
     aggregate_point = "aggregate_point"
     aggregate_polygon = "aggregate_polygon"
     aggregate_line = "aggregate_line"

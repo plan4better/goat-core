@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Body, Depends
 
 from src.core.tool import CRUDToolBase, start_calculation
-from src.crud.crud_data_management import CRUDJoin
+from src.crud.crud_data_management import CRUDJoin, CRUDJoinClassical
 from src.crud.crud_geoanalysis import (
     CRUDAggregatePoint,
     CRUDAggregatePolygon,
@@ -16,11 +16,13 @@ from src.schemas.tool import (
     IAggregationPolygon,
     IBuffer,
     IJoin,
+    IJoinClassical,
     IOriginDestination,
     request_example_buffer,
     request_examples_aggregation_point,
     request_examples_aggregation_polygon,
     request_examples_join,
+    request_examples_join_classical,
 )
 from src.schemas.toolbox_base import (
     CommonToolParams,
@@ -90,6 +92,35 @@ async def join(
         job_type=JobType.join,
         tool_class=CRUDJoin,
         crud_method="join_run",
+        async_session=common.async_session,
+        user_id=common.user_id,
+        background_tasks=common.background_tasks,
+        project_id=common.project_id,
+        params=params,
+    )
+
+
+@router.post(
+    "/join-classical",
+    summary="Perform left, right, or inner join operation on two layers.",
+    response_model=IToolResponse,
+    status_code=201,
+    dependencies=[Depends(auth_z)],
+)
+async def join_classical(
+    common: CommonToolParams = Depends(),
+    params: IJoinClassical = Body(
+        ...,
+        examples=request_examples_join_classical,
+        description="The classical join parameters.",
+    ),
+):
+    """Join two layers using left, right, or inner join operations, with options for spatial join and duplicate handling."""
+
+    return await start_calculation(
+        job_type=JobType.join_classical,
+        tool_class=CRUDJoinClassical,
+        crud_method="join_classical_run",
         async_session=common.async_session,
         user_id=common.user_id,
         background_tasks=common.background_tasks,
